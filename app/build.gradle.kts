@@ -39,6 +39,9 @@ android {
     lint {
         checkDependencies = true
     }
+    testOptions {
+        animationsDisabled = true
+    }
 }
 
 dependencies {

@@ -30,24 +30,29 @@ internal fun GameScreen(game: Game?, paused: Boolean, onPause: () -> Unit) {
     val cells = if (is2048) listOf("2", "", "4", "", "", "8", "", "2", "16", "", "4", "", "", "2", "", "")
                 else listOf("×", "", "○", "", "×", "", "○", "", "")
     val columns = if (is2048) 4 else 3
-    FeaturePage("Muted game / preview", game.title, "Best · " + game.bestScore + "  /  Sound off") {
-        item {
-            Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(20.dp)).padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                cells.chunked(columns).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { value ->
-                            Box(Modifier.weight(1f).aspectRatio(1f)
-                                .background(Mint.copy(alpha = if (value.isEmpty()) .04f else .18f), RoundedCornerShape(10.dp)),
-                                contentAlignment = Alignment.Center) {
-                                Text(if (paused) "·" else value, style = MaterialTheme.typography.headlineSmall, color = Mint)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val boardSize = minOf(maxWidth - 40.dp, (maxHeight * .5f).coerceIn(160.dp, 300.dp))
+        FeaturePage("Muted game / preview", game.title, "Best · " + game.bestScore + "  /  Sound off") {
+            item {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(Modifier.width(boardSize).background(Panel, RoundedCornerShape(20.dp)).padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        cells.chunked(columns).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { value ->
+                                    Box(Modifier.weight(1f).aspectRatio(1f)
+                                        .background(Mint.copy(alpha = if (value.isEmpty()) .04f else .18f), RoundedCornerShape(10.dp)),
+                                        contentAlignment = Alignment.Center) {
+                                        Text(if (paused) "·" else value, style = MaterialTheme.typography.headlineSmall, color = Mint)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
+            item { Button(onClick = onPause) { Text(if (paused) "Resume preview" else "Pause preview") } }
+            item { PrototypeNote(if (paused) "Paused · Return when you are ready." else "Board preview · Gameplay will be implemented in the next phase.") }
         }
-        item { Button(onClick = onPause) { Text(if (paused) "Resume preview" else "Pause preview") } }
-        item { PrototypeNote(if (paused) "Paused · Return when you are ready." else "Board preview · Gameplay will be implemented in the next phase.") }
     }
 }

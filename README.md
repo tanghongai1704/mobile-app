@@ -97,7 +97,7 @@ Video tiếp tục floating khi chuyển News/Home/game mute, pause khi sang Mus
 
 ## Build và kiểm tra
 
-Mở root project bằng Android Studio, Sync Gradle rồi Run `app` trên API 26+. Giữ SDK/JDK cấu hình sẵn của project; Gradle daemon dùng JDK 25, bytecode các module target JVM 11.
+Mở root project bằng Android Studio, Sync Gradle rồi chọn run configuration `OneSpace` (được chia sẻ trong `.run/OneSpace.run.xml`). Chọn emulator và Run trên API 26+. Xem máy ảo trong **View → Tool Windows → Running Devices**; khởi động AVD bằng nút `+` của cửa sổ này. Giữ SDK/JDK cấu hình sẵn của project; Gradle daemon dùng JDK 25, bytecode các module target JVM 11.
 
 ```powershell
 .\gradlew.bat projects
@@ -108,13 +108,23 @@ Mở root project bằng Android Studio, Sync Gradle rồi Run `app` trên API 2
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
-Unit tests nghiệp vụ ở `domain/src/test`; test saved-state adapter ở `core/session/src/test`. `NavigationSmokeTest` ở app kiểm tra floating video, bookmark khi đổi tab và mở lại Now Playing từ mini-player. Cần emulator/thiết bị để chạy:
+Unit tests nghiệp vụ ở `domain/src/test`; test saved-state adapter ở `core/session/src/test`. Đã chạy thành công **6 UI tests** trên emulator AOSP API 35: năm tab, floating video, mini music player/Next, bookmark qua đổi tab, game Pause/Resume và settings sau Activity recreation.
+
+Khởi động emulator trước, rồi chạy script build/install/test và mở lại app:
 
 ```powershell
-.\gradlew.bat :app:connectedDebugAndroidTest
+.\scripts\smoke-test.ps1 -Serial emulator-5554
 ```
 
-Máy dựng skeleton chưa có thiết bị/AVD; compile UI test không thay thế việc chạy test trên thiết bị.
+Script kiểm tra kết quả instrumentation thực sự (`OK (6 tests)`), lưu log ở `build/emulator-smoke-test.txt` và ảnh ở `build/screenshots/`. Không chỉ dựa vào trạng thái Gradle khi thiết bị có thể bị offline.
+
+Máy dựng baseline dùng AVD `OneSpace_API35`: AOSP x86_64 API 35, 720×1280, density 280, RAM 1536 MB, 2 cores và software graphics. AVD Pixel 9/API 37 cũ trên máy này gặp ANR ở Launcher/SystemUI; AVD nhẹ mới đã chạy được app và bộ UI tests. SDK/AVD là cấu hình cục bộ, không nằm trong Git; máy khác tạo AVD qua Device Manager.
+
+Ảnh chụp app thực tế từ emulator sau khi kiểm tra:
+
+| Home | Music | News + floating video | Game preview |
+| --- | --- | --- | --- |
+| <img src="docs/screenshots/home.png" width="180" alt="Home" /> | <img src="docs/screenshots/music.png" width="180" alt="Music controls" /> | <img src="docs/screenshots/news-floating-video.png" width="180" alt="News and floating video" /> | <img src="docs/screenshots/game-board.png" width="180" alt="Game controls" /> |
 
 ## Triển khai tiếp
 

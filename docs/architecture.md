@@ -85,7 +85,9 @@ Data trả public factory có kiểu repository interface; mock class internal. 
 
 Chưa có Media3/Audio Focus, background music/notification, decoder dùng chung, persisted session, offline cache/download, game loop/save hoặc retry mạng thật. UI có play/pause/floating không chứng minh các cơ chế đó đã hoạt động.
 
-Tests kiểm tra policy Kotlin, queue và saved-state adapter; navigation cần thiết bị. Kiểm thử process death, service lifecycle, pin/RAM/decoder và mất mạng thực hiện sau khi có runtime.
+Tests kiểm tra policy Kotlin, queue và saved-state adapter. Đã chạy 6 instrumentation tests trên AOSP API 35, bao phủ năm tab, floating video, mini music player/Next, bookmark qua đổi tab, game Pause/Resume và settings sau Activity recreation. Đã chỉnh artwork Music và board Games theo chiều cao khả dụng để controls hiển thị trên màn hình 411×731 dp. Ảnh thực tế ở `docs/screenshots`; chạy lại bằng `scripts/smoke-test.ps1`.
+
+Kiểm thử process death, service lifecycle, pin/RAM/decoder và mất mạng thực hiện sau khi có runtime. Kết quả navigation hiện tại chỉ xác nhận prototype với dữ liệu mock.
 
 ## Quy tắc triển khai tiếp
 
