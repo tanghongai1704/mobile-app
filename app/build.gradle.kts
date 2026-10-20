@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -11,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.onespace"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
@@ -34,9 +36,32 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        checkDependencies = true
+    }
 }
 
 dependencies {
+    implementation(project(":domain"))
+    implementation(project(":core:designsystem"))
+    implementation(project(":core:session"))
+    implementation(project(":feature:home"))
+    implementation(project(":feature:video"))
+    implementation(project(":feature:music"))
+    implementation(project(":feature:news"))
+    implementation(project(":feature:games"))
+    implementation(project(":feature:account"))
+    implementation(project(":data:video"))
+    implementation(project(":data:music"))
+    implementation(project(":data:news"))
+    implementation(project(":data:games"))
+    implementation(libs.hilt.android)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.hilt.viewmodel.compose)
+    ksp(libs.hilt.compiler)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
