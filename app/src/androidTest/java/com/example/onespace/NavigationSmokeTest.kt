@@ -2,6 +2,7 @@ package com.example.onespace
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.junit.Rule
@@ -17,7 +18,7 @@ class NavigationSmokeTest {
         compose.onNodeWithText("Float & explore").performClick()
         compose.onNodeWithText("A fresh perspective.").assertIsDisplayed()
         compose.onNodeWithText("Floating · Demo playing").assertIsDisplayed()
-        compose.onNodeWithText("Expand").performClick()
+        compose.onNodeWithContentDescription("Expand").performClick()
         compose.onNodeWithText("Float & explore").assertIsDisplayed()
     }
 
@@ -28,7 +29,7 @@ class NavigationSmokeTest {
         compose.onNodeWithText("Music").performClick()
         compose.onNodeWithText("News").performClick()
         compose.onNodeWithText("Saved ✓").assertIsDisplayed()
-        compose.onNodeWithText("‹ Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Saved (1)").performClick()
         compose.onNodeWithText("A greener city starts with small ideas").assertIsDisplayed()
     }
@@ -37,8 +38,8 @@ class NavigationSmokeTest {
         compose.onNodeWithText("Music").performClick()
         compose.onNodeWithText("Morning light").performClick()
         compose.onNodeWithText("News").performClick()
-        compose.onNodeWithText("♫  Morning light").performClick()
+        compose.onNodeWithText("Morning light").performClick()
         compose.onNodeWithText("ON REPEAT").assertIsDisplayed()
-        compose.onNodeWithText("Pause").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Pause").assertIsDisplayed()
     }
 }

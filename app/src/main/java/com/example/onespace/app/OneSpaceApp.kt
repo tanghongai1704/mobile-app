@@ -1,6 +1,9 @@
 package com.example.onespace.app
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -65,11 +68,13 @@ fun OneSpaceApp() {
             TopAppBar(
                 title = { Text("oneSpace", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
-                    if (detail) TextButton(onClick = { nav.popBackStack() }) { Text("‹ Back") }
+                    if (detail) IconButton(onClick = { nav.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 },
                 actions = {
-                    TextButton(onClick = { nav.navigate(AccountNavigation.ACCOUNT) { launchSingleTop = true } }) {
-                        Text("Guest ○")
+                    IconButton(onClick = { nav.navigate(AccountNavigation.ACCOUNT) { launchSingleTop = true } }) {
+                        Icon(Icons.Filled.AccountCircle, contentDescription = "Account")
                     }
                 }
             )
@@ -86,7 +91,7 @@ fun OneSpaceApp() {
                         NavigationBarItem(
                             selected = selected == tab,
                             onClick = { select(tab.section) },
-                            icon = { Text(tab.glyph, style = MaterialTheme.typography.titleLarge) },
+                            icon = { Icon(tab.icon, contentDescription = null) },
                             label = { Text(tab.label) }
                         )
                     }

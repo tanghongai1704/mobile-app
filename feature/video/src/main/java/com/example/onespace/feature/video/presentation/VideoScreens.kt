@@ -2,6 +2,8 @@ package com.example.onespace.feature.video.presentation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -15,7 +17,7 @@ internal fun VideoScreen(videos: List<Video>, onOpen: (String) -> Unit) {
         item { Artwork("THE EVERYDAY COLLECTION", Modifier.fillMaxWidth().height(170.dp)) }
         item { SectionTitle("Made for your next break") }
         items(videos, key = { it.id }) { video ->
-            ContentCard(video.title, video.creator + " · " + video.duration, "▶", { onOpen(video.id) })
+            ContentCard(video.title, video.creator + " · " + video.duration, Icons.Filled.PlayCircle, { onOpen(video.id) })
         }
     }
 }
@@ -32,7 +34,7 @@ internal fun VideoDetailScreen(video: Video?, playing: Boolean, onToggle: () -> 
             }
         }
         item { SectionTitle("A moment to explore") }
-        item { Text("Keep this story with you while you read the news or take a break with a game.") }
+        item { Text("Keep this story with you while you read the news or take a break with a game.", style = MaterialTheme.typography.bodyLarge) }
         item { PrototypeNote("Player preview · Sample content, no video stream connected yet.") }
     }
 }
