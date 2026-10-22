@@ -6,7 +6,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.*
 import androidx.navigation.compose.*
 import com.example.onespace.core.designsystem.CatalogContent
+import com.example.onespace.core.designsystem.EmptySpec
 import com.example.onespace.core.session.SessionCoordinator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
 
 import com.example.onespace.feature.music.presentation.*
 
@@ -23,7 +26,13 @@ fun NavGraphBuilder.musicGraph(nav: NavHostController, session: SessionCoordinat
             val owner = remember(entry) { nav.getBackStackEntry(MusicNavigation.GRAPH) }
             val vm: MusicViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
-            CatalogContent(state) { tracks ->
+            val offline by vm.offline.collectAsStateWithLifecycle()
+            CatalogContent(
+                state,
+                offline = offline,
+                onRetry = vm::retry,
+                empty = EmptySpec(Icons.Filled.MusicNote, "Kho nhạc trống", "Làm mới", vm::retry)
+            ) { tracks ->
                 MusicScreen(tracks) { id ->
                     tracks.find { it.id == id }?.let { session.playMusic(it.id, it.title) }
                     nav.navigate(MusicNavigation.nowPlaying(id)) { launchSingleTop = true }
@@ -34,17 +43,21 @@ fun NavGraphBuilder.musicGraph(nav: NavHostController, session: SessionCoordinat
             val owner = remember(entry) { nav.getBackStackEntry(MusicNavigation.GRAPH) }
             val vm: MusicViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
-            val playback by session.uiState.collectAsStateWithLifecycle()
+            val playback by session.music.collectAsStateWithLifecycle()
             CatalogContent(state) { tracks ->
-                val track = tracks.find { it.id == entry.arguments?.getString("id") }
-                NowPlayingScreen(track, playback.musicPlaying && playback.trackId == track?.id,
+                // Follow the engine, not the route argument: auto-advance may have moved on.
+                val current = tracks.firstOrNull { it.id == playback.trackId }
+                    ?: tracks.firstOrNull { it.id == entry.arguments?.getString("id") }
+                NowPlayingScreen(
+                    track = current,
+                    playback = playback,
                     onToggle = {
-                        track?.let {
-                            if (playback.trackId == it.id) session.toggleMusic() else session.playMusic(it.id, it.title)
-                        }
+                        if (playback.trackId == current?.id) session.toggleMusic()
+                        else current?.let { session.playMusic(it.id, it.title) }
                     },
+                    onSeekTo = session::seekMusicTo,
                     onNext = {
-                        vm.nextTrack(track?.id)?.let { next ->
+                        vm.nextTrack(playback.trackId ?: current?.id)?.let { next ->
                             session.playMusic(next.id, next.title)
                             nav.navigate(MusicNavigation.nowPlaying(next.id)) {
                                 popUpTo(MusicNavigation.NOW_PLAYING) { inclusive = true }

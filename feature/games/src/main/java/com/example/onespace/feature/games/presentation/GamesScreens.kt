@@ -16,20 +16,19 @@ import com.example.onespace.domain.games.model.Game
 
 @Composable
 internal fun GamesScreen(games: List<Game>, onOpen: (String) -> Unit) {
-    FeaturePage("Play / recharge", "A small escape.", "Offline favourites. No pressure, just play.") {
-        item { Artwork("MAKE SPACE FOR PLAY", Modifier.fillMaxWidth().height(160.dp)) }
+    FeaturePage {
         items(games, key = { it.id }) { game ->
             ContentCard(game.title, game.description,
                 if (game.id == "g1") Icons.Filled.GridView else Icons.Filled.SelectAll,
                 { onOpen(game.id) })
         }
-        item { PrototypeNote("Game boards are previews. Rules, scoring and persistent saves come next.") }
     }
 }
 
+/** Game detail: score status, board, pause control. Identity is in the top bar ("← Games"). */
 @Composable
 internal fun GameScreen(game: Game?, paused: Boolean, onPause: () -> Unit) {
-    if (game == null) { Text("Game unavailable"); return }
+    if (game == null) { Text("Chưa có game này"); return }
     val is2048 = game.id == "g1"
     val cells = if (is2048) listOf("2", "", "4", "", "", "8", "", "2", "16", "", "4", "", "", "2", "", "")
                 else listOf("×", "", "○", "", "×", "", "○", "", "")
@@ -38,29 +37,33 @@ internal fun GameScreen(game: Game?, paused: Boolean, onPause: () -> Unit) {
                     else MaterialTheme.colorScheme.secondaryContainer
     val cellTextColor = if (is2048) MaterialTheme.colorScheme.onPrimaryContainer
                        else MaterialTheme.colorScheme.onSecondaryContainer
-    FeaturePage("Muted game / preview", game.title, "Best · " + game.bestScore + "  /  Sound off") {
-        item {
-            Column(Modifier.fillMaxWidth().background(
-                    MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                cells.chunked(columns).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { value ->
-                            Box(Modifier.weight(1f).aspectRatio(1f)
-                                .background(if (value.isEmpty())
-                                    MaterialTheme.colorScheme.surfaceContainerHighest
-                                    else cellColor,
-                                    MaterialTheme.shapes.small),
-                                contentAlignment = Alignment.Center) {
-                                Text(if (paused) "·" else value, style = MaterialTheme.typography.headlineSmall,
-                                    color = if (value.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else cellTextColor)
-                            }
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(game.title, style = MaterialTheme.typography.headlineSmall)
+            Text("Điểm cao · " + game.bestScore, style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Column(Modifier.fillMaxWidth().background(
+                MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            cells.chunked(columns).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { value ->
+                        Box(Modifier.weight(1f).aspectRatio(1f)
+                            .background(if (value.isEmpty())
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                                else cellColor,
+                                MaterialTheme.shapes.small),
+                            contentAlignment = Alignment.Center) {
+                            Text(if (paused) "·" else value, style = MaterialTheme.typography.headlineSmall,
+                                color = if (value.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else cellTextColor)
                         }
                     }
                 }
             }
         }
-        item { Button(onClick = onPause) { Text(if (paused) "Resume preview" else "Pause preview") } }
-        item { PrototypeNote(if (paused) "Paused · Return when you are ready." else "Board preview · Gameplay will be implemented in the next phase.") }
+        Button(onClick = onPause) { Text(if (paused) "Chơi bản demo" else "Tạm dừng bản demo") }
+        if (paused) PrototypeNote("Đang tạm dừng · Tiếp tục khi bạn sẵn sàng.")
     }
 }

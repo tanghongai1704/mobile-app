@@ -1,0 +1,12 @@
+package com.example.onespace.core.common
+
+import kotlin.math.abs
+
+/** Human readable m:ss / m:ss for playback positions and durations. */
+fun formatMsWhole(ms: Long): String {
+    if (ms <= 0) return "0:00"
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = abs(totalSeconds % 60)
+    return "%d:%02d".format(minutes, seconds)
+}

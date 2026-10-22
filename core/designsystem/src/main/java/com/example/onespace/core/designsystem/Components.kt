@@ -4,41 +4,37 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/** Screen scaffold for catalog-style feature pages: 16dp margins on the 4dp grid. */
+/**
+ * Content-first page scaffold: only a padded, evenly spaced list. Destination
+ * identity lives in the shell top bar ("Where am I?"), so feeds start with
+ * content immediately — no per-screen hero or marketing header.
+ */
 @Composable
-fun FeaturePage(eyebrow: String, title: String, subtitle: String, content: LazyListScope.() -> Unit) {
+fun FeaturePage(content: LazyListScope.() -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(eyebrow.uppercase(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
-                Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
         content()
         item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
+/** Functional section label inside a feed (e.g. "Tiếp tục xem", "Liên quan"). */
 @Composable
 fun SectionTitle(title: String) {
     Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -67,26 +63,22 @@ fun ContentCard(title: String, subtitle: String, icon: ImageVector, onClick: () 
     }
 }
 
-/** Media placeholder: brand-tinted gradient surface in the large shape slot. */
+/** Decorative media placeholder surface: brand gradient, no marketing text. */
 @Composable
-fun Artwork(label: String, modifier: Modifier = Modifier) {
+fun Artwork(modifier: Modifier = Modifier) {
     Box(modifier.background(
         Brush.linearGradient(listOf(
             MaterialTheme.colorScheme.primaryContainer,
             MaterialTheme.colorScheme.surfaceContainerHighest)),
         MaterialTheme.shapes.extraLarge),
         contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Filled.RadioButtonChecked, contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp))
-            Text(label, color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelLarge)
-        }
+        Icon(Icons.Filled.RadioButtonChecked, contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp))
     }
 }
 
+/** Compact supporting/status text; use for real status only, never filler. */
 @Composable
 fun PrototypeNote(text: String) {
     Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)

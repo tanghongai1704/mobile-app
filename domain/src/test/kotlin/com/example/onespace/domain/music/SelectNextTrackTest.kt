@@ -6,7 +6,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SelectNextTrackTest {
-    private val queue = listOf(Track("a", "A", "Artist", "3:00"), Track("b", "B", "Artist", "4:00"))
+    private val queue = listOf(
+        Track("a", "A", "Artist", "3:00", "https://example.com/a.mp3"),
+        Track("b", "B", "Artist", "4:00", "https://example.com/b.mp3")
+    )
     @Test fun nextWrapsToBeginningOfQueue() {
         assertEquals("b", SelectNextTrack(queue, "a")?.id)
         assertEquals("a", SelectNextTrack(queue, "b")?.id)

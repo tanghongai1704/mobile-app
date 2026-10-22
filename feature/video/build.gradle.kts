@@ -23,6 +23,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(project(":core:common"))
     implementation(project(":core:session"))
+    implementation(project(":core:media"))
     implementation(libs.androidx.hilt.viewmodel.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.savedstate)

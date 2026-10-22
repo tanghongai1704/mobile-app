@@ -1,11 +1,15 @@
 package com.example.onespace.feature.news.navigation
 
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.runtime.*
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.*
 import androidx.navigation.compose.*
+import com.example.onespace.core.common.ContentUiState
+import com.example.onespace.core.designsystem.CatalogContent
+import com.example.onespace.core.designsystem.EmptySpec
 
 import com.example.onespace.feature.news.presentation.*
 
@@ -22,10 +26,14 @@ fun NavGraphBuilder.newsGraph(nav: NavHostController) {
             val owner = remember(entry) { nav.getBackStackEntry(NewsNavigation.GRAPH) }
             val vm: NewsViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
-            when {
-                state.isLoading -> Text("Loading…")
-                state.error != null -> Text(state.error.orEmpty())
-                else -> NewsScreen(state.items, state.savedIds) { nav.navigate(NewsNavigation.article(it)) }
+            val offline by vm.offline.collectAsStateWithLifecycle()
+            CatalogContent(
+                ContentUiState(items = state.items, isLoading = state.isLoading, error = state.error),
+                offline = offline,
+                onRetry = vm::retry,
+                empty = EmptySpec(Icons.Filled.Newspaper, "Chưa có tin tức", "Làm mới", vm::retry)
+            ) { articles ->
+                NewsScreen(articles, state.savedIds) { nav.navigate(NewsNavigation.article(it)) }
             }
         }
         composable(NewsNavigation.ARTICLE, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
@@ -33,10 +41,8 @@ fun NavGraphBuilder.newsGraph(nav: NavHostController) {
             val vm: NewsViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
             val id = entry.arguments?.getString("id")
-            when {
-                state.isLoading -> Text("Loading…")
-                state.error != null -> Text(state.error.orEmpty())
-                else -> ArticleScreen(state.items.find { it.id == id }, id in state.savedIds) {
+            CatalogContent(ContentUiState(items = state.items, isLoading = state.isLoading, error = state.error)) { articles ->
+                ArticleScreen(articles.find { it.id == id }, id in state.savedIds) {
                     if (id != null) vm.bookmark(id)
                 }
             }

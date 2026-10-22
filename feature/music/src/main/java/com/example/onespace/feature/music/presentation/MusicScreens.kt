@@ -7,68 +7,107 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.onespace.core.common.formatMsWhole
 import com.example.onespace.core.designsystem.*
 import com.example.onespace.domain.music.model.Track
+import com.example.onespace.domain.session.port.MusicPlayback
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MusicScreen(tracks: List<Track>, onOpen: (String) -> Unit) {
     var downloaded by rememberSaveable { mutableStateOf(false) }
-    FeaturePage("Listen / unwind", "Find your rhythm.", "A soundtrack for whatever comes next.") {
-        item { Artwork("YOUR DAILY MIX", Modifier.fillMaxWidth().height(170.dp)) }
+    val visible = tracks.filter { !downloaded || it.downloaded }
+    FeaturePage {
         item {
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 SegmentedButton(
                     selected = !downloaded,
                     onClick = { downloaded = false },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    label = { Text("For you") }
+                    label = { Text("Dành cho bạn") }
                 )
                 SegmentedButton(
                     selected = downloaded,
                     onClick = { downloaded = true },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    label = { Text("Downloaded") }
+                    label = { Text("Đã tải") }
                 )
             }
         }
-        items(tracks.filter { !downloaded || it.downloaded }, key = { it.id }) { track ->
-            ContentCard(track.title, track.artist + " · " + track.duration +
-                if (track.downloaded) " · Offline sample" else "", Icons.Filled.MusicNote, { onOpen(track.id) })
+        if (visible.isEmpty()) {
+            item {
+                EmptyState(EmptySpec(
+                    icon = Icons.Filled.MusicNote,
+                    title = if (downloaded) "Không có bài tải xuống trong mục này" else "Kho nhạc trống",
+                    cta = if (downloaded) "Bật nhạc ngẫu nhiên" else "Làm mới",
+                    onCta = {
+                        // Always offer a next step: random play takes the listener straight in.
+                        if (downloaded) tracks.randomOrNull()?.let { onOpen(it.id) }
+                    }
+                ))
+            }
         }
-        item { PrototypeNote("Downloaded is a sample filter. Audio files will be added later.") }
+        items(visible, key = { it.id }) { track ->
+            ContentCard(track.title, track.artist + " · " + track.duration +
+                if (track.downloaded) " · Mẫu ngoại tuyến" else "", Icons.Filled.MusicNote, { onOpen(track.id) })
+        }
     }
 }
 
+/** Full player: artwork, meta, seek bar, transport. Identity is in the top bar ("← Music"). */
 @Composable
-internal fun NowPlayingScreen(track: Track?, playing: Boolean, onToggle: () -> Unit, onNext: () -> Unit) {
-    if (track == null) { Text("Track unavailable"); return }
-    FeaturePage("Your daily mix", track.title, track.artist) {
-        item { Artwork("ON REPEAT", Modifier.fillMaxWidth().aspectRatio(1f)) }
-        item {
-            LinearProgressIndicator(progress = { .32f }, modifier = Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("1:12 · Demo", style = MaterialTheme.typography.labelMedium); Text(track.duration, style = MaterialTheme.typography.labelMedium)
+internal fun NowPlayingScreen(
+    track: Track?,
+    playback: MusicPlayback,
+    onToggle: () -> Unit,
+    onSeekTo: (Long) -> Unit,
+    onNext: () -> Unit
+) {
+    if (track == null) { Text("Chưa có bài này"); return }
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+        Artwork(Modifier.fillMaxWidth().aspectRatio(1f))
+        Spacer(Modifier.height(24.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(track.title, style = MaterialTheme.typography.headlineSmall)
+            Text(track.artist, style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(16.dp))
+        Slider(
+            value = playback.positionMs.toFloat().coerceIn(0f, playback.totalMs.toFloat().coerceAtLeast(1f)),
+            onValueChange = { onSeekTo(it.toLong()) },
+            valueRange = 0f..playback.totalMs.toFloat().coerceAtLeast(1f),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatMsWhole(playback.positionMs), style = MaterialTheme.typography.labelMedium)
+            Text(
+                if (playback.totalMs > 0) formatMsWhole(playback.totalMs) else track.duration,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { onSeekTo((playback.positionMs - 10_000).coerceAtLeast(0)) }) {
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "Bài trước")
+            }
+            FilledIconButton(onClick = onToggle) {
+                Icon(
+                    if (playback.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playback.playing) "Tạm dừng" else "Phát"
+                )
+            }
+            IconButton(onClick = onNext) {
+                Icon(Icons.Filled.SkipNext, contentDescription = "Tiếp theo")
             }
         }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically) {
-                FilledIconButton(onClick = onToggle) {
-                    Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playing) "Pause" else "Play")
-                }
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Next")
-                }
-            }
-        }
-        item { PrototypeNote("Playback controls simulate UI state. Background audio and notifications are not connected yet.") }
     }
 }
