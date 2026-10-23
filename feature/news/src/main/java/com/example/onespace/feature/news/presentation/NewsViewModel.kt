@@ -6,6 +6,7 @@ import com.example.onespace.domain.news.model.Article
 import com.example.onespace.domain.news.usecase.GetNews
 import com.example.onespace.domain.news.usecase.ObserveSavedArticles
 import com.example.onespace.domain.news.usecase.ToggleBookmark
+import com.example.onespace.domain.session.repository.SessionPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.*
@@ -22,12 +23,21 @@ internal data class NewsUiState(
 internal class NewsViewModel @Inject constructor(
     getNews: GetNews,
     observeSavedArticles: ObserveSavedArticles,
+    preferences: SessionPreferencesRepository,
     private val toggleBookmark: ToggleBookmark
 ) : ViewModel() {
-    val uiState = combine(getNews(), observeSavedArticles()) { articles, saved ->
+    private val refresh = MutableStateFlow(0)
+
+    val uiState = combine(getNews(), observeSavedArticles(), refresh) { articles, saved, _ ->
         NewsUiState(items = articles, savedIds = saved)
-    }.catch { emit(NewsUiState(error = "Unable to load stories")) }
+    }.catch { emit(NewsUiState(error = "Không tải được tin.")) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewsUiState(isLoading = true))
+
+    /** Demo switch from Settings: feeds render their offline state while on. */
+    val offline = preferences.preferences.map { it.simulateOffline }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun retry() { refresh.value = refresh.value + 1 }
 
     fun bookmark(id: String) {
         viewModelScope.launch { toggleBookmark(id) }

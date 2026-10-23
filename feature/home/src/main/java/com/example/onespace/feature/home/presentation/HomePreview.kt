@@ -8,5 +8,5 @@ import com.example.onespace.core.designsystem.OneSpaceTheme
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun HomePreview() {
-    OneSpaceTheme { Surface { HomeScreen {} } }
+    OneSpaceTheme { Surface { HomeScreen(HomeUiState(), { _, _ -> }, { _, _ -> }, {}) } }
 }

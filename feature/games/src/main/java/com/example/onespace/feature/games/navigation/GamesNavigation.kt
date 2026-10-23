@@ -6,7 +6,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.*
 import androidx.navigation.compose.*
 import com.example.onespace.core.designsystem.CatalogContent
+import com.example.onespace.core.designsystem.EmptySpec
 import com.example.onespace.core.session.SessionCoordinator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SportsEsports
 
 import com.example.onespace.feature.games.presentation.*
 
@@ -23,7 +26,13 @@ fun NavGraphBuilder.gamesGraph(nav: NavHostController, session: SessionCoordinat
             val owner = remember(entry) { nav.getBackStackEntry(GamesNavigation.GRAPH) }
             val vm: GamesViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
-            CatalogContent(state) { games ->
+            val offline by vm.offline.collectAsStateWithLifecycle()
+            CatalogContent(
+                state,
+                offline = offline,
+                onRetry = vm::retry,
+                empty = EmptySpec(Icons.Filled.SportsEsports, "Chưa mở khoá game nào", "Chơi thử ngay", vm::retry)
+            ) { games ->
                 GamesScreen(games) { nav.navigate(GamesNavigation.game(it)) }
             }
         }

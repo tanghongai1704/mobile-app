@@ -41,4 +41,31 @@ class SessionPolicyTest {
         assertTrue(leaving.gamePaused)
         assertTrue(SessionPolicy.enter(leaving, Section.GAMES).gamePaused)
     }
+
+    @Test fun musicStartsFreelyWhenNoVideoIsPlaying() {
+        val plan = SessionPolicy.resolveMusicStart(videoActive = false, rememberedRule = null)
+        assertEquals(MusicStartPlan.Start(VideoAudioEffect.NONE), plan)
+    }
+
+    @Test fun firstCollisionOfVideoAndMusicAsksTheUserForARule() {
+        assertEquals(MusicStartPlan.AskUser, SessionPolicy.resolveMusicStart(true, null))
+    }
+
+    @Test fun rememberedRulesAreAppliedSilently() {
+        assertEquals(
+            MusicStartPlan.Start(VideoAudioEffect.MUTE),
+            SessionPolicy.resolveMusicStart(true, MediaConflictRule.MUTE_VIDEO))
+        assertEquals(
+            MusicStartPlan.Start(VideoAudioEffect.PAUSE),
+            SessionPolicy.resolveMusicStart(true, MediaConflictRule.PAUSE_VIDEO))
+        assertEquals(
+            MusicStartPlan.DoNotStart,
+            SessionPolicy.resolveMusicStart(true, MediaConflictRule.KEEP_VIDEO))
+    }
+
+    @Test fun rememberedRuleIsIgnoredWhenNoVideoIsActive() {
+        assertEquals(
+            MusicStartPlan.Start(VideoAudioEffect.NONE),
+            SessionPolicy.resolveMusicStart(false, MediaConflictRule.KEEP_VIDEO))
+    }
 }

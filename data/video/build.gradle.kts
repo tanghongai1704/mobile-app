@@ -14,6 +14,7 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":core:database"))
     implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit)
 }

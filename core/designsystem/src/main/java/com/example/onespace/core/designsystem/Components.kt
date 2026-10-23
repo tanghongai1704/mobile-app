@@ -4,72 +4,82 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+/**
+ * Content-first page scaffold: only a padded, evenly spaced list. Destination
+ * identity lives in the shell top bar ("Where am I?"), so feeds start with
+ * content immediately — no per-screen hero or marketing header.
+ */
 @Composable
-fun FeaturePage(eyebrow: String, title: String, subtitle: String, content: LazyListScope.() -> Unit) {
+fun FeaturePage(content: LazyListScope.() -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(eyebrow.uppercase(), color = Mint, style = MaterialTheme.typography.labelMedium)
-                Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
         content()
         item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
+/** Functional section label inside a feed (e.g. "Tiếp tục xem", "Liên quan"). */
 @Composable
 fun SectionTitle(title: String) {
-    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
 }
 
+/** Filled M3 card: icon tinted with primaryContainer, text roles, decorative chevron. */
 @Composable
-fun ContentCard(title: String, subtitle: String, mark: String, onClick: () -> Unit) {
-    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = Panel)) {
+fun ContentCard(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
+    Card(onClick = onClick) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(Modifier.size(58.dp).background(Mint.copy(alpha = .12f), RoundedCornerShape(16.dp)),
+            Box(Modifier.size(48.dp).background(
+                MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
                 contentAlignment = Alignment.Center) {
-                Text(mark, color = Mint, style = MaterialTheme.typography.titleLarge)
+                Icon(icon, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(title, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall,
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("›", color = Mint, style = MaterialTheme.typography.headlineSmall)
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
+/** Decorative media placeholder surface: brand gradient, no marketing text. */
 @Composable
-fun Artwork(label: String, modifier: Modifier = Modifier) {
-    Box(modifier.background(Brush.linearGradient(listOf(Color(0xFF355C4D), Color(0xFF172C32))),
-        RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("◉", color = Mint, style = MaterialTheme.typography.displayLarge)
-            Text(label, color = Color.White, style = MaterialTheme.typography.labelLarge)
-        }
+fun Artwork(modifier: Modifier = Modifier) {
+    Box(modifier.background(
+        Brush.linearGradient(listOf(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.surfaceContainerHighest)),
+        MaterialTheme.shapes.extraLarge),
+        contentAlignment = Alignment.Center) {
+        Icon(Icons.Filled.RadioButtonChecked, contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp))
     }
 }
 
+/** Compact supporting/status text; use for real status only, never filler. */
 @Composable
 fun PrototypeNote(text: String) {
     Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
 }
-
