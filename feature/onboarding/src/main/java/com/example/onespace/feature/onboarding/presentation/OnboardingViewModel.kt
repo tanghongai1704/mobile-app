@@ -58,7 +58,8 @@ internal class OnboardingViewModel @Inject constructor(
     }
 
     private suspend fun finish() {
-        preferences.setSelectedTopics(_selected.value)
+        // Re-entering Login from Profile must not erase interests chosen earlier.
+        if (_selected.value.isNotEmpty()) preferences.setSelectedTopics(_selected.value)
         preferences.setOnboarded(true)
     }
 

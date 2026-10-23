@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.example.onespace.core.media.VideoSurface
@@ -54,9 +55,11 @@ fun BoxScope.FloatingVideo(
     muted: Boolean,
     onExpand: () -> Unit,
     onToggle: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onHeightChanged: (Int) -> Unit = {}
 ) {
-    Card(Modifier.align(Alignment.BottomEnd).padding(12.dp).widthIn(max = 320.dp)) {
+    Card(Modifier.align(Alignment.BottomEnd).onSizeChanged { onHeightChanged(it.height) }
+        .padding(12.dp).widthIn(max = 320.dp)) {
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
                 VideoSurface(player, Modifier.fillMaxSize())

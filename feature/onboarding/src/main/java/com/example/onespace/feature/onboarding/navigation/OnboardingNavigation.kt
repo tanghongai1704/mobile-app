@@ -1,6 +1,7 @@
 package com.example.onespace.feature.onboarding.navigation
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
@@ -29,14 +30,16 @@ fun NavGraphBuilder.onboardingGraph(nav: NavHostController, onDone: () -> Unit) 
                 }
             })
         }
-        composable(OnboardingNavigation.STEPS) {
-            val vm: OnboardingViewModel = hiltViewModel()
+        composable(OnboardingNavigation.STEPS) { entry ->
+            val owner = remember(entry) { nav.getBackStackEntry(OnboardingNavigation.GRAPH) }
+            val vm: OnboardingViewModel = hiltViewModel(owner)
             OnboardingScreen(vm, onDone = {
                 nav.navigate(OnboardingNavigation.LOGIN) { launchSingleTop = true }
             })
         }
-        composable(OnboardingNavigation.LOGIN) {
-            val vm: OnboardingViewModel = hiltViewModel()
+        composable(OnboardingNavigation.LOGIN) { entry ->
+            val owner = remember(entry) { nav.getBackStackEntry(OnboardingNavigation.GRAPH) }
+            val vm: OnboardingViewModel = hiltViewModel(owner)
             LoginScreen(vm, onDone = onDone)
         }
     }

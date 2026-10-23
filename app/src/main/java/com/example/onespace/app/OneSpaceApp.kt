@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -25,6 +26,7 @@ import com.example.onespace.domain.session.Section
 import com.example.onespace.domain.session.repository.SessionPreferences
 import com.example.onespace.feature.account.navigation.AccountNavigation
 import com.example.onespace.feature.games.navigation.GamesNavigation
+import com.example.onespace.feature.home.navigation.HomeNavigation
 import com.example.onespace.feature.music.navigation.MusicNavigation
 import com.example.onespace.feature.onboarding.navigation.OnboardingNavigation
 import com.example.onespace.feature.video.navigation.VideoNavigation
@@ -57,6 +59,8 @@ fun OneSpaceApp() {
     val prefs: SessionPreferences? by media.preferences.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    var floatingPlayerHeight by remember { mutableIntStateOf(0) }
 
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
@@ -66,6 +70,11 @@ fun OneSpaceApp() {
     val contextTitle = entry?.destination.contextTitle()
     fun select(section: Section) {
         val destination = TopLevelDestination.entries.first { it.section == section }
+        // Account/settings are auxiliary screens, not part of Home's saved tab stack.
+        if (nav.currentDestination?.route == AccountNavigation.ACCOUNT ||
+            nav.currentDestination?.route == AccountNavigation.SETTINGS) {
+            nav.popBackStack(HomeNavigation.FEED, inclusive = false)
+        }
         coordinator.enter(section)
         nav.navigate(destination.route) {
             popUpTo(nav.graph.findStartDestination().id) { saveState = true }
@@ -114,7 +123,11 @@ fun OneSpaceApp() {
     val showMini = !inOnboarding && trackId != null && contextTitle != "Music" && contextTitle != "Games"
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState, Modifier.padding(
+                bottom = if (showFloat) with(density) { floatingPlayerHeight.toDp() } else 0.dp
+            ))
+        },
         topBar = {
             if (!inOnboarding) TopAppBar(
                 title = { Text(contextTitle ?: selected?.label ?: "") },
@@ -125,7 +138,10 @@ fun OneSpaceApp() {
                 },
                 actions = {
                     // Profile is secondary: reachable from Home only, not every screen.
-                    if (onHome) IconButton(onClick = { nav.navigate(AccountNavigation.ACCOUNT) { launchSingleTop = true } }) {
+                    if (onHome) IconButton(onClick = {
+                        coordinator.cancelPendingRestore()
+                        nav.navigate(AccountNavigation.ACCOUNT) { launchSingleTop = true }
+                    }) {
                         Icon(Icons.Filled.AccountCircle, contentDescription = "Tài khoản")
                     }
                 }
@@ -174,6 +190,7 @@ fun OneSpaceApp() {
                 title = videoState.title.ifEmpty { session.videoTitle.orEmpty() },
                 playing = videoState.playing,
                 muted = videoState.muted,
+                onHeightChanged = { floatingPlayerHeight = it },
                 onExpand = { videoId?.let { nav.navigate(VideoNavigation.detail(it)) { launchSingleTop = true } } },
                 onToggle = coordinator::toggleVideo,
                 onClose = {

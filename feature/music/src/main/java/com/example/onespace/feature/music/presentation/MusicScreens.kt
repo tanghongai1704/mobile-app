@@ -1,6 +1,8 @@
 package com.example.onespace.feature.music.presentation
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -13,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import com.example.onespace.core.common.formatMsWhole
 import com.example.onespace.core.designsystem.*
@@ -69,45 +70,50 @@ internal fun NowPlayingScreen(
     playback: MusicPlayback,
     onToggle: () -> Unit,
     onSeekTo: (Long) -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onPrevious: () -> Unit
 ) {
     if (track == null) { Text("Chưa có bài này"); return }
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-        Artwork(Modifier.fillMaxWidth().aspectRatio(1f))
-        Spacer(Modifier.height(24.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(track.title, style = MaterialTheme.typography.headlineSmall)
-            Text(track.artist, style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.height(16.dp))
-        Slider(
-            value = playback.positionMs.toFloat().coerceIn(0f, playback.totalMs.toFloat().coerceAtLeast(1f)),
-            onValueChange = { onSeekTo(it.toLong()) },
-            valueRange = 0f..playback.totalMs.toFloat().coerceAtLeast(1f),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatMsWhole(playback.positionMs), style = MaterialTheme.typography.labelMedium)
-            Text(
-                if (playback.totalMs > 0) formatMsWhole(playback.totalMs) else track.duration,
-                style = MaterialTheme.typography.labelMedium
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onSeekTo((playback.positionMs - 10_000).coerceAtLeast(0)) }) {
-                Icon(Icons.Filled.SkipPrevious, contentDescription = "Bài trước")
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val artworkSize = minOf(maxWidth - 48.dp, (maxHeight * .3f).coerceIn(100.dp, 220.dp))
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Artwork(Modifier.size(artworkSize))
+            Spacer(Modifier.height(24.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(track.title, style = MaterialTheme.typography.headlineSmall)
+                Text(track.artist, style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            FilledIconButton(onClick = onToggle) {
-                Icon(
-                    if (playback.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playback.playing) "Tạm dừng" else "Phát"
+            Spacer(Modifier.height(16.dp))
+            Slider(
+                value = playback.positionMs.toFloat().coerceIn(0f, playback.totalMs.toFloat().coerceAtLeast(1f)),
+                onValueChange = { onSeekTo(it.toLong()) },
+                valueRange = 0f..playback.totalMs.toFloat().coerceAtLeast(1f),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatMsWhole(playback.positionMs), style = MaterialTheme.typography.labelMedium)
+                Text(
+                    if (playback.totalMs > 0) formatMsWhole(playback.totalMs) else track.duration,
+                    style = MaterialTheme.typography.labelMedium
                 )
             }
-            IconButton(onClick = onNext) {
-                Icon(Icons.Filled.SkipNext, contentDescription = "Tiếp theo")
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onPrevious) {
+                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Bài trước")
+                }
+                FilledIconButton(onClick = onToggle) {
+                    Icon(
+                        if (playback.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playback.playing) "Tạm dừng" else "Phát"
+                    )
+                }
+                IconButton(onClick = onNext) {
+                    Icon(Icons.Filled.SkipNext, contentDescription = "Tiếp theo")
+                }
             }
         }
     }

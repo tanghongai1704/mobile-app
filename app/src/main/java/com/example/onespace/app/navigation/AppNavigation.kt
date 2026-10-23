@@ -30,14 +30,19 @@ fun AppNavigation(
     NavHost(navController = nav, startDestination = HomeNavigation.GRAPH, modifier = modifier) {
         homeGraph(
             onOpenVideo = { id, title ->
+                session.enter(Section.VIDEO)
                 session.playVideo(id, title)
                 nav.navigate(VideoNavigation.detail(id)) { launchSingleTop = true }
             },
             onPlayTrack = { id, title ->
+                session.enter(Section.MUSIC)
                 session.playMusic(id, title)
                 nav.navigate(MusicNavigation.nowPlaying(id)) { launchSingleTop = true }
             },
-            onOpenArticle = { nav.navigate(NewsNavigation.article(it)) { launchSingleTop = true } }
+            onOpenArticle = {
+                session.enter(Section.NEWS)
+                nav.navigate(NewsNavigation.article(it)) { launchSingleTop = true }
+            }
         )
         videoGraph(nav, session, onBrowseNews = { onSection(Section.NEWS) })
         musicGraph(nav, session)

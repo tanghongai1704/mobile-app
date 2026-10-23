@@ -1,6 +1,8 @@
 package com.example.onespace.feature.games.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -37,14 +39,15 @@ internal fun GameScreen(game: Game?, paused: Boolean, onPause: () -> Unit) {
                     else MaterialTheme.colorScheme.secondaryContainer
     val cellTextColor = if (is2048) MaterialTheme.colorScheme.onPrimaryContainer
                        else MaterialTheme.colorScheme.onSecondaryContainer
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
             Text(game.title, style = MaterialTheme.typography.headlineSmall)
             Text("Điểm cao · " + game.bestScore, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Column(Modifier.fillMaxWidth().background(
+        Column(Modifier.widthIn(max = 320.dp).fillMaxWidth().background(
                 MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             cells.chunked(columns).forEach { row ->
@@ -62,8 +65,6 @@ internal fun GameScreen(game: Game?, paused: Boolean, onPause: () -> Unit) {
                     }
                 }
             }
-            item { Button(onClick = onPause) { Text(if (paused) "Resume preview" else "Pause preview") } }
-            item { PrototypeNote(if (paused) "Paused · Return when you are ready." else "Board preview · Gameplay will be implemented in the next phase.") }
         }
         Button(onClick = onPause) { Text(if (paused) "Chơi bản demo" else "Tạm dừng bản demo") }
         if (paused) PrototypeNote("Đang tạm dừng · Tiếp tục khi bạn sẵn sàng.")

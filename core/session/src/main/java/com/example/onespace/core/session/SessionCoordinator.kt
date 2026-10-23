@@ -57,6 +57,7 @@ class SessionCoordinator @Inject constructor(
     /** One-shot restored tab after a cold start (TC10 restore chain). */
     private val _restoredSection = MutableStateFlow<Section?>(null)
     val restoredSection: StateFlow<Section?> = _restoredSection.asStateFlow()
+    private var restoreAllowed = true
 
     init {
         viewModelScope.launch {
@@ -69,11 +70,13 @@ class SessionCoordinator @Inject constructor(
     }
 
     fun enter(section: Section) {
+        cancelPendingRestore()
         update(SessionPolicy.enter(_uiState.value, section))
         viewModelScope.launch { preferences.setLastSection(section) }
     }
 
     fun playVideo(id: String, title: String = id) {
+        cancelPendingRestore()
         viewModelScope.launch {
             val video = getVideo().firstOrNull()?.firstOrNull { it.id == id } ?: return@launch
             val resumeFrom = viewingSession.progressOf(id)
@@ -82,6 +85,7 @@ class SessionCoordinator @Inject constructor(
     }
 
     fun playMusic(id: String, title: String = id) {
+        cancelPendingRestore()
         viewModelScope.launch {
             val queue = getMusic().firstOrNull().orEmpty()
             val track = queue.firstOrNull { it.id == id } ?: return@launch
@@ -113,14 +117,29 @@ class SessionCoordinator @Inject constructor(
     /** Shell navigation has applied the restored tab; do not apply it twice. */
     fun consumeRestoredSection() { _restoredSection.value = null }
 
+    /** A slow disk/catalog read must never navigate over a newer user action. */
+    fun cancelPendingRestore() {
+        restoreAllowed = false
+        _restoredSection.value = null
+    }
+
     fun toggleVideo() = port.toggleVideo()
-    fun toggleMusic() = port.toggleMusic()
+    fun toggleMusic() {
+        val playback = port.music.value
+        if (playback.playing) port.toggleMusic()
+        else playback.trackId?.let { playMusic(it) }
+    }
     fun seekVideoBy(deltaMs: Long) = port.seekVideoBy(deltaMs)
     fun seekMusicTo(positionMs: Long) = port.seekMusicTo(positionMs)
+    fun previousTrack() = port.skipToPrevious()
 
     /** Floating window dismissal (case C3): stop and keep the video for later. */
     fun closeVideo() = port.dismissVideo(toWatchlist = true)
-    fun closeMusic() = port.stopMusic()
+    fun closeMusic() {
+        cancelPendingRestore()
+        port.stopMusic()
+        viewModelScope.launch { preferences.setLastTrackId(null) }
+    }
 
     fun pauseGame() = update(_uiState.value.copy(gamePaused = !_uiState.value.gamePaused))
     fun resumeGame() = update(_uiState.value.copy(gamePaused = false))
@@ -133,18 +152,21 @@ class SessionCoordinator @Inject constructor(
 
     private suspend fun restoreColdStartSession() {
         // SavedStateHandle wins when the OS recreated this exact ViewModel.
-        if (savedState.get<String>("trackId") != null) return
+        if (!restoreAllowed || savedState.get<String>("trackId") != null) return
         val prefs = preferences.preferences.first()
-        if (prefs.lastTrackId != null) {
+        if (!restoreAllowed) return
+        if (prefs.lastTrackId != null && port.music.value.trackId == null) {
             val queue = getMusic().firstOrNull().orEmpty()
+            if (!restoreAllowed) return
             queue.firstOrNull { it.id == prefs.lastTrackId }?.let {
                 port.prepareRestoredMusic(it, queue)
             }
         }
-        if (prefs.lastSection != Section.HOME) _restoredSection.value = prefs.lastSection
+        if (restoreAllowed && prefs.lastSection != Section.HOME) _restoredSection.value = prefs.lastSection
     }
 
     private fun updateMusic(playback: MusicPlayback) {
+        val previousId = _uiState.value.trackId
         val next = if (playback.trackId == null) {
             _uiState.value.copy(trackId = null, trackTitle = null, musicPlaying = false)
         } else {
@@ -155,6 +177,9 @@ class SessionCoordinator @Inject constructor(
             )
         }
         update(next)
+        if (playback.trackId != null && playback.trackId != previousId) {
+            viewModelScope.launch { preferences.setLastTrackId(playback.trackId) }
+        }
     }
 
     private fun updateVideo(playback: VideoPlayback) {

@@ -1,6 +1,8 @@
 package com.example.onespace.feature.onboarding.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.pager.HorizontalPager
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -149,14 +152,15 @@ private fun TopicsStep(topics: List<String>, selected: Set<String>, onToggle: (S
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LoginScreen(vm: OnboardingViewModel, onDone: () -> Unit) {
-    var email by remember { mutableStateOf("") }
-    var otp by remember { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var otp by rememberSaveable { mutableStateOf("") }
     var showGuest by remember { mutableStateOf(false) }
     var touched by remember { mutableStateOf(false) }
     val signingIn by vm.signingIn.collectAsState()
     val emailError = touched && !vm.isValidEmail(email)
 
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Spacer(Modifier.height(32.dp))
         Text("Đăng nhập / Đăng ký", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
         Text("Một tài khoản cho cả bốn phân hệ.", style = MaterialTheme.typography.bodyMedium,

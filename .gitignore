@@ -1,17 +1,42 @@
-*.iml
-.gradle
+# Gradle/Kotlin caches and generated output in every module
+.gradle/
 .kotlin/
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-**/build/
-/captures
-.externalNativeBuild
-.cxx
+build/
+.externalNativeBuild/
+.cxx/
+
+# Machine-specific Android SDK paths and IDE metadata
 local.properties
+*.iml
+/.idea/*
+!/.idea/.gitignore
+# Shared run configurations in .run/ remain versioned.
+
+# Android packages and local profiling/capture output
+*.apk
+*.aab
+*.ap_
+*.dex
+*.hprof
+/captures/
+/.navigation/
+
+# Local signing and environment configuration
+*.jks
+*.keystore
+keystore.properties
+key.properties
+.env
+.env.*
+!.env.example
+!.env.template
+
+# OS/editor temporary files and JVM crash dumps
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+hs_err_pid*
+replay_pid*

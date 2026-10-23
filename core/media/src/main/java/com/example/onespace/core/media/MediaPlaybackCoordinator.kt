@@ -84,6 +84,7 @@ class MediaPlaybackCoordinator @Inject constructor(
         })
         videoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) = syncVideoState()
+            override fun onPlaybackStateChanged(state: Int) = syncVideoState()
         })
         // Persist the video resume position on a slow cadence (F-VID-05, TC10).
         scope.launch {
@@ -139,6 +140,7 @@ class MediaPlaybackCoordinator @Inject constructor(
 
     override fun prepareRestoredMusic(track: Track, queue: List<Track>) {
         this.queue = queue
+        musicPlayer.pause()
         musicPlayer.setMediaItem(mediaItem(track))
         musicPlayer.prepare()
         _music.value = MusicPlayback(
@@ -148,11 +150,15 @@ class MediaPlaybackCoordinator @Inject constructor(
     }
 
     override fun toggleMusic() {
-        if (musicPlayer.isPlaying) musicPlayer.pause() else musicPlayer.play()
+        if (musicPlayer.playWhenReady) musicPlayer.pause() else {
+            if (videoPlayer.volume > 0f) videoPlayer.pause()
+            musicPlayer.play()
+        }
         syncMusicState()
     }
 
     override fun stopMusic() {
+        musicPlayer.pause()
         musicPlayer.stop()
         musicPlayer.clearMediaItems()
         _music.value = MusicPlayback()
@@ -176,8 +182,13 @@ class MediaPlaybackCoordinator @Inject constructor(
 
     private fun playTrack(track: Track, queue: List<Track>) {
         this.queue = queue
-        musicPlayer.setMediaItem(mediaItem(track))
-        musicPlayer.prepare()
+        if (videoPlayer.volume > 0f) videoPlayer.pause()
+        if (musicPlayer.currentMediaItem?.mediaId != track.id || musicPlayer.playbackState == Player.STATE_IDLE) {
+            musicPlayer.setMediaItem(mediaItem(track))
+            musicPlayer.prepare()
+        } else if (musicPlayer.playbackState == Player.STATE_ENDED) {
+            musicPlayer.seekTo(0)
+        }
         musicPlayer.play()
         syncMusicState()
     }
@@ -208,7 +219,7 @@ class MediaPlaybackCoordinator @Inject constructor(
 
     override fun openVideo(video: Video, startPositionMs: Long) {
         // ADR-07, one audible source: opening a user-started video parks the dock music.
-        if (musicPlayer.isPlaying) musicPlayer.pause()
+        musicPlayer.pause()
         videoPlayer.setMediaItem(
             MediaItem.Builder()
                 .setUri(video.url)
@@ -226,7 +237,12 @@ class MediaPlaybackCoordinator @Inject constructor(
     }
 
     override fun toggleVideo() {
-        if (videoPlayer.isPlaying) videoPlayer.pause() else videoPlayer.play()
+        if (videoPlayer.playWhenReady && videoPlayer.playbackState != Player.STATE_ENDED) videoPlayer.pause() else {
+            if (videoPlayer.volume > 0f) musicPlayer.pause()
+            if (videoPlayer.playbackState == Player.STATE_ENDED) videoPlayer.seekTo(0)
+            if (videoPlayer.playbackState == Player.STATE_IDLE) videoPlayer.prepare()
+            videoPlayer.play()
+        }
         syncVideoState()
     }
 
@@ -244,7 +260,7 @@ class MediaPlaybackCoordinator @Inject constructor(
         val videoId = current.videoId
         val position = videoPlayer.currentPosition
         val hasContent = videoPlayer.currentMediaItem != null
-        if (videoId != null && hasContent && position > 0) {
+        if (videoId != null && hasContent) {
             scope.launch {
                 viewingSession.saveProgress(videoId, position)
                 if (toWatchlist) viewingSession.addToWatchlist(videoId, current.title)
@@ -265,7 +281,8 @@ class MediaPlaybackCoordinator @Inject constructor(
             videoId = item.mediaId,
             title = item.mediaMetadata.title?.toString().orEmpty(),
             // playWhenReady = user intent; true while buffering too, so status text is stable.
-            playing = videoPlayer.playWhenReady && videoPlayer.playbackState != Player.STATE_IDLE,
+            playing = videoPlayer.playWhenReady && videoPlayer.playbackState != Player.STATE_IDLE &&
+                videoPlayer.playbackState != Player.STATE_ENDED,
             positionMs = videoPlayer.currentPosition.coerceAtLeast(0),
             totalMs = durationOf(videoPlayer),
             muted = videoPlayer.volume == 0f
@@ -273,7 +290,7 @@ class MediaPlaybackCoordinator @Inject constructor(
     }
 
     private fun durationOf(player: Player): Long =
-        player.duration.takeIf { it != C.TIME_UNSET } ?: 0
+        player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0) ?: 0
 
     fun release() {
         scope.cancel()

@@ -81,6 +81,12 @@ internal fun VideoDetailScreen(
             }
         }
         item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onToggle) { Text(if (playing) "Tạm dừng" else "Phát") }
+                OutlinedButton(onClick = onMinimize) { Text("Thu nhỏ & khám phá") }
+            }
+        }
+        item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(video.title, style = MaterialTheme.typography.headlineSmall)
                 Text(
@@ -103,12 +109,6 @@ internal fun VideoDetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onToggle) { Text(if (playing) "Tạm dừng" else "Phát") }
-                OutlinedButton(onClick = onMinimize) { Text("Thu nhỏ & khám phá") }
             }
         }
         if (related.any { it.id != video.id }) {

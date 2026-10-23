@@ -56,6 +56,7 @@ fun NavGraphBuilder.musicGraph(nav: NavHostController, session: SessionCoordinat
                         else current?.let { session.playMusic(it.id, it.title) }
                     },
                     onSeekTo = session::seekMusicTo,
+                    onPrevious = session::previousTrack,
                     onNext = {
                         vm.nextTrack(playback.trackId ?: current?.id)?.let { next ->
                             session.playMusic(next.id, next.title)

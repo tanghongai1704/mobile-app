@@ -181,4 +181,38 @@ class SessionCoordinatorTest {
         assertEquals("v1", port.videoState.value.videoId)
         assertTrue(port.videoState.value.playing)
     }
+
+    @Test fun coldStartRestoresTheLastTabAndPreparesMusicPaused() = runTest(dispatcher) {
+        val port = FakePort()
+        val prefs = FakePrefs()
+        prefs.state.value = SessionPreferences(lastSection = Section.NEWS, lastTrackId = "m1")
+        val coordinator = coordinator(SavedStateHandle(), port, prefs)
+        advanceUntilIdle()
+        assertEquals(Section.NEWS, coordinator.restoredSection.value)
+        assertEquals("m1", port.music.value.trackId)
+        assertFalse(port.music.value.playing)
+    }
+
+    @Test fun userNavigationWinsOverPendingColdStartRestore() = runTest(dispatcher) {
+        val port = FakePort()
+        val prefs = FakePrefs()
+        prefs.state.value = SessionPreferences(lastSection = Section.NEWS, lastTrackId = "m1")
+        val coordinator = coordinator(SavedStateHandle(), port, prefs)
+        coordinator.enter(Section.GAMES)
+        advanceUntilIdle()
+        assertNull(coordinator.restoredSection.value)
+        assertNull(port.music.value.trackId)
+    }
+
+    @Test fun closingTheDockDoesNotBringItBackOnColdStart() = runTest(dispatcher) {
+        val port = FakePort()
+        val prefs = FakePrefs()
+        val coordinator = coordinator(SavedStateHandle(), port, prefs)
+        coordinator.playMusic("m1")
+        advanceUntilIdle()
+        coordinator.closeMusic()
+        advanceUntilIdle()
+        assertNull(port.music.value.trackId)
+        assertNull(prefs.state.value.lastTrackId)
+    }
 }
