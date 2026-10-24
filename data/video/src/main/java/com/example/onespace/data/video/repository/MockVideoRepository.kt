@@ -17,19 +17,33 @@ internal class MockVideoRepository : VideoRepository {
         emit(listOf(
         Video(
             "v1", "Gần với thiên nhiên thêm chút", "OneSpace Studio", "1:00",
-            "https://cdn.jsdelivr.net/gh/mediaelement/mediaelement-files@master/big_buck_bunny.mp4"
+            "https://cdn.jsdelivr.net/gh/mediaelement/mediaelement-files@master/big_buck_bunny.mp4",
+            "Thiên nhiên"
         ),
         Video(
             "v2", "Sài Gòn, sau giờ tan", "Chuyện phố", "0:46",
-            "https://vjs.zencdn.net/v/oceans.mp4"
+            "https://vjs.zencdn.net/v/oceans.mp4",
+            "Đời sống"
         ),
         Video(
             "v3", "Nghệ thuật chậm lại", "Sống chậm", "0:06",
-            "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
+            "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+            "Nhẹ nhàng"
         ),
         Video(
             "v4", "Khung hình êm, phố vắng", "Sống chậm", "0:30",
-            "https://stream.mux.com/DS00Spx1CV902MCtPj5WknGlR102V5HFkDe/high.mp4"
+            "https://stream.mux.com/DS00Spx1CV902MCtPj5WknGlR102V5HFkDe/high.mp4",
+            "Du lịch"
+        ),
+        Video(
+            "v5", "Bếp hồng giữa đông", "Bữa cơm nhà", "0:15",
+            "https://stream.mux.com/DS00Spx1CV902MCtPj5WknGlR102V5HFkDe/low.mp4",
+            "Ẩm thực"
+        ),
+        Video(
+            "v6", "Đạp ven đô buổi sáng", "Sân sau", "0:15",
+            "https://cdn.jsdelivr.net/gh/mdn/interactive-examples@main/live-examples/media/cc0-videos/flower.mp4",
+            "Thể thao"
         )
         ))
     }

@@ -33,6 +33,10 @@ internal class VideoViewModel @Inject constructor(
     val offline = preferences.preferences.map { it.simulateOffline }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    /** F-VID-02: topics picked at onboarding drive the "Dành cho bạn" section of the feed. */
+    val selectedTopics = preferences.preferences.map { it.selectedTopics }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     fun retry() { refresh.value = refresh.value + 1 }
 
     /** The single shared video player instance (ADR-08: never recreated per screen). */

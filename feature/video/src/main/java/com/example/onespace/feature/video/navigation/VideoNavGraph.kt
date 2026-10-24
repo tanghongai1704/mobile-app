@@ -28,13 +28,14 @@ fun NavGraphBuilder.videoGraph(
             val state by vm.uiState.collectAsStateWithLifecycle()
             val continueList by vm.continueWatching.collectAsStateWithLifecycle()
             val offline by vm.offline.collectAsStateWithLifecycle()
+            val topics by vm.selectedTopics.collectAsStateWithLifecycle()
             CatalogContent(
                 state,
                 offline = offline,
                 onRetry = vm::retry,
                 empty = EmptySpec(Icons.Filled.PlayCircle, "Chưa có video nào", "Làm mới", vm::retry)
             ) { videos ->
-                VideoScreen(videos, continueList) { id ->
+                VideoScreen(videos, topics, continueList) { id ->
                     videos.find { it.id == id }?.let { session.playVideo(it.id, it.title) }
                     onOpenVideo(id)
                 }

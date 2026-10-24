@@ -18,9 +18,14 @@ import com.example.onespace.domain.video.repository.ContinueEntry
 @Composable
 internal fun VideoScreen(
     videos: List<Video>,
+    topics: Set<String>,
     continueWatching: List<ContinueEntry>,
     onOpen: (String) -> Unit
 ) {
+    // F-VID-02: videos whose topic was picked at onboarding come first ("Dành cho bạn"),
+    // the rest stay reachable below ("Khám phá thêm") so the feed never hides content.
+    val forYou = videos.filter { it.topic in topics }
+    val rest = videos.filter { it.topic !in topics }
     FeaturePage {
         if (continueWatching.isNotEmpty()) {
             item { SectionTitle("Tiếp tục xem") }
@@ -34,10 +39,27 @@ internal fun VideoScreen(
                 )
             }
         }
-        items(videos, key = { it.id }) { video ->
-            ContentCard(video.title, video.creator + " · " + video.duration, Icons.Filled.PlayCircle, { onOpen(video.id) })
+        if (forYou.isNotEmpty()) {
+            item { SectionTitle("Dành cho bạn") }
+            items(forYou, key = { "foryou-" + it.id }) { video ->
+                FeedCard(video, onOpen)
+            }
+        }
+        if (rest.isNotEmpty() || forYou.isEmpty()) {
+            item { SectionTitle(if (forYou.isEmpty()) "Tất cả video" else "Khám phá thêm") }
+            items(if (forYou.isEmpty()) videos else rest, key = { it.id }) { video ->
+                FeedCard(video, onOpen)
+            }
         }
     }
+}
+
+@Composable
+private fun FeedCard(video: Video, onOpen: (String) -> Unit) {
+    val subtitle = listOf(video.topic, video.creator, video.duration)
+        .filter { it.isNotBlank() }
+        .joinToString(" · ")
+    ContentCard(video.title, subtitle, Icons.Filled.PlayCircle, { onOpen(video.id) })
 }
 
 /**
