@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.isOn
+import androidx.compose.ui.test.isOff
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.onespace.core.session.SessionCoordinator
+import com.example.onespace.domain.session.port.PlaybackStatus
 import java.io.File
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.assertIsDisplayed
@@ -27,6 +29,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -84,10 +87,12 @@ class NavigationSmokeTest {
             compose.onNodeWithText("Công nghệ").performClick()
             compose.onNodeWithText("Du lịch").performClick()
             compose.onNodeWithText("Bắt đầu").performClick()
+            compose.waitUntil(10_000) { media.preferences.value?.onboarded == true }
+            assertEquals(false, checkNotNull(media.preferences.value).guestMode)
         }
         // Both fresh-run and post-logout states end on the Login screen.
         if (awaitAny("Dùng thử không cần tài khoản", timeoutMs = 10_000)) {
-            compose.onNodeWithText("Dùng thử không cần tài khoản").performClick()
+            compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
             compose.onNodeWithText("Tiếp tục dùng thử").performClick()
         }
     }
@@ -142,8 +147,7 @@ class NavigationSmokeTest {
         compose.onAllNodesWithText("Gần với thiên nhiên thêm chút").onFirst().performClick()
         compose.onNodeWithText("Thu nhỏ & khám phá").performClick()
         awaitText("Mới nhất"); compose.onNodeWithText("Mới nhất").assertIsDisplayed()
-        awaitText("Đang phát · cửa sổ nổi")
-        compose.onNodeWithText("Đang phát · cửa sổ nổi").assertIsDisplayed()
+        compose.onNodeWithTag("floating-video").assertIsDisplayed()
         saveScreenshot("news-floating-video")
         compose.onNodeWithContentDescription("Mở rộng").performClick()
         awaitText("Thu nhỏ & khám phá")
@@ -215,22 +219,35 @@ class NavigationSmokeTest {
         compose.onNode(hasScrollAction()).performScrollToNode(hasText(label))
     }
 
+    private fun awaitSwitch(label: String, enabled: Boolean) {
+        val matcher = hasText(label).and(isToggleable()).and(if (enabled) isOn() else isOff())
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test fun settingsSurviveRecreationAndOfflineCanBeRecovered() {
         openSettings()
         val dataSaver = hasText("Tiết kiệm dữ liệu").and(isToggleable())
-        compose.onNode(dataSaver).performClick().assertIsOn()
+        compose.onNode(dataSaver).performClick()
+        awaitSwitch("Tiết kiệm dữ liệu", enabled = true)
         compose.activityRule.scenario.recreate()
+        awaitSwitch("Tiết kiệm dữ liệu", enabled = true)
         compose.onNode(dataSaver).assertIsOn().performClick()
+        awaitSwitch("Tiết kiệm dữ liệu", enabled = false)
         compose.onNodeWithText("Tối").performClick()
         compose.onNodeWithText("Hệ thống").performClick()
         val offline = hasText("Mô phỏng mất mạng (demo)").and(isToggleable())
         scrollSetting("Mô phỏng mất mạng (demo)")
         compose.onNode(offline).performScrollTo().performClick()
+        awaitSwitch("Mô phỏng mất mạng (demo)", enabled = true)
         compose.tapTab("News")
+        awaitText("Không có kết nối")
         compose.onNodeWithText("Không có kết nối").assertIsDisplayed()
         openSettings()
         scrollSetting("Mô phỏng mất mạng (demo)")
         compose.onNode(offline).performScrollTo().performClick()
+        awaitSwitch("Mô phỏng mất mạng (demo)", enabled = false)
         saveScreenshot("settings")
         compose.tapTab("News")
         awaitText("Mới nhất")
@@ -246,6 +263,8 @@ class NavigationSmokeTest {
         awaitText("Gần với thiên nhiên thêm chút")
         compose.onAllNodesWithText("Gần với thiên nhiên thêm chút").onFirst().performClick()
         compose.tapTab("Music")
+        compose.onNodeWithTag("floating-video").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Mở rộng").assertIsDisplayed()
         awaitText("Nắng sớm")
         compose.onNodeWithText("Nắng sớm").performClick()
         awaitText("Tắt tiếng video, phát nhạc")
@@ -254,6 +273,21 @@ class NavigationSmokeTest {
         compose.onNodeWithText("Tắt tiếng").assertIsDisplayed()
         compose.onNodeWithText("Nắng sớm").assertIsDisplayed()
         saveScreenshot("video-and-music")
+    }
+
+    @Test fun nextTrackDoesNotAddAnotherPlayerToTheBackStack() {
+        lateinit var session: SessionCoordinator
+        compose.runOnIdle { session = ViewModelProvider(compose.activity)[SessionCoordinator::class.java] }
+        compose.tapTab("Music")
+        awaitText("Nắng sớm")
+        compose.onNodeWithText("Nắng sớm").performClick()
+        compose.waitUntil(10_000) { session.music.value.queue.isNotEmpty() }
+        compose.onNodeWithContentDescription("Tiếp theo").performClick()
+        awaitText("Nơi nào yên tĩnh")
+        compose.onNodeWithContentDescription("Bài trước").performClick()
+        awaitText("Nắng sớm")
+        compose.onNodeWithContentDescription("Quay lại").performClick()
+        compose.onNodeWithText("Dành cho bạn").assertIsDisplayed()
     }
 
     @Test fun realMediaStreamsAdvanceBeyondTheInitialPosition() {
@@ -269,7 +303,8 @@ class NavigationSmokeTest {
         val videoPosition = session.video.value.positionMs
         compose.waitUntil(15_000) { session.video.value.positionMs > videoPosition + 500 }
         compose.runOnIdle { session.seekVideoBy(session.video.value.totalMs) }
-        compose.waitUntil(10_000) { !session.video.value.playing }
+        compose.waitUntil(10_000) { session.video.value.status == PlaybackStatus.ENDED }
+        awaitText("Phát")
         compose.onNodeWithText("Phát").performClick()
         compose.waitUntil(15_000) { session.video.value.positionMs in 501..5_000 }
         compose.tapTab("News")
@@ -290,18 +325,31 @@ class NavigationSmokeTest {
         compose.onNodeWithContentDescription("Tài khoản").performClick()
         compose.onNodeWithText("Đăng nhập để giữ tiến độ").performClick()
         awaitText("Tiếp tục với email")
+        saveScreenshot("auth-login")
+        compose.activityRule.scenario.recreate()
+        awaitText("Tiếp tục với email")
         compose.onNodeWithText("Email").performTextInput("invalid")
         compose.onNodeWithText("Tiếp tục với email").performScrollTo().performClick()
         compose.onNodeWithText("Email chưa hợp lệ — kiểm tra lại giúp mình nhé.").assertIsDisplayed()
         compose.onNodeWithText("Email").performTextReplacement("test@onespace.example")
         compose.onNodeWithText("Tiếp tục với email").performScrollTo().performClick()
+        awaitText("Kiểm tra mã xác thực")
+        saveScreenshot("auth-verify")
+        compose.onNodeWithText("Mã OTP").performTextInput("000000")
+        compose.onNodeWithText("Xác nhận & tiếp tục").performScrollTo().performClick()
+        awaitText("Mã xác thực chưa đúng. Nhập 6 chữ số, mã demo là 123456.")
+        compose.onNodeWithText("Mã OTP").performTextReplacement("123456")
+        compose.onNodeWithText("Xác nhận & tiếp tục").performScrollTo().performClick()
+        compose.tapTab("Home")
+        compose.activityRule.scenario.recreate()
         compose.tapTab("Home")
         compose.onNodeWithContentDescription("Tài khoản").performClick()
         awaitText("test@onespace.example")
         compose.onNodeWithText("Đăng xuất").performClick()
         compose.onAllNodesWithText("Đăng xuất").onLast().performClick()
+        compose.activityRule.scenario.recreate()
         awaitText("Dùng thử không cần tài khoản")
-        compose.onNodeWithText("Dùng thử không cần tài khoản").performClick()
+        compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
         compose.onNodeWithText("Tiếp tục dùng thử").performClick()
         compose.tapTab("Home")
         assertEquals(interests, checkNotNull(preferences.preferences.value).selectedTopics)

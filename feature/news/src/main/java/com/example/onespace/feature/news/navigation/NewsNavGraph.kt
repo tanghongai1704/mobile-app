@@ -13,17 +13,13 @@ import com.example.onespace.core.designsystem.EmptySpec
 
 import com.example.onespace.feature.news.presentation.*
 
-object NewsNavigation {
-    const val GRAPH = "news"
-    const val FEED = "news/feed"
-    const val ARTICLE = "news/article/{id}"
-    fun article(id: String) = "news/article/" + android.net.Uri.encode(id)
-}
-
-fun NavGraphBuilder.newsGraph(nav: NavHostController) {
-    navigation(startDestination = NewsNavigation.FEED, route = NewsNavigation.GRAPH) {
-        composable(NewsNavigation.FEED) { entry ->
-            val owner = remember(entry) { nav.getBackStackEntry(NewsNavigation.GRAPH) }
+fun NavGraphBuilder.newsGraph(
+    getGraphEntry: () -> NavBackStackEntry,
+    onOpenArticle: (String) -> Unit
+) {
+    navigation<NewsRoute.Graph>(startDestination = NewsRoute.Feed) {
+        composable<NewsRoute.Feed> { entry ->
+            val owner = remember(entry) { getGraphEntry() }
             val vm: NewsViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
             val offline by vm.offline.collectAsStateWithLifecycle()
@@ -33,17 +29,17 @@ fun NavGraphBuilder.newsGraph(nav: NavHostController) {
                 onRetry = vm::retry,
                 empty = EmptySpec(Icons.Filled.Newspaper, "Chưa có tin tức", "Làm mới", vm::retry)
             ) { articles ->
-                NewsScreen(articles, state.savedIds) { nav.navigate(NewsNavigation.article(it)) }
+                NewsScreen(articles, state.savedIds, onOpenArticle)
             }
         }
-        composable(NewsNavigation.ARTICLE, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
-            val owner = remember(entry) { nav.getBackStackEntry(NewsNavigation.GRAPH) }
+        composable<NewsRoute.Article> { entry ->
+            val owner = remember(entry) { getGraphEntry() }
             val vm: NewsViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
-            val id = entry.arguments?.getString("id")
+            val id = entry.toRoute<NewsRoute.Article>().id
             CatalogContent(ContentUiState(items = state.items, isLoading = state.isLoading, error = state.error)) { articles ->
                 ArticleScreen(articles.find { it.id == id }, id in state.savedIds) {
-                    if (id != null) vm.bookmark(id)
+                    vm.bookmark(id)
                 }
             }
         }

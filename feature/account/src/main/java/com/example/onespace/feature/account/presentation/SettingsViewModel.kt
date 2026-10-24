@@ -1,5 +1,6 @@
 package com.example.onespace.feature.account.presentation
 
+import com.example.onespace.domain.auth.usecase.SignOut
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onespace.domain.session.repository.Language
@@ -15,7 +16,8 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 internal class SettingsViewModel @Inject constructor(
-    private val preferences: SessionPreferencesRepository
+    private val preferences: SessionPreferencesRepository,
+    private val signOut: SignOut
 ) : ViewModel() {
     val uiState: StateFlow<SessionPreferences> = preferences.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SessionPreferences())
@@ -34,11 +36,9 @@ internal class SettingsViewModel @Inject constructor(
     fun resetConflictRule() { viewModelScope.launch { preferences.setConflictRule(null) } }
 
     /** TC08: leave the account and return to the mock login screen. */
-    fun exitAccount(onDone: () -> Unit) {
+    fun exitAccount() {
         viewModelScope.launch {
-            preferences.setAuthEmail(null)
-            preferences.setOnboarded(false)
-            onDone()
+            signOut()
         }
     }
 }

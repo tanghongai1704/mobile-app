@@ -1,5 +1,9 @@
 package com.example.onespace.app.di
 
+import com.example.onespace.data.auth.createAuthRepository
+import com.example.onespace.domain.auth.repository.AuthRepository
+import com.example.onespace.domain.auth.usecase.*
+import com.example.onespace.domain.session.repository.SessionPreferencesRepository
 import com.example.onespace.core.database.ContentDatabase
 import com.example.onespace.data.video.createVideoRepository
 import com.example.onespace.data.video.createViewingSessionRepository
@@ -30,6 +34,11 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object RepositoryModule {
+    @Provides @Singleton fun auth(preferences: SessionPreferencesRepository): AuthRepository = createAuthRepository(preferences)
+    @Provides fun requestCode(repository: AuthRepository) = RequestSignInCode(repository)
+    @Provides fun verifyCode(repository: AuthRepository) = VerifySignInCode(repository)
+    @Provides fun guest(repository: AuthRepository) = ContinueAsGuest(repository)
+    @Provides fun signOut(repository: AuthRepository) = SignOut(repository)
     @Provides @Singleton fun videos(): VideoRepository = createVideoRepository()
     @Provides @Singleton fun music(): MusicRepository = createMusicRepository()
     @Provides @Singleton fun news(): NewsRepository = createNewsRepository()

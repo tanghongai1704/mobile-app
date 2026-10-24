@@ -1,8 +1,13 @@
 plugins {
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+}
+
+tasks.named("check") {
+    dependsOn(rootProject.tasks.named("verifyArchitecture"))
 }
 
 android {
@@ -45,6 +50,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.kotlinx.serialization.json)
     implementation(project(":domain"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:session"))
@@ -53,6 +59,9 @@ dependencies {
     implementation(project(":core:datastore"))
     implementation(project(":feature:home"))
     implementation(project(":feature:onboarding"))
+    implementation(project(":feature:auth"))
+    implementation(project(":data:auth"))
+    implementation(libs.androidx.core.splashscreen)
     implementation(project(":feature:video"))
     implementation(project(":feature:music"))
     implementation(project(":feature:news"))

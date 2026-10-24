@@ -8,8 +8,8 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.onespace.domain.music.model.Track
-import com.example.onespace.domain.music.usecase.SelectNextTrack
-import com.example.onespace.domain.session.MediaConflictRule
+import com.example.onespace.domain.session.VideoStartPlan
+import com.example.onespace.domain.session.port.PlaybackStatus
 import com.example.onespace.domain.session.VideoAudioEffect
 import com.example.onespace.domain.session.port.MediaSessionPort
 import com.example.onespace.domain.session.port.MusicPlayback
@@ -36,10 +36,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * PlaybackCoordinator from the report: one shared engine for every audible
- * content, so PIP, the dock and detail screens never recreate a player. The
- * ExoPlayer instances handle Android audio focus natively — one audible source
- * at a time (ADR-07), the dock music yields to user-started video or TTS.
+ * Shared video/audio engines: in-app floating, dock and detail screens reuse them.
+ * Music currently delegates audio focus to Media3; complete video focus/noisy handling
+ * and service-owned background playback are follow-up work in Section 4.
+ * Internal conflict policy allows one audible primary source at a time.
  */
 @Singleton
 class MediaPlaybackCoordinator @Inject constructor(
@@ -55,16 +55,19 @@ class MediaPlaybackCoordinator @Inject constructor(
         .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
         .build()
 
-    val videoPlayer: ExoPlayer = ExoPlayer.Builder(context)
+    private val videoEngine: ExoPlayer = ExoPlayer.Builder(context)
         // The app arbitrates the video voice itself (case C1): muting must keep the
         // frames rolling, so the video player must not react to system audio focus.
         .setAudioAttributes(mediaAudioAttributes, /* handleAudioFocus = */ false)
         .build()
 
-    val musicPlayer: ExoPlayer = ExoPlayer.Builder(context)
+    private val musicPlayer: ExoPlayer = ExoPlayer.Builder(context)
         // Dock music yields to any other audible source (calls, other apps, video).
         .setAudioAttributes(mediaAudioAttributes, /* handleAudioFocus = */ true)
         .build()
+
+    /** Platform surface handle; audio engine and playlist are private implementation details. */
+    val videoPlayer: Player get() = videoEngine
 
     private val _music = MutableStateFlow(MusicPlayback())
     override val music: StateFlow<MusicPlayback> = _music.asStateFlow()
@@ -75,16 +78,12 @@ class MediaPlaybackCoordinator @Inject constructor(
     private var queue: List<Track> = emptyList()
 
     init {
+        musicPlayer.repeatMode = Player.REPEAT_MODE_ALL
         musicPlayer.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) = syncMusicState()
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_ENDED) skipToNext()
-                syncMusicState()
-            }
+            override fun onEvents(player: Player, events: Player.Events) = syncMusicState()
         })
-        videoPlayer.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) = syncVideoState()
-            override fun onPlaybackStateChanged(state: Int) = syncVideoState()
+        videoEngine.addListener(object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) = syncVideoState()
         })
         // Persist the video resume position on a slow cadence (F-VID-05, TC10).
         scope.launch {
@@ -93,14 +92,14 @@ class MediaPlaybackCoordinator @Inject constructor(
                 val current = _video.value
                 val videoId = current.videoId
                 if (videoId != null && current.playing) {
-                    viewingSession.saveProgress(videoId, videoPlayer.currentPosition)
+                    viewingSession.saveProgress(videoId, videoEngine.currentPosition)
                 }
             }
         }
         // Data saver (F-COM-13): cap playback quality to roughly 720p.
         scope.launch {
             preferences.preferences.collect { prefs ->
-                videoPlayer.trackSelectionParameters = videoPlayer.trackSelectionParameters
+                videoEngine.trackSelectionParameters = videoEngine.trackSelectionParameters
                     .buildUpon()
                     .setMaxVideoSize(if (prefs.dataSaver) Int.MAX_VALUE else Int.MAX_VALUE,
                         if (prefs.dataSaver) 720 else Int.MAX_VALUE)
@@ -112,7 +111,7 @@ class MediaPlaybackCoordinator @Inject constructor(
             while (isActive) {
                 delay(POSITION_TICK_MS)
                 if (musicPlayer.playbackState != Player.STATE_IDLE) syncMusicState()
-                if (videoPlayer.playbackState != Player.STATE_IDLE) syncVideoState()
+                if (videoEngine.playbackState != Player.STATE_IDLE) syncVideoState()
             }
         }
     }
@@ -122,38 +121,25 @@ class MediaPlaybackCoordinator @Inject constructor(
     override fun requestMusic(track: Track, queue: List<Track>, effect: VideoAudioEffect) {
         when (effect) {
             // The video keeps playing visually without audio (ADR-07 single audible source).
-            VideoAudioEffect.MUTE -> { videoPlayer.volume = 0f; syncVideoState() }
-            VideoAudioEffect.PAUSE -> videoPlayer.pause()
+            VideoAudioEffect.MUTE -> { videoEngine.volume = 0f; syncVideoState() }
+            VideoAudioEffect.PAUSE -> videoEngine.pause()
             VideoAudioEffect.NONE -> Unit
         }
         playTrack(track, queue)
     }
 
-    override fun resolveMusicConflict(track: Track, queue: List<Track>, rule: MediaConflictRule) {
-        if (rule == MediaConflictRule.KEEP_VIDEO) return
-        requestMusic(track, queue, when (rule) {
-            MediaConflictRule.MUTE_VIDEO -> VideoAudioEffect.MUTE
-            MediaConflictRule.PAUSE_VIDEO -> VideoAudioEffect.PAUSE
-            MediaConflictRule.KEEP_VIDEO -> VideoAudioEffect.NONE
-        })
-    }
-
     override fun prepareRestoredMusic(track: Track, queue: List<Track>) {
-        this.queue = queue
+        val index = queue.indexOfFirst { it.id == track.id }
+        if (index < 0) return
+        this.queue = queue.toList()
         musicPlayer.pause()
-        musicPlayer.setMediaItem(mediaItem(track))
+        musicPlayer.setMediaItems(this.queue.map(::mediaItem), index, 0)
         musicPlayer.prepare()
-        _music.value = MusicPlayback(
-            trackId = track.id, title = track.title, artist = track.artist,
-            playing = false, positionMs = 0, totalMs = 0
-        )
+        syncMusicState()
     }
 
-    override fun toggleMusic() {
-        if (musicPlayer.playWhenReady) musicPlayer.pause() else {
-            if (videoPlayer.volume > 0f) videoPlayer.pause()
-            musicPlayer.play()
-        }
+    override fun pauseMusic() {
+        musicPlayer.pause()
         syncMusicState()
     }
 
@@ -161,6 +147,7 @@ class MediaPlaybackCoordinator @Inject constructor(
         musicPlayer.pause()
         musicPlayer.stop()
         musicPlayer.clearMediaItems()
+        queue = emptyList()
         _music.value = MusicPlayback()
     }
 
@@ -169,25 +156,21 @@ class MediaPlaybackCoordinator @Inject constructor(
         syncMusicState()
     }
 
-    override fun skipToNext() {
-        SelectNextTrack(queue, _music.value.trackId)?.let { playTrack(it, queue) }
-    }
-
-    override fun skipToPrevious() {
-        if (queue.isEmpty()) return
-        val index = queue.indexOfFirst { it.id == _music.value.trackId }
-        val previous = queue[(index - 1 + queue.size) % queue.size]
-        playTrack(previous, queue)
-    }
-
     private fun playTrack(track: Track, queue: List<Track>) {
-        this.queue = queue
-        if (videoPlayer.volume > 0f) videoPlayer.pause()
-        if (musicPlayer.currentMediaItem?.mediaId != track.id || musicPlayer.playbackState == Player.STATE_IDLE) {
-            musicPlayer.setMediaItem(mediaItem(track))
+        val index = queue.indexOfFirst { it.id == track.id }
+        if (index < 0) return
+        val changed = this.queue != queue || musicPlayer.mediaItemCount != queue.size
+        this.queue = queue.toList()
+        if (changed) {
+            musicPlayer.setMediaItems(this.queue.map(::mediaItem), index, 0)
             musicPlayer.prepare()
-        } else if (musicPlayer.playbackState == Player.STATE_ENDED) {
-            musicPlayer.seekTo(0)
+        } else {
+            if (musicPlayer.currentMediaItemIndex != index || musicPlayer.playbackState == Player.STATE_ENDED) {
+                musicPlayer.seekToDefaultPosition(index)
+            }
+            if (musicPlayer.playbackState == Player.STATE_IDLE || musicPlayer.playerError != null) {
+                musicPlayer.prepare()
+            }
         }
         musicPlayer.play()
         syncMusicState()
@@ -208,8 +191,12 @@ class MediaPlaybackCoordinator @Inject constructor(
             trackId = item.mediaId,
             title = track?.title ?: item.mediaMetadata.title?.toString().orEmpty(),
             artist = track?.artist ?: item.mediaMetadata.artist?.toString().orEmpty(),
-            // playWhenReady = user intent; true while buffering too, so transport UI is stable.
-            playing = musicPlayer.playWhenReady && musicPlayer.playbackState != Player.STATE_IDLE,
+            playing = musicPlayer.isPlaying,
+            playRequested = musicPlayer.playWhenReady && musicPlayer.playbackState != Player.STATE_ENDED,
+            status = statusOf(musicPlayer),
+            suppressed = musicPlayer.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE,
+            error = musicPlayer.playerError?.let { "Không phát được nhạc. Kiểm tra kết nối rồi nhấn Phát để thử lại." },
+            queue = queue,
             positionMs = musicPlayer.currentPosition.coerceAtLeast(0),
             totalMs = durationOf(musicPlayer)
         )
@@ -217,10 +204,9 @@ class MediaPlaybackCoordinator @Inject constructor(
 
     // ---- Video ----
 
-    override fun openVideo(video: Video, startPositionMs: Long) {
-        // ADR-07, one audible source: opening a user-started video parks the dock music.
-        musicPlayer.pause()
-        videoPlayer.setMediaItem(
+    override fun openVideo(video: Video, startPositionMs: Long, plan: VideoStartPlan) {
+        if (plan.pauseMusic) musicPlayer.pause()
+        videoEngine.setMediaItem(
             MediaItem.Builder()
                 .setUri(video.url)
                 .setMediaId(video.id)
@@ -229,50 +215,49 @@ class MediaPlaybackCoordinator @Inject constructor(
                 )
                 .build()
         )
-        videoPlayer.prepare()
-        if (startPositionMs > 0) videoPlayer.seekTo(startPositionMs)
-        videoPlayer.volume = 1f
-        videoPlayer.play()
+        videoEngine.prepare()
+        if (startPositionMs > 0) videoEngine.seekTo(startPositionMs)
+        videoEngine.volume = 1f
+        videoEngine.play()
         syncVideoState()
     }
 
-    override fun toggleVideo() {
-        if (videoPlayer.playWhenReady && videoPlayer.playbackState != Player.STATE_ENDED) videoPlayer.pause() else {
-            if (videoPlayer.volume > 0f) musicPlayer.pause()
-            if (videoPlayer.playbackState == Player.STATE_ENDED) videoPlayer.seekTo(0)
-            if (videoPlayer.playbackState == Player.STATE_IDLE) videoPlayer.prepare()
-            videoPlayer.play()
-        }
+    override fun resumeVideo(plan: VideoStartPlan) {
+        if (videoEngine.currentMediaItem == null) return
+        if (plan.pauseMusic) musicPlayer.pause()
+        if (videoEngine.playbackState == Player.STATE_ENDED) videoEngine.seekTo(0)
+        if (videoEngine.playbackState == Player.STATE_IDLE || videoEngine.playerError != null) videoEngine.prepare()
+        videoEngine.play()
         syncVideoState()
     }
 
     override fun pauseVideo() {
-        videoPlayer.pause()
+        videoEngine.pause()
         syncVideoState()
     }
 
     override fun seekVideoBy(deltaMs: Long) {
-        videoPlayer.seekTo((videoPlayer.currentPosition + deltaMs).coerceIn(0, durationOf(videoPlayer)))
+        videoEngine.seekTo((videoEngine.currentPosition + deltaMs).coerceIn(0, durationOf(videoEngine)))
     }
 
     override fun dismissVideo(toWatchlist: Boolean) {
         val current = _video.value
         val videoId = current.videoId
-        val position = videoPlayer.currentPosition
-        val hasContent = videoPlayer.currentMediaItem != null
+        val position = videoEngine.currentPosition
+        val hasContent = videoEngine.currentMediaItem != null
         if (videoId != null && hasContent) {
             scope.launch {
                 viewingSession.saveProgress(videoId, position)
                 if (toWatchlist) viewingSession.addToWatchlist(videoId, current.title)
             }
         }
-        videoPlayer.stop()
-        videoPlayer.clearMediaItems()
+        videoEngine.stop()
+        videoEngine.clearMediaItems()
         _video.value = VideoPlayback()
     }
 
     private fun syncVideoState() {
-        val item = videoPlayer.currentMediaItem ?: if (videoPlayer.playbackState == Player.STATE_IDLE) {
+        val item = videoEngine.currentMediaItem ?: if (videoEngine.playbackState == Player.STATE_IDLE) {
             _video.value = VideoPlayback()
             return
         } else null
@@ -280,13 +265,23 @@ class MediaPlaybackCoordinator @Inject constructor(
         _video.value = VideoPlayback(
             videoId = item.mediaId,
             title = item.mediaMetadata.title?.toString().orEmpty(),
-            // playWhenReady = user intent; true while buffering too, so status text is stable.
-            playing = videoPlayer.playWhenReady && videoPlayer.playbackState != Player.STATE_IDLE &&
-                videoPlayer.playbackState != Player.STATE_ENDED,
-            positionMs = videoPlayer.currentPosition.coerceAtLeast(0),
-            totalMs = durationOf(videoPlayer),
-            muted = videoPlayer.volume == 0f
+            playing = videoEngine.isPlaying,
+            playRequested = videoEngine.playWhenReady && videoEngine.playbackState != Player.STATE_ENDED,
+            status = statusOf(videoEngine),
+            suppressed = videoEngine.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE,
+            error = videoEngine.playerError?.let { "Không phát được video. Kiểm tra kết nối rồi nhấn Phát để thử lại." },
+            positionMs = videoEngine.currentPosition.coerceAtLeast(0),
+            totalMs = durationOf(videoEngine),
+            muted = videoEngine.volume == 0f
         )
+    }
+
+    private fun statusOf(player: Player): PlaybackStatus = when {
+        player.playerError != null -> PlaybackStatus.ERROR
+        player.playbackState == Player.STATE_BUFFERING -> PlaybackStatus.BUFFERING
+        player.playbackState == Player.STATE_READY -> PlaybackStatus.READY
+        player.playbackState == Player.STATE_ENDED -> PlaybackStatus.ENDED
+        else -> PlaybackStatus.IDLE
     }
 
     private fun durationOf(player: Player): Long =
@@ -295,7 +290,7 @@ class MediaPlaybackCoordinator @Inject constructor(
     fun release() {
         scope.cancel()
         musicPlayer.release()
-        videoPlayer.release()
+        videoEngine.release()
     }
 
     companion object {

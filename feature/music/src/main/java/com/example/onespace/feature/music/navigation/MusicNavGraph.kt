@@ -13,17 +13,14 @@ import androidx.compose.material.icons.filled.MusicNote
 
 import com.example.onespace.feature.music.presentation.*
 
-object MusicNavigation {
-    const val GRAPH = "music"
-    const val FEED = "music/feed"
-    const val NOW_PLAYING = "music/playing/{id}"
-    fun nowPlaying(id: String) = "music/playing/" + android.net.Uri.encode(id)
-}
-
-fun NavGraphBuilder.musicGraph(nav: NavHostController, session: SessionCoordinator) {
-    navigation(startDestination = MusicNavigation.FEED, route = MusicNavigation.GRAPH) {
-        composable(MusicNavigation.FEED) { entry ->
-            val owner = remember(entry) { nav.getBackStackEntry(MusicNavigation.GRAPH) }
+fun NavGraphBuilder.musicGraph(
+    session: SessionCoordinator,
+    getGraphEntry: () -> NavBackStackEntry,
+    onOpenPlayer: (String) -> Unit
+) {
+    navigation<MusicRoute.Graph>(startDestination = MusicRoute.Feed) {
+        composable<MusicRoute.Feed> { entry ->
+            val owner = remember(entry) { getGraphEntry() }
             val vm: MusicViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
             val offline by vm.offline.collectAsStateWithLifecycle()
@@ -35,19 +32,21 @@ fun NavGraphBuilder.musicGraph(nav: NavHostController, session: SessionCoordinat
             ) { tracks ->
                 MusicScreen(tracks) { id ->
                     tracks.find { it.id == id }?.let { session.playMusic(it.id, it.title) }
-                    nav.navigate(MusicNavigation.nowPlaying(id)) { launchSingleTop = true }
+                    onOpenPlayer(id)
                 }
             }
         }
-        composable(MusicNavigation.NOW_PLAYING, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
-            val owner = remember(entry) { nav.getBackStackEntry(MusicNavigation.GRAPH) }
+        composable<MusicRoute.NowPlaying> { entry ->
+            val id = entry.toRoute<MusicRoute.NowPlaying>().id
+            val owner = remember(entry) { getGraphEntry() }
             val vm: MusicViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
             val playback by session.music.collectAsStateWithLifecycle()
-            CatalogContent(state) { tracks ->
-                // Follow the engine, not the route argument: auto-advance may have moved on.
+            // Active playback remains usable even if the catalog reload fails.
+            val tracks = playback.queue.ifEmpty { state.items }
+            // Follow the engine, not the route argument: auto-advance may have moved on.
                 val current = tracks.firstOrNull { it.id == playback.trackId }
-                    ?: tracks.firstOrNull { it.id == entry.arguments?.getString("id") }
+                    ?: tracks.firstOrNull { it.id == id }
                 NowPlayingScreen(
                     track = current,
                     playback = playback,
@@ -57,16 +56,7 @@ fun NavGraphBuilder.musicGraph(nav: NavHostController, session: SessionCoordinat
                     },
                     onSeekTo = session::seekMusicTo,
                     onPrevious = session::previousTrack,
-                    onNext = {
-                        vm.nextTrack(playback.trackId ?: current?.id)?.let { next ->
-                            session.playMusic(next.id, next.title)
-                            nav.navigate(MusicNavigation.nowPlaying(next.id)) {
-                                popUpTo(MusicNavigation.NOW_PLAYING) { inclusive = true }
-                                launchSingleTop = true
-                            }
-                        }
-                    })
-            }
+                    onNext = session::nextTrack)
         }
     }
 }

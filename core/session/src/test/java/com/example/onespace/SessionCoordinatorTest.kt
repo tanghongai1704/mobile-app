@@ -7,6 +7,8 @@ import com.example.onespace.domain.music.repository.MusicRepository
 import com.example.onespace.domain.music.usecase.GetMusic
 import com.example.onespace.domain.session.MediaConflictRule
 import com.example.onespace.domain.session.Section
+import com.example.onespace.domain.session.VideoStartPlan
+import com.example.onespace.domain.session.port.PlaybackStatus
 import com.example.onespace.domain.session.VideoAudioEffect
 import com.example.onespace.domain.session.port.MediaSessionPort
 import com.example.onespace.domain.session.port.MusicPlayback
@@ -49,35 +51,32 @@ class SessionCoordinatorTest {
 
         override fun requestMusic(track: Track, queue: List<Track>, effect: VideoAudioEffect) {
             musicRequests.add(track.id to effect)
-            musicState.value = MusicPlayback(track.id, track.title, track.artist, playing = true)
-        }
-
-        override fun resolveMusicConflict(track: Track, queue: List<Track>, rule: MediaConflictRule) {
-            if (rule != MediaConflictRule.KEEP_VIDEO) {
-                requestMusic(track, queue, when (rule) {
-                    MediaConflictRule.MUTE_VIDEO -> VideoAudioEffect.MUTE
-                    MediaConflictRule.PAUSE_VIDEO -> VideoAudioEffect.PAUSE
-                    MediaConflictRule.KEEP_VIDEO -> VideoAudioEffect.NONE
-                })
+            when (effect) {
+                VideoAudioEffect.MUTE -> videoState.value = videoState.value.copy(muted = true)
+                VideoAudioEffect.PAUSE -> pauseVideo()
+                VideoAudioEffect.NONE -> Unit
             }
+            musicState.value = MusicPlayback(track.id, track.title, track.artist, playing = true, queue = queue)
         }
 
         override fun prepareRestoredMusic(track: Track, queue: List<Track>) {
-            musicState.value = MusicPlayback(track.id, track.title, track.artist, playing = false)
+            musicState.value = MusicPlayback(track.id, track.title, track.artist, playing = false, queue = queue)
         }
 
-        override fun toggleMusic() { musicState.value = musicState.value.copy(playing = !musicState.value.playing) }
+        override fun pauseMusic() { musicState.value = musicState.value.copy(playing = false, playRequested = false) }
         override fun stopMusic() { musicState.value = MusicPlayback() }
         override fun seekMusicTo(positionMs: Long) { musicState.value = musicState.value.copy(positionMs = positionMs) }
-        override fun skipToNext() = Unit
-        override fun skipToPrevious() = Unit
 
-        override fun openVideo(video: Video, startPositionMs: Long) {
+        override fun openVideo(video: Video, startPositionMs: Long, plan: VideoStartPlan) {
+            if (plan.pauseMusic) pauseMusic()
             videoState.value = VideoPlayback(video.id, video.title, playing = true, positionMs = startPositionMs)
         }
 
-        override fun toggleVideo() { videoState.value = videoState.value.copy(playing = !videoState.value.playing) }
-        override fun pauseVideo() { videoState.value = videoState.value.copy(playing = false) }
+        override fun resumeVideo(plan: VideoStartPlan) {
+            if (plan.pauseMusic) pauseMusic()
+            videoState.value = videoState.value.copy(playing = true, playRequested = true, status = PlaybackStatus.READY, error = null)
+        }
+        override fun pauseVideo() { videoState.value = videoState.value.copy(playing = false, playRequested = false) }
         override fun seekVideoBy(deltaMs: Long) = Unit
         override fun dismissVideo(toWatchlist: Boolean) { videoState.value = VideoPlayback() }
     }
@@ -93,7 +92,7 @@ class SessionCoordinatorTest {
         override suspend fun setDataSaver(enabled: Boolean) = Unit
         override suspend fun setThemeMode(mode: ThemeMode) = Unit
         override suspend fun setOnboarded(done: Boolean) = Unit
-        override suspend fun setAuthEmail(email: String?) = Unit
+        override suspend fun setAuthSession(email: String?, guest: Boolean) = Unit
         override suspend fun setSelectedTopics(topics: Set<String>) = Unit
         override suspend fun setLanguage(language: com.example.onespace.domain.session.repository.Language) = Unit
         override suspend fun setSimulateOffline(enabled: Boolean) = Unit
@@ -130,8 +129,6 @@ class SessionCoordinatorTest {
         assertEquals("A video", restored.videoTitle)
         assertEquals("m1", restored.trackId)
         assertEquals("A track", restored.trackTitle)
-        assertFalse(restored.videoPlaying)
-        assertFalse(restored.musicPlaying)
     }
 
     @Test fun engineStateDrivesTheUiSessionState() = runTest(dispatcher) {
@@ -141,11 +138,11 @@ class SessionCoordinatorTest {
         advanceUntilIdle()
         assertEquals("m1", coordinator.uiState.value.trackId)
         assertEquals("A track", coordinator.uiState.value.trackTitle)
-        assertTrue(coordinator.uiState.value.musicPlaying)
+        assertTrue(coordinator.music.value.playing)
         port.musicState.value = MusicPlayback()
         advanceUntilIdle()
         assertNull(coordinator.uiState.value.trackId)
-        assertFalse(coordinator.uiState.value.musicPlaying)
+        assertFalse(coordinator.music.value.playing)
     }
 
     @Test fun firstVideoMusicCollisionAsksOnceThenAppliesTheRememberedRule() = runTest(dispatcher) {
@@ -166,10 +163,11 @@ class SessionCoordinatorTest {
         assertEquals(MediaConflictRule.MUTE_VIDEO, prefs.state.value.conflictRule)
         assertNull(coordinator.conflict.value)
 
-        // Same pair again: silent, the remembered rule is applied without asking.
+        // Muted video no longer competes for audio, even when another track is requested.
         coordinator.playMusic("m1", "A track")
         advanceUntilIdle()
         assertEquals(2, port.musicRequests.size)
+        assertEquals(VideoAudioEffect.NONE, port.musicRequests.last().second)
         assertNull(coordinator.conflict.value)
     }
 
@@ -214,5 +212,88 @@ class SessionCoordinatorTest {
         advanceUntilIdle()
         assertNull(port.music.value.trackId)
         assertNull(prefs.state.value.lastTrackId)
+    }
+
+    @Test fun musicCatalogDoesNotChangeEnginePlaybackOrOpenAConflict() = runTest(dispatcher) {
+        val port = FakePort()
+        val coordinator = coordinator(SavedStateHandle(), port)
+        port.videoState.value = VideoPlayback("v1", "A video", playing = true)
+        advanceUntilIdle()
+        coordinator.enter(Section.MUSIC)
+        advanceUntilIdle()
+        assertTrue(coordinator.video.value.playing)
+        assertNull(coordinator.conflict.value)
+        assertTrue(port.musicRequests.isEmpty())
+    }
+
+    @Test fun nextAndPreviousUseTheActiveQueueInsteadOfTheCatalog() = runTest(dispatcher) {
+        val port = FakePort()
+        val coordinator = coordinator(SavedStateHandle(), port)
+        val second = tracks.single().copy(id = "outside-catalog", title = "Queue only")
+        val queue = listOf(tracks.single(), second)
+        port.musicState.value = MusicPlayback("m1", queue = queue)
+        coordinator.nextTrack()
+        advanceUntilIdle()
+        assertEquals(second.id, port.music.value.trackId)
+        coordinator.previousTrack()
+        advanceUntilIdle()
+        assertEquals("m1", port.music.value.trackId)
+        assertEquals(queue, port.music.value.queue)
+    }
+
+    @Test fun resumingMutedVideoKeepsMusicButAudibleVideoPausesIt() = runTest(dispatcher) {
+        val port = FakePort()
+        val coordinator = coordinator(SavedStateHandle(), port)
+        port.musicState.value = MusicPlayback("m1", playing = true)
+        port.videoState.value = VideoPlayback("v1", muted = true)
+        coordinator.toggleVideo()
+        assertTrue(port.video.value.playing)
+        assertTrue(port.music.value.playing)
+        port.videoState.value = VideoPlayback("v1", muted = false)
+        coordinator.toggleVideo()
+        assertFalse(port.music.value.playRequested)
+    }
+
+    @Test fun bufferingMusicCanBePausedWithoutRestartingTheQueue() = runTest(dispatcher) {
+        val port = FakePort()
+        val coordinator = coordinator(SavedStateHandle(), port)
+        port.musicState.value = MusicPlayback("m1", playRequested = true, status = PlaybackStatus.BUFFERING, queue = tracks)
+        coordinator.toggleMusic()
+        advanceUntilIdle()
+        assertFalse(port.music.value.playRequested)
+        assertTrue(port.musicRequests.isEmpty())
+    }
+
+    @Test fun closingMediaCancelsAnOlderPendingPlayRequest() = runTest(dispatcher) {
+        val port = FakePort()
+        val coordinator = coordinator(SavedStateHandle(), port)
+        coordinator.playVideo("v1")
+        coordinator.playMusic("m1")
+        coordinator.closeMusic()
+        coordinator.closeVideo()
+        advanceUntilIdle()
+        assertNull(port.video.value.videoId)
+        assertNull(port.music.value.trackId)
+    }
+
+    @Test fun backgroundCannotBeOvertakenByAnOlderPendingVideoRequest() = runTest(dispatcher) {
+        val port = FakePort()
+        val coordinator = coordinator(SavedStateHandle(), port)
+        coordinator.playVideo("v1")
+        coordinator.background()
+        advanceUntilIdle()
+        assertNull(port.video.value.videoId)
+    }
+
+    @Test fun keepVideoNeverSendsAStartCommandToTheEngine() = runTest(dispatcher) {
+        val port = FakePort()
+        val coordinator = coordinator(SavedStateHandle(), port)
+        port.videoState.value = VideoPlayback("v1", playing = true)
+        coordinator.playMusic("m1")
+        advanceUntilIdle()
+        coordinator.resolveMusicConflict(MediaConflictRule.KEEP_VIDEO)
+        advanceUntilIdle()
+        assertTrue(port.musicRequests.isEmpty())
+        assertTrue(port.video.value.playing)
     }
 }

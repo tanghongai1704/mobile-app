@@ -1,71 +1,46 @@
 package com.example.onespace.domain.session
 
+import com.example.onespace.domain.session.port.PlaybackStatus
+import com.example.onespace.domain.session.port.VideoPlayback
 import org.junit.Assert.*
 import org.junit.Test
 
 class SessionPolicyTest {
-    @Test fun videoContinuesOverNewsAndMutedGamesButPausesForMusic() {
-        val playing = SessionPolicy.playVideo(SessionState(), "v1", "Video")
-        assertTrue(SessionPolicy.enter(playing, Section.NEWS).videoPlaying)
-        assertTrue(SessionPolicy.enter(playing, Section.GAMES).videoPlaying)
-        assertFalse(SessionPolicy.enter(playing, Section.MUSIC).videoPlaying)
+    @Test fun choosingAnyCatalogPreservesMediaIdentity() {
+        val state = SessionState(videoId = "v1", trackId = "m1")
+        Section.entries.forEach { assertEquals(state, SessionPolicy.enter(state, it)) }
     }
-
-    @Test fun onlyOneAudibleMediaSourcePlaysAtATime() {
-        val video = SessionPolicy.playVideo(SessionState(), "v1", "Video")
-        val music = SessionPolicy.playMusic(video, "m1", "Track")
-        assertTrue(music.musicPlaying)
-        assertFalse(music.videoPlaying)
-        assertTrue(SessionPolicy.enter(music, Section.GAMES).musicPlaying)
-        val nextVideo = SessionPolicy.playVideo(music, "v2", "Next")
-        assertFalse(nextVideo.musicPlaying)
-        assertTrue(nextVideo.videoPlaying)
+    @Test fun leavingGamePausesItWithoutStartingAnotherGame() {
+        val state = SessionState(gamePaused = false)
+        assertTrue(SessionPolicy.enter(state, Section.NEWS).gamePaused)
+        assertTrue(SessionPolicy.enter(SessionState(), Section.GAMES).gamePaused)
+        assertTrue(SessionPolicy.background(state).gamePaused)
     }
-
-    @Test fun backgroundPausesVideoAndGameWhileKeepingMusic() {
-        val music = SessionPolicy.playMusic(SessionState(gamePaused = false), "m1", "Track")
-        val background = SessionPolicy.background(music)
-        assertTrue(background.musicPlaying)
-        assertTrue(background.gamePaused)
-        val video = SessionPolicy.playVideo(music, "v1", "Video")
-        assertFalse(SessionPolicy.background(video).videoPlaying)
+    @Test fun audibleVideoMustPauseMusicButMutedVideoCanCoexist() {
+        assertTrue(SessionPolicy.resolveVideoStart(muted = false).pauseMusic)
+        assertFalse(SessionPolicy.resolveVideoStart(muted = true).pauseMusic)
     }
-
-    @Test fun emptySessionControlsNeverStartAnUnknownMediaItem() {
-        assertFalse(SessionPolicy.toggleVideo(SessionState()).videoPlaying)
-        assertFalse(SessionPolicy.toggleMusic(SessionState()).musicPlaying)
-    }
-
-    @Test fun leavingGamePausesItAndEnteringCatalogDoesNotStartGameLoop() {
-        val leaving = SessionPolicy.enter(SessionState(gamePaused = false), Section.NEWS)
-        assertTrue(leaving.gamePaused)
-        assertTrue(SessionPolicy.enter(leaving, Section.GAMES).gamePaused)
-    }
-
-    @Test fun musicStartsFreelyWhenNoVideoIsPlaying() {
-        val plan = SessionPolicy.resolveMusicStart(videoActive = false, rememberedRule = null)
-        assertEquals(MusicStartPlan.Start(VideoAudioEffect.NONE), plan)
-    }
-
-    @Test fun firstCollisionOfVideoAndMusicAsksTheUserForARule() {
+    @Test fun firstAudibleCollisionRequiresAChoice() {
         assertEquals(MusicStartPlan.AskUser, SessionPolicy.resolveMusicStart(true, null))
     }
-
-    @Test fun rememberedRulesAreAppliedSilently() {
-        assertEquals(
-            MusicStartPlan.Start(VideoAudioEffect.MUTE),
-            SessionPolicy.resolveMusicStart(true, MediaConflictRule.MUTE_VIDEO))
-        assertEquals(
-            MusicStartPlan.Start(VideoAudioEffect.PAUSE),
-            SessionPolicy.resolveMusicStart(true, MediaConflictRule.PAUSE_VIDEO))
-        assertEquals(
-            MusicStartPlan.DoNotStart,
-            SessionPolicy.resolveMusicStart(true, MediaConflictRule.KEEP_VIDEO))
+    @Test fun rememberedRulesProduceExplicitEffects() {
+        assertEquals(MusicStartPlan.Start(VideoAudioEffect.MUTE), SessionPolicy.resolveMusicStart(true, MediaConflictRule.MUTE_VIDEO))
+        assertEquals(MusicStartPlan.Start(VideoAudioEffect.PAUSE), SessionPolicy.resolveMusicStart(true, MediaConflictRule.PAUSE_VIDEO))
+        assertEquals(MusicStartPlan.DoNotStart, SessionPolicy.resolveMusicStart(true, MediaConflictRule.KEEP_VIDEO))
     }
-
-    @Test fun rememberedRuleIsIgnoredWhenNoVideoIsActive() {
-        assertEquals(
-            MusicStartPlan.Start(VideoAudioEffect.NONE),
-            SessionPolicy.resolveMusicStart(false, MediaConflictRule.KEEP_VIDEO))
+    @Test fun stoppedOrMutedVideoDoesNotBlockMusicWithARememberedKeepVideoRule() {
+        assertEquals(MusicStartPlan.Start(VideoAudioEffect.NONE), SessionPolicy.resolveMusicStart(false, MediaConflictRule.KEEP_VIDEO))
+        assertFalse(VideoPlayback(videoId = "v1", playing = true, muted = true).audible)
+    }
+    @Test fun explicitKeepVideoChoiceCancelsEvenWhenTheVideoHasEnded() {
+        assertEquals(MusicStartPlan.DoNotStart, SessionPolicy.resolveMusicChoice(false, MediaConflictRule.KEEP_VIDEO))
+        assertEquals(MusicStartPlan.Start(VideoAudioEffect.NONE), SessionPolicy.resolveMusicChoice(false, MediaConflictRule.MUTE_VIDEO))
+    }
+    @Test fun bufferingRetainsAudioIntentButEndedAndFailedMediaDoNot() {
+        val buffering = VideoPlayback(videoId = "v1", playRequested = true, status = PlaybackStatus.BUFFERING)
+        assertFalse(buffering.playing)
+        assertTrue(buffering.audible)
+        assertFalse(buffering.copy(status = PlaybackStatus.ENDED).audible)
+        assertFalse(buffering.copy(status = PlaybackStatus.ERROR).audible)
     }
 }

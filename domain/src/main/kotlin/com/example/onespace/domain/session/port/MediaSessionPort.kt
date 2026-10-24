@@ -1,10 +1,13 @@
 package com.example.onespace.domain.session.port
 
 import com.example.onespace.domain.music.model.Track
-import com.example.onespace.domain.session.MediaConflictRule
 import com.example.onespace.domain.session.VideoAudioEffect
+import com.example.onespace.domain.session.VideoStartPlan
 import com.example.onespace.domain.video.model.Video
 import kotlinx.coroutines.flow.StateFlow
+
+/** Framework-independent state; requested playback is distinct from actual output. */
+enum class PlaybackStatus { IDLE, BUFFERING, READY, ENDED, ERROR }
 
 data class MusicPlayback(
     val trackId: String? = null,
@@ -12,7 +15,12 @@ data class MusicPlayback(
     val artist: String = "",
     val playing: Boolean = false,
     val positionMs: Long = 0,
-    val totalMs: Long = 0
+    val totalMs: Long = 0,
+    val playRequested: Boolean = playing,
+    val status: PlaybackStatus = if (playing) PlaybackStatus.READY else PlaybackStatus.IDLE,
+    val suppressed: Boolean = false,
+    val error: String? = null,
+    val queue: List<Track> = emptyList()
 )
 
 data class VideoPlayback(
@@ -21,36 +29,34 @@ data class VideoPlayback(
     val playing: Boolean = false,
     val positionMs: Long = 0,
     val totalMs: Long = 0,
-    val muted: Boolean = false
-)
+    val muted: Boolean = false,
+    val playRequested: Boolean = playing,
+    val status: PlaybackStatus = if (playing) PlaybackStatus.READY else PlaybackStatus.IDLE,
+    val suppressed: Boolean = false,
+    val error: String? = null
+) {
+    // Buffering video still owns its audio intent; muted/ended/error video does not.
+    val audible: Boolean get() = videoId != null && playRequested && !muted &&
+        status != PlaybackStatus.ENDED && status != PlaybackStatus.ERROR
+}
 
-/** First-time collision of video + music; the shell turns it into the case C1 popup. */
+/** A user request awaiting the C1 decision; it is not a second active queue. */
 data class MusicConflictRequest(val track: Track, val queue: List<Track>)
 
-/**
- * Domain-facing contract of the shared media engine (PlaybackCoordinator in the
- * report's coordinator table). Implemented in core:media with a single shared
- * player pair for music and video, so no screen ever creates its own player.
- */
+/** Adapters execute explicit effects; policy and navigation stay outside the engine. */
 interface MediaSessionPort {
     val music: StateFlow<MusicPlayback>
     val video: StateFlow<VideoPlayback>
 
-    /** Start music, telling the engine how to treat a playing video per [effect]. */
     fun requestMusic(track: Track, queue: List<Track>, effect: VideoAudioEffect)
-    fun resolveMusicConflict(track: Track, queue: List<Track>, rule: MediaConflictRule)
-    /** Rehydrate the queue and last track after a process death, without autoplay. */
     fun prepareRestoredMusic(track: Track, queue: List<Track>)
-    fun toggleMusic()
+    fun pauseMusic()
     fun stopMusic()
     fun seekMusicTo(positionMs: Long)
-    fun skipToNext()
-    fun skipToPrevious()
 
-    fun openVideo(video: Video, startPositionMs: Long)
-    fun toggleVideo()
+    fun openVideo(video: Video, startPositionMs: Long, plan: VideoStartPlan)
+    fun resumeVideo(plan: VideoStartPlan)
     fun seekVideoBy(deltaMs: Long)
     fun pauseVideo()
-    /** Stops the video; progress is persisted, [toWatchlist] adds it to Watchlist (case C3). */
     fun dismissVideo(toWatchlist: Boolean)
 }

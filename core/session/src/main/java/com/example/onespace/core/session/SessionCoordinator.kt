@@ -3,12 +3,16 @@ package com.example.onespace.core.session
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.onespace.domain.music.model.Track
+import com.example.onespace.domain.music.usecase.SelectNextTrack
+import com.example.onespace.domain.music.usecase.SelectPreviousTrack
 import com.example.onespace.domain.music.usecase.GetMusic
 import com.example.onespace.domain.session.MediaConflictRule
 import com.example.onespace.domain.session.MusicStartPlan
 import com.example.onespace.domain.session.Section
 import com.example.onespace.domain.session.SessionPolicy
 import com.example.onespace.domain.session.SessionState
+import com.example.onespace.domain.session.port.PlaybackStatus
 import com.example.onespace.domain.session.port.MediaSessionPort
 import com.example.onespace.domain.session.port.MusicConflictRequest
 import com.example.onespace.domain.session.port.MusicPlayback
@@ -19,7 +23,6 @@ import com.example.onespace.domain.video.usecase.GetVideo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -27,7 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * App-scoped session adapter (ADR-11): the single place that wires user intents
+ * Activity-scoped presentation adapter (Section 4 ADR-07): the single place that wires user intents
  * to the shared media engine and keeps the UI session state in sync. Playback
  * truth (positions, buffering, auto-advance) always comes from the engine via
  * [port]; this coordinator owns identity, section switching and the case C1
@@ -46,7 +49,7 @@ class SessionCoordinator @Inject constructor(
     private val _uiState = MutableStateFlow(restoreFromSavedState())
     val uiState: StateFlow<SessionState> = _uiState.asStateFlow()
 
-    /** Engine playback truths for dock, PIP, slider and transport UI. */
+    /** Engine playback truths for dock, floating surface, slider and transport UI. */
     val music: StateFlow<MusicPlayback> = port.music
     val video: StateFlow<VideoPlayback> = port.video
 
@@ -58,6 +61,7 @@ class SessionCoordinator @Inject constructor(
     private val _restoredSection = MutableStateFlow<Section?>(null)
     val restoredSection: StateFlow<Section?> = _restoredSection.asStateFlow()
     private var restoreAllowed = true
+    private var requestVersion = 0L
 
     init {
         viewModelScope.launch {
@@ -76,40 +80,54 @@ class SessionCoordinator @Inject constructor(
     }
 
     fun playVideo(id: String, title: String = id) {
-        cancelPendingRestore()
+        val version = newPlaybackRequest()
         viewModelScope.launch {
             val video = getVideo().firstOrNull()?.firstOrNull { it.id == id } ?: return@launch
             val resumeFrom = viewingSession.progressOf(id)
-            port.openVideo(video, resumeFrom)
-        }
-    }
-
-    fun playMusic(id: String, title: String = id) {
-        cancelPendingRestore()
-        viewModelScope.launch {
-            val queue = getMusic().firstOrNull().orEmpty()
-            val track = queue.firstOrNull { it.id == id } ?: return@launch
-            val rule = preferences.preferences.first().conflictRule
-            when (val plan = SessionPolicy.resolveMusicStart(port.video.value.playing, rule)) {
-                is MusicStartPlan.Start -> {
-                    port.requestMusic(track, queue, plan.videoEffect)
-                    preferences.setLastTrackId(track.id)
-                }
-                MusicStartPlan.DoNotStart -> Unit
-                MusicStartPlan.AskUser -> _conflict.value = MusicConflictRequest(track, queue)
+            if (version == requestVersion) {
+                port.openVideo(video, resumeFrom, SessionPolicy.resolveVideoStart(muted = false))
             }
         }
     }
 
-    /** Shell reports the user's C1 choice; it is remembered for the pair from now on. */
+    fun playMusic(id: String, title: String = id) {
+        val version = newPlaybackRequest()
+        viewModelScope.launch {
+            val queue = getMusic().firstOrNull().orEmpty()
+            val track = queue.firstOrNull { it.id == id } ?: return@launch
+            startMusic(track, queue, version)
+        }
+    }
+
+    private fun newPlaybackRequest(): Long {
+        cancelPendingRestore()
+        _conflict.value = null
+        return ++requestVersion
+    }
+
+    private suspend fun startMusic(track: Track, queue: List<Track>, version: Long) {
+        val rule = preferences.preferences.first().conflictRule
+        if (version != requestVersion) return
+        applyMusicPlan(MusicConflictRequest(track, queue), SessionPolicy.resolveMusicStart(port.video.value.audible, rule))
+    }
+
+    private fun applyMusicPlan(request: MusicConflictRequest, plan: MusicStartPlan) {
+        when (plan) {
+            is MusicStartPlan.Start -> {
+                port.requestMusic(request.track, request.queue, plan.videoEffect)
+                viewModelScope.launch { preferences.setLastTrackId(request.track.id) }
+            }
+            MusicStartPlan.DoNotStart -> Unit
+            MusicStartPlan.AskUser -> _conflict.value = request
+        }
+    }
+
+    /** Re-evaluate against current playback; the video may have stopped while the dialog was open. */
     fun resolveMusicConflict(rule: MediaConflictRule) {
         val request = _conflict.value ?: return
         _conflict.value = null
-        port.resolveMusicConflict(request.track, request.queue, rule)
-        viewModelScope.launch {
-            preferences.setConflictRule(rule)
-            if (rule != MediaConflictRule.KEEP_VIDEO) preferences.setLastTrackId(request.track.id)
-        }
+        applyMusicPlan(request, SessionPolicy.resolveMusicChoice(port.video.value.audible, rule))
+        viewModelScope.launch { preferences.setConflictRule(rule) }
     }
 
     fun dismissMusicConflict() { _conflict.value = null }
@@ -123,20 +141,52 @@ class SessionCoordinator @Inject constructor(
         _restoredSection.value = null
     }
 
-    fun toggleVideo() = port.toggleVideo()
+    fun toggleVideo() {
+        newPlaybackRequest()
+        val playback = port.video.value
+        if (playback.videoId == null) return
+        if (playback.playRequested && playback.error == null && playback.status != PlaybackStatus.ENDED) {
+            port.pauseVideo()
+        } else {
+            port.resumeVideo(SessionPolicy.resolveVideoStart(playback.muted))
+        }
+    }
+
     fun toggleMusic() {
         val playback = port.music.value
-        if (playback.playing) port.toggleMusic()
-        else playback.trackId?.let { playMusic(it) }
+        if (playback.playRequested && playback.error == null && playback.status != PlaybackStatus.ENDED) {
+            newPlaybackRequest()
+            port.pauseMusic()
+        } else {
+            playback.queue.firstOrNull { it.id == playback.trackId }?.let { requestQueuedTrack(it, playback.queue) }
+        }
     }
+
+    private fun requestQueuedTrack(track: Track, queue: List<Track>) {
+        val version = newPlaybackRequest()
+        viewModelScope.launch { startMusic(track, queue, version) }
+    }
+
+    fun nextTrack() {
+        val playback = port.music.value
+        SelectNextTrack(playback.queue, playback.trackId)?.let { requestQueuedTrack(it, playback.queue) }
+    }
+
+    fun previousTrack() {
+        val playback = port.music.value
+        SelectPreviousTrack(playback.queue, playback.trackId)?.let { requestQueuedTrack(it, playback.queue) }
+    }
+
     fun seekVideoBy(deltaMs: Long) = port.seekVideoBy(deltaMs)
     fun seekMusicTo(positionMs: Long) = port.seekMusicTo(positionMs)
-    fun previousTrack() = port.skipToPrevious()
 
     /** Floating window dismissal (case C3): stop and keep the video for later. */
-    fun closeVideo() = port.dismissVideo(toWatchlist = true)
+    fun closeVideo() {
+        newPlaybackRequest()
+        port.dismissVideo(toWatchlist = true)
+    }
     fun closeMusic() {
-        cancelPendingRestore()
+        newPlaybackRequest()
         port.stopMusic()
         viewModelScope.launch { preferences.setLastTrackId(null) }
     }
@@ -146,6 +196,7 @@ class SessionCoordinator @Inject constructor(
 
     /** ADR-12: leaving the app pauses video and the game loop; dock music keeps playing. */
     fun background() {
+        newPlaybackRequest()
         port.pauseVideo()
         update(SessionPolicy.background(_uiState.value))
     }
@@ -168,12 +219,11 @@ class SessionCoordinator @Inject constructor(
     private fun updateMusic(playback: MusicPlayback) {
         val previousId = _uiState.value.trackId
         val next = if (playback.trackId == null) {
-            _uiState.value.copy(trackId = null, trackTitle = null, musicPlaying = false)
+            _uiState.value.copy(trackId = null, trackTitle = null)
         } else {
             _uiState.value.copy(
                 trackId = playback.trackId,
-                trackTitle = playback.title.ifEmpty { _uiState.value.trackTitle ?: "" },
-                musicPlaying = playback.playing
+                trackTitle = playback.title.ifEmpty { _uiState.value.trackTitle ?: "" }
             )
         }
         update(next)
@@ -184,12 +234,11 @@ class SessionCoordinator @Inject constructor(
 
     private fun updateVideo(playback: VideoPlayback) {
         val next = if (playback.videoId == null) {
-            _uiState.value.copy(videoId = null, videoTitle = null, videoPlaying = false)
+            _uiState.value.copy(videoId = null, videoTitle = null)
         } else {
             _uiState.value.copy(
                 videoId = playback.videoId,
-                videoTitle = playback.title.ifEmpty { _uiState.value.videoTitle ?: "" },
-                videoPlaying = playback.playing
+                videoTitle = playback.title.ifEmpty { _uiState.value.videoTitle ?: "" }
             )
         }
         update(next)

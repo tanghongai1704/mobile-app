@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onespace.core.common.ContentUiState
 import com.example.onespace.domain.music.usecase.GetMusic
-import com.example.onespace.domain.music.usecase.SelectNextTrack
 import com.example.onespace.domain.session.repository.SessionPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -27,5 +26,4 @@ internal class MusicViewModel @Inject constructor(
 
     fun retry() { refresh.value = refresh.value + 1 }
 
-    fun nextTrack(currentId: String?) = SelectNextTrack(uiState.value.items, currentId)
 }

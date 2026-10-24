@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.example.onespace.core.common.formatMsWhole
 import com.example.onespace.core.designsystem.*
 import com.example.onespace.domain.music.model.Track
+import com.example.onespace.domain.session.port.PlaybackStatus
 import com.example.onespace.domain.session.port.MusicPlayback
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,9 +87,11 @@ internal fun NowPlayingScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(16.dp))
+            PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
             Slider(
                 value = playback.positionMs.toFloat().coerceIn(0f, playback.totalMs.toFloat().coerceAtLeast(1f)),
                 onValueChange = { onSeekTo(it.toLong()) },
+                enabled = playback.totalMs > 0,
                 valueRange = 0f..playback.totalMs.toFloat().coerceAtLeast(1f),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -102,16 +105,16 @@ internal fun NowPlayingScreen(
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPrevious) {
+                IconButton(onClick = onPrevious, enabled = playback.queue.isNotEmpty()) {
                     Icon(Icons.Filled.SkipPrevious, contentDescription = "Bài trước")
                 }
                 FilledIconButton(onClick = onToggle) {
                     Icon(
-                        if (playback.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playback.playing) "Tạm dừng" else "Phát"
+                        if (playback.playRequested && playback.error == null) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playback.playRequested && playback.error == null) "Tạm dừng" else "Phát"
                     )
                 }
-                IconButton(onClick = onNext) {
+                IconButton(onClick = onNext, enabled = playback.queue.isNotEmpty()) {
                     Icon(Icons.Filled.SkipNext, contentDescription = "Tiếp theo")
                 }
             }

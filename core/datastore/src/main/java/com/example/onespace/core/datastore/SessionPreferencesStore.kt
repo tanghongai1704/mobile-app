@@ -37,6 +37,7 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
         val DATA_SAVER = booleanPreferencesKey("data_saver")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val ONBOARDED = booleanPreferencesKey("onboarded")
+        val GUEST_MODE = booleanPreferencesKey("guest_mode")
         val AUTH_EMAIL = stringPreferencesKey("auth_email")
         val TOPICS = stringSetPreferencesKey("selected_topics")
         val LANGUAGE = stringPreferencesKey("language")
@@ -53,6 +54,8 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
             themeMode = it[Keys.THEME_MODE]?.let(ThemeMode::valueOf) ?: ThemeMode.SYSTEM,
             onboarded = it[Keys.ONBOARDED] ?: false,
             authEmail = it[Keys.AUTH_EMAIL],
+            // Existing demo installs with no email were guest sessions.
+            guestMode = it[Keys.GUEST_MODE] ?: (it[Keys.ONBOARDED] == true && it[Keys.AUTH_EMAIL] == null),
             selectedTopics = it[Keys.TOPICS] ?: emptySet(),
             language = it[Keys.LANGUAGE]?.let(Language::valueOf) ?: Language.VI,
             simulateOffline = it[Keys.SIM_OFFLINE] ?: false,
@@ -69,8 +72,14 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
     }
     override suspend fun setDataSaver(enabled: Boolean) = set { it[Keys.DATA_SAVER] = enabled }
     override suspend fun setThemeMode(mode: ThemeMode) = set { it[Keys.THEME_MODE] = mode.name }
-    override suspend fun setOnboarded(done: Boolean) = set { it[Keys.ONBOARDED] = done }
-    override suspend fun setAuthEmail(email: String?) = set {
+    override suspend fun setOnboarded(done: Boolean) = set {
+        it[Keys.ONBOARDED] = done
+        // A newly completed onboarding is not an explicit guest sign-in.
+        // Set the key so the legacy guest fallback applies only to older installs.
+        if (it[Keys.GUEST_MODE] == null) it[Keys.GUEST_MODE] = false
+    }
+    override suspend fun setAuthSession(email: String?, guest: Boolean) = set {
+        it[Keys.GUEST_MODE] = guest
         if (email == null) it.remove(Keys.AUTH_EMAIL) else it[Keys.AUTH_EMAIL] = email
     }
     override suspend fun setSelectedTopics(topics: Set<String>) = set { it[Keys.TOPICS] = topics }

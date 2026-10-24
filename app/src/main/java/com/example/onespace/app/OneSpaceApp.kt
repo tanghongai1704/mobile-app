@@ -14,37 +14,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.example.onespace.app.navigation.*
 import com.example.onespace.app.ui.*
 import com.example.onespace.core.session.SessionCoordinator
 import com.example.onespace.domain.session.MediaConflictRule
 import com.example.onespace.domain.session.Section
-import com.example.onespace.domain.session.repository.SessionPreferences
-import com.example.onespace.feature.account.navigation.AccountNavigation
-import com.example.onespace.feature.games.navigation.GamesNavigation
-import com.example.onespace.feature.home.navigation.HomeNavigation
-import com.example.onespace.feature.music.navigation.MusicNavigation
-import com.example.onespace.feature.onboarding.navigation.OnboardingNavigation
-import com.example.onespace.feature.video.navigation.VideoNavigation
 import kotlinx.coroutines.launch
-
-/**
- * IA: the top bar always answers "Where am I?" — the tab name on root screens,
- * or "<- Parent" on a detail screen. Branding and profile live only on Home.
- */
-private fun NavDestination?.contextTitle(): String? = when (this?.route) {
-    VideoNavigation.DETAIL -> "Video"
-    MusicNavigation.NOW_PLAYING -> "Music"
-    com.example.onespace.feature.news.navigation.NewsNavigation.ARTICLE -> "News"
-    GamesNavigation.GAME -> "Games"
-    AccountNavigation.ACCOUNT -> "Tài khoản"
-    AccountNavigation.SETTINGS -> "Tùy chỉnh"
-    else -> null
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,55 +30,30 @@ fun OneSpaceApp() {
     // One coordinator for the entire shell; catalog ViewModels live inside feature graphs.
     val coordinator: SessionCoordinator = hiltViewModel()
     val media: MediaViewModel = hiltViewModel()
-    val session by coordinator.uiState.collectAsStateWithLifecycle()
     val musicState by coordinator.music.collectAsStateWithLifecycle()
     val videoState by coordinator.video.collectAsStateWithLifecycle()
     val conflict by coordinator.conflict.collectAsStateWithLifecycle()
-    val prefs: SessionPreferences? by media.preferences.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     var floatingPlayerHeight by remember { mutableIntStateOf(0) }
 
     val nav = rememberNavController()
+    val appState = rememberOneSpaceAppState(nav)
     val entry by nav.currentBackStackEntryAsState()
-    val selected = TopLevelDestination.entries.find { tab ->
-        entry?.destination?.hierarchy?.any { it.route == tab.route } == true
-    }
+    val selected = TopLevelDestination.entries.find { it.contains(entry?.destination) }
+    val inMain = entry?.destination?.hierarchy?.any { it.hasRoute<AppRoute.Main>() } == true
     val contextTitle = entry?.destination.contextTitle()
     fun select(section: Section) {
-        val destination = TopLevelDestination.entries.first { it.section == section }
-        // Account/settings are auxiliary screens, not part of Home's saved tab stack.
-        if (nav.currentDestination?.route == AccountNavigation.ACCOUNT ||
-            nav.currentDestination?.route == AccountNavigation.SETTINGS) {
-            nav.popBackStack(HomeNavigation.FEED, inclusive = false)
-        }
         coordinator.enter(section)
-        nav.navigate(destination.route) {
-            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
+        appState.navigateToSection(section)
     }
 
-    // First-run gate: act only on a REAL preference emission, and never when the
-    // flow already sits inside onboarding (e.g. right after a logout → Login).
-    LaunchedEffect(prefs?.onboarded) {
-        if (prefs?.onboarded == false) {
-            val alreadyInside = nav.currentBackStackEntry?.destination?.hierarchy
-                ?.any { it.route == OnboardingNavigation.GRAPH } == true
-            if (!alreadyInside) nav.navigate(OnboardingNavigation.GRAPH) { launchSingleTop = true }
-        }
-    }
-
-    // TC10 restore chain: jump back to the last active tab after process death.
-    LaunchedEffect(coordinator, prefs?.onboarded) {
-        if (prefs?.onboarded == true) {
-            coordinator.restoredSection.collect { restored ->
-                if (restored != null) {
-                    select(restored)
-                    coordinator.consumeRestoredSection()
-                }
+    LaunchedEffect(inMain) {
+        if (inMain) coordinator.restoredSection.collect { restored ->
+            if (restored != null) {
+                select(restored)
+                coordinator.consumeRestoredSection()
             }
         }
     }
@@ -115,12 +68,10 @@ fun OneSpaceApp() {
     }
 
     val onHome = selected?.section == Section.HOME && contextTitle == null
-    val inOnboarding = entry?.destination?.hierarchy
-        ?.any { it.route == OnboardingNavigation.GRAPH } == true
-    val videoId = session.videoId
-    val trackId = musicState.trackId ?: session.trackId
-    val showFloat = !inOnboarding && videoId != null && contextTitle != "Video" && selected?.section != Section.MUSIC
-    val showMini = !inOnboarding && trackId != null && contextTitle != "Music" && contextTitle != "Games"
+    val videoId = videoState.videoId
+    val trackId = musicState.trackId
+    val showFloat = inMain && videoId != null && contextTitle != "Video"
+    val showMini = inMain && trackId != null && contextTitle != "Music"
 
     Scaffold(
         snackbarHost = {
@@ -129,10 +80,10 @@ fun OneSpaceApp() {
             ))
         },
         topBar = {
-            if (!inOnboarding) TopAppBar(
+            if (inMain) TopAppBar(
                 title = { Text(contextTitle ?: selected?.label ?: "") },
                 navigationIcon = {
-                    if (contextTitle != null) IconButton(onClick = { nav.popBackStack() }) {
+                    if (contextTitle != null) IconButton(onClick = appState::navigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
                     }
                 },
@@ -140,7 +91,7 @@ fun OneSpaceApp() {
                     // Profile is secondary: reachable from Home only, not every screen.
                     if (onHome) IconButton(onClick = {
                         coordinator.cancelPendingRestore()
-                        nav.navigate(AccountNavigation.ACCOUNT) { launchSingleTop = true }
+                        appState.openProfile()
                     }) {
                         Icon(Icons.Filled.AccountCircle, contentDescription = "Tài khoản")
                     }
@@ -148,12 +99,12 @@ fun OneSpaceApp() {
             )
         },
         bottomBar = {
-            if (!inOnboarding) Column {
+            if (inMain) Column {
                 // Hierarchy: content > mini player > bottom navigation.
                 if (showMini) MusicMiniPlayer(
-                    title = musicState.title.ifEmpty { session.trackTitle.orEmpty() },
-                    playing = musicState.playing,
-                    onExpand = { trackId?.let { nav.navigate(MusicNavigation.nowPlaying(it)) { launchSingleTop = true } } },
+                    title = musicState.title,
+                    playback = musicState,
+                    onExpand = { trackId?.let { appState.openMusicPlayer(it) } },
                     onToggle = coordinator::toggleMusic,
                     onClose = {
                         // Undo pattern: the user can bring the music back within 4 seconds.
@@ -169,7 +120,7 @@ fun OneSpaceApp() {
                         }
                     }
                 )
-                NavigationBar {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                     TopLevelDestination.entries.forEach { tab ->
                         NavigationBarItem(
                             selected = selected == tab,
@@ -183,15 +134,14 @@ fun OneSpaceApp() {
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            AppNavigation(nav, coordinator, ::select,
-                Modifier.fillMaxSize().padding(bottom = if (showFloat) 140.dp else 0.dp))
+            AppNavigation(appState, coordinator, ::select,
+                Modifier.fillMaxSize().padding(bottom = if (showFloat) with(density) { floatingPlayerHeight.toDp() } else 0.dp))
             if (showFloat) FloatingVideo(
                 player = media.videoPlayer,
-                title = videoState.title.ifEmpty { session.videoTitle.orEmpty() },
-                playing = videoState.playing,
-                muted = videoState.muted,
+                title = videoState.title,
+                playback = videoState,
                 onHeightChanged = { floatingPlayerHeight = it },
-                onExpand = { videoId?.let { nav.navigate(VideoNavigation.detail(it)) { launchSingleTop = true } } },
+                onExpand = { videoId?.let { appState.openVideo(it) } },
                 onToggle = coordinator::toggleVideo,
                 onClose = {
                     coordinator.closeVideo()
@@ -202,7 +152,7 @@ fun OneSpaceApp() {
     }
 
     // Case C1: the first time music collides with a playing video, ask once and remember.
-    conflict?.let { request ->
+    conflict?.takeIf { inMain }?.let { request ->
         AlertDialog(
             onDismissRequest = coordinator::dismissMusicConflict,
             title = { Text(videoState.title.ifEmpty { "Video đang phát" }) },

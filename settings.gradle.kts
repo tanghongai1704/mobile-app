@@ -29,3 +29,5 @@ include(":core:common", ":core:designsystem", ":core:session", ":core:media")
 include(":core:network", ":core:database", ":core:datastore", ":core:sync")
 include(":data:video", ":data:music", ":data:news", ":data:games")
 include(":feature:home", ":feature:video", ":feature:music", ":feature:news", ":feature:games", ":feature:account", ":feature:onboarding")
+
+include(":feature:auth", ":data:auth")

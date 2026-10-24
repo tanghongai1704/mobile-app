@@ -1,135 +1,57 @@
 # OneSpace
 
-Android Native · Kotlin · Jetpack Compose · Material 3 · Hilt/KSP · API 26+
+Android Compose baseline cho Video, Music, News và Games. App shell, feature, domain, data và core là Gradle module riêng. Metadata hiện dùng mock.
 
-Bộ khung Video, Music, News & Games với các **Gradle module độc lập**. Hiện dùng dữ liệu mẫu và mô phỏng playback/game; chưa nối media engine, backend hoặc persisted storage.
-
-## Cấu trúc module
+## Cấu trúc
 
 ```text
-app/                         :app — Application, MainActivity, Hilt, shell, root navigation
-domain/                      :domain — Kotlin/JVM, models, contracts, use cases, session rules
-  src/main/kotlin/.../domain/
-    video/ music/ news/ games/ session/
+app/                    Activity, Application, shell, root NavHost, Hilt bindings
+domain/                 Pure Kotlin models, contracts, use cases, policies
 data/
-  video/                     :data:video — video repository implementation
-  music/                     :data:music — music repository implementation
-  news/                      :data:news — articles + in-memory bookmarks
-  games/                     :data:games — game catalog
+  auth/                 Demo OTP authentication repository
+  video/ music/         Catalogs; Room viewing progress
+  news/ games/          Mock catalogs/bookmarks/board metadata
 feature/
-  home/                      :feature:home
-  video/                     :feature:video
-  music/                     :feature:music
-  news/                      :feature:news
-  games/                     :feature:games
-  account/                   :feature:account — guest + settings preview
+  auth/                 Email → OTP → guest/authenticated session
+  onboarding/           Welcome → multitasking → interests
+  home/ video/ music/ news/ games/ account/
+    navigation/         Typed Route + NavGraph
+    presentation/       State, ViewModel, screens
 core/
-  common/                    :core:common — Kotlin/JVM, reusable UI state
-  designsystem/              :core:designsystem — theme, shared Compose components
-  session/                   :core:session — shared UI coordinator + SavedStateHandle adapter
-  media/                     :core:media — future playback adapter boundary
-  network/                   :core:network — future Retrofit/OkHttp
-  database/                  :core:database — future Room
-  datastore/                 :core:datastore — future preferences storage
-  sync/                      :core:sync — future WorkManager
-docs/
-  architecture.md            Architecture audit, decisions and Android reference links
+  designsystem/         Material 3 colors, bundled fonts, shapes, components
+  common/               Shared UI types and formatting
+  session/              Cross-feature playback coordinator
+  media/                Media3 engine and video surface
+  datastore/            Settings and demo session
+  database/             Room progress/watchlist
+  network/ sync/        Reserved extension points
 ```
 
-Mỗi module có build file riêng; các module Android có manifest/namespace riêng. `core`, `data`, `feature` ở root là nhóm module, không phải package trong app. Không còn feature/domain/data/core source code dưới `app/src`.
+Không có dependency feature → feature/data. Screens nhận state/callback, graph sở hữu route/ViewModel; app chọn repository qua Hilt. [Bản đồ implementation](docs/architecture.md). **Nguồn chốt kiến trúc cho bài:** [LaTeX Section 4](https://github.com/nhinguyen140809/mobile-report/blob/duy_1.2_1.5_parts/sections/4-technical-architecture/main.tex).
 
-## Ranh giới ba lớp
+## Navigation và auth
 
-```mermaid
-flowchart TD
-    App[app: shell + Hilt + root NavHost] --> Feature[feature: UI + graph + ViewModel]
-    App --> Data[data: repository implementations]
-    App --> Domain[domain: models, contracts, use cases]
-    Feature --> Domain
-    Data --> Domain
-    Feature --> Design[core:designsystem]
-    Feature --> Session[core:session]
-    Session --> Domain
-    Design --> Common[core:common]
-```
+System splash → đọc phiên → onboarding / auth / main. Main có năm nested tab graphs giữ back stack và Account graph riêng. Mọi route dùng Kotlin Serialization và Navigation Compose typed API. Feature khai báo graph và phát callbacks; app/OneSpaceAppState thực thi điều hướng. Catalog/auth dùng graph-scoped ViewModel qua graph-entry provider, feature không nhận NavController.
 
-- **Presentation:** màn hình nhận state/callbacks; ViewModel thuộc navigation graph của feature, dùng Hilt và `StateFlow`. Feature công khai API navigation; màn hình/ViewModel là `internal`.
-- **Domain:** Kotlin/JVM thuần, không Android/Compose/Hilt. Repository contracts và use cases tách khỏi implementation. SessionPolicy sở hữu quy tắc audio/background; SelectNextTrack sở hữu quy tắc queue.
-- **Data:** mock repository phát catalog bằng `Flow`, bookmark dùng `MutableStateFlow` ở repository. Implementation là `internal`; app nối qua factory trả về interface domain.
-- **App:** `@HiltAndroidApp`, `@AndroidEntryPoint`, Hilt `RepositoryModule`, global shell và đăng ký feature graphs. App không tạo catalog ViewModel, không giữ bookmark hoặc logic Next.
-- Không có dependency feature → feature, feature → data hoặc domain → Android. Feature giao tiếp qua root navigation/callbacks và shared coordinator.
+Auth là **demo local**: nhập email hợp lệ → OTP **123456**. Mã hết hạn sau 5 phút, năm lần sai cần gửi lại. Không gửi email, chưa có backend/Firebase. Guest mode được lưu trên thiết bị. Đăng xuất trở lại Auth và giữ interests.
 
-Core media/network/database/datastore/sync đã là module thật nhưng chưa nối runtime. Chưa có dependency Media3/Retrofit/Room/DataStore/WorkManager; thêm khi triển khai tương ứng. DI thủ công đã được thay bằng **Hilt + KSP thực sự**.
+## Chức năng
 
-Đánh giá chi tiết và đối chiếu tài liệu Android: [docs/architecture.md](docs/architecture.md).
+Material 3 light/dark theme, teal/lavender, Manrope headings + Roboto body đóng gói offline. Có onboarding, login/verify, Home, catalog/detail và settings.
 
-## Navigation
+Video/nhạc dùng ExoPlayer phát sample stream thật, có controls, floating video, music dock và conflict policy. Room lưu progress/watchlist; DataStore lưu settings/phiên. Game là board preview, news bookmarks còn trong RAM. Chưa có remote sync, TTS/conversion, gamification hay background playback service.
 
-5 tab: Home, Video, Music, News, Games. Mỗi tab là nested graph, giữ back stack bằng `saveState / restoreState / launchSingleTop`.
+## Build
 
-```text
-Home → các catalog
-Video → Video detail → Float & explore → News
-Music → Now Playing → Next
-News → Article → Save story; catalog có bộ lọc Saved
-Games → 2048 / Tic-Tac-Toe board preview → Pause / Resume
-Guest → Profile → Settings
-```
-
-Feature sở hữu route/arguments và graph của mình. App nối các graph và điều hướng liên feature. Arguments chỉ truyền ID, không truyền model. Top bar và system Back dùng cùng NavController. Màn chi tiết giữ bottom bar để thử chuyển phân hệ.
-
-Floating video và mini music player là UI của app shell, nhận title/state từ coordinator dùng chung; app không đọc catalog của feature để vẽ player.
-
-## State và phạm vi hoạt động
-
-| State | Owner / scope | Giới hạn hiện tại |
-| --- | --- | --- |
-| Catalog | Repository → use case → graph-scoped feature ViewModel | Mock bundled catalog |
-| News bookmarks | Singleton mock NewsRepository → NewsViewModel | In-memory, mất khi process bị kill |
-| Tab back stack, scroll, filter | Navigation + saveable Compose state | Android saved-state restoration |
-| Data saver toggle | Settings destination, rememberSaveable | UI preview, chưa đổi streaming |
-| Playback selection + play/pause | Một SessionCoordinator ở app shell | UI simulation, không phát media |
-| Quy tắc chuyển nội dung/audio | Domain SessionPolicy | Thuần Kotlin, có unit tests |
-| Game board | Game UI preview | Board tĩnh; chưa có gameplay/save game |
-| Playback ID/title sau recreate | Coordinator SavedStateHandle | Không autoplay; không thay Room/DataStore |
-
-Video tiếp tục floating khi chuyển News/Home/game mute, pause khi sang Music. Phát nhạc sẽ pause video; phát video sẽ pause nhạc. Rời game sẽ pause; mở board gọi resume. Activity ON_STOP pause video/game, giữ state nhạc. **Không có âm thanh, video stream, notification hay background service thật trong build này.**
-
-## Build và kiểm tra
-
-Mở root project bằng Android Studio, Sync Gradle rồi chọn run configuration `OneSpace` (được chia sẻ trong `.run/OneSpace.run.xml`). Chọn emulator và Run trên API 26+. Xem máy ảo trong **View → Tool Windows → Running Devices**; khởi động AVD bằng nút `+` của cửa sổ này. Giữ SDK/JDK cấu hình sẵn của project; Gradle daemon dùng JDK 25, bytecode các module target JVM 11.
+Mở root bằng Android Studio, Sync Gradle, chọn run configuration **OneSpace**. Emulator nằm trong **View → Tool Windows → Running Devices**. minSdk 26, compile/targetSdk 37; daemon full JDK 25 (có jlink), bytecode JVM 11. Nếu editor chọn nhầm JRE, đặt JAVA_HOME/Gradle JDK về full JDK và restart daemon; không commit đường dẫn cục bộ.
 
 ```powershell
-.\gradlew.bat projects
-.\gradlew.bat :app:assembleDebug :domain:test :core:session:testDebugUnitTest :app:testDebugUnitTest
-.\gradlew.bat :app:assembleDebugAndroidTest
-.\gradlew.bat :app:lintDebug
+.\gradlew.bat verifyArchitecture
+.\gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1
+.\gradlew.bat :domain:test :core:session:testDebugUnitTest :data:auth:testDebugUnitTest --max-workers=1
+.\gradlew.bat :app:connectedDebugAndroidTest --max-workers=1
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`.
+NavigationSmokeTest kiểm tra các tab, media, player overlay, settings/offline, bookmark, email/OTP và recreate trong luồng auth. Mạng cần cho sample streams; demo auth và fonts chạy offline.
 
-Unit tests nghiệp vụ ở `domain/src/test`; test saved-state adapter ở `core/session/src/test`. Đã chạy thành công **6 UI tests** trên emulator AOSP API 35: năm tab, floating video, mini music player/Next, bookmark qua đổi tab, game Pause/Resume và settings sau Activity recreation.
-
-Khởi động emulator trước, rồi chạy script build/install/test và mở lại app:
-
-```powershell
-.\scripts\smoke-test.ps1 -Serial emulator-5554
-```
-
-Script kiểm tra kết quả instrumentation thực sự (`OK (6 tests)`), lưu log ở `build/emulator-smoke-test.txt` và ảnh ở `build/screenshots/`. Không chỉ dựa vào trạng thái Gradle khi thiết bị có thể bị offline.
-
-Máy dựng baseline dùng AVD `OneSpace_API35`: AOSP x86_64 API 35, 720×1280, density 280, RAM 1536 MB, 2 cores và software graphics. AVD Pixel 9/API 37 cũ trên máy này gặp ANR ở Launcher/SystemUI; AVD nhẹ mới đã chạy được app và bộ UI tests. SDK/AVD là cấu hình cục bộ, không nằm trong Git; máy khác tạo AVD qua Device Manager.
-
-Ảnh chụp app thực tế từ emulator sau khi kiểm tra:
-
-| Home | Music | News + floating video | Game preview |
-| --- | --- | --- | --- |
-| <img src="docs/screenshots/home.png" width="180" alt="Home" /> | <img src="docs/screenshots/music.png" width="180" alt="Music controls" /> | <img src="docs/screenshots/news-floating-video.png" width="180" alt="News and floating video" /> | <img src="docs/screenshots/game-board.png" width="180" alt="Game controls" /> |
-
-## Triển khai tiếp
-
-1. Chốt API và dữ liệu; thay factory/binding mock, thêm data sources/DTO/entity/mappers trong data modules.
-2. Tích hợp core hạ tầng đúng nơi được dùng, thêm retry/error handling thực tế.
-3. Media3 video controller dùng chung detail/floating, MediaSessionService cho music, Audio Focus và notification. Service/controller sở hữu playback, không để Activity/ViewModel giữ player.
-4. Room/DataStore cho tiến độ, bookmarks/preferences, game state và session checkpoints. Streaming cache khác downloaded content.
-5. Gameplay thực, offline/lifecycle/process-death tests và đo tài nguyên trên thiết bị.
+Font theo SIL OFL; giấy phép trong [core/designsystem/licenses](core/designsystem/licenses). Tham khảo: [Android architecture](https://developer.android.com/topic/architecture/recommendations), [typed navigation](https://developer.android.com/guide/navigation/design/type-safety), [Material 3](https://m3.material.io/).

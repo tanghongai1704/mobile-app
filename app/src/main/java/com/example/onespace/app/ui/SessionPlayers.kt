@@ -13,24 +13,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.example.onespace.core.media.VideoSurface
+import com.example.onespace.core.designsystem.PlaybackFeedback
+import com.example.onespace.domain.session.port.MusicPlayback
+import com.example.onespace.domain.session.port.VideoPlayback
+import com.example.onespace.domain.session.port.PlaybackStatus
 
 /** M3 mini player dock: whole row expands; transport actions are 48dp icon buttons. */
 @Composable
-fun MusicMiniPlayer(title: String, playing: Boolean, onExpand: () -> Unit, onToggle: () -> Unit, onClose: () -> Unit) {
+fun MusicMiniPlayer(title: String, playback: MusicPlayback, onExpand: () -> Unit, onToggle: () -> Unit, onClose: () -> Unit) {
+    val playing = playback.playRequested && playback.error == null
     Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
         Row(Modifier.fillMaxWidth()
             .clickable(onClick = onExpand)
             .padding(horizontal = 16.dp)
-            .height(56.dp),
+            .heightIn(min = 56.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.MusicNote, contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
-            Text(title, maxLines = 1, style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                Text(title, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
+            }
             IconButton(onClick = onToggle) {
                 Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (playing) "Tạm dừng" else "Phát")
@@ -51,19 +59,19 @@ fun MusicMiniPlayer(title: String, playing: Boolean, onExpand: () -> Unit, onTog
 fun BoxScope.FloatingVideo(
     player: Player?,
     title: String,
-    playing: Boolean,
-    muted: Boolean,
+    playback: VideoPlayback,
     onExpand: () -> Unit,
     onToggle: () -> Unit,
     onClose: () -> Unit,
     onHeightChanged: (Int) -> Unit = {}
 ) {
-    Card(Modifier.align(Alignment.BottomEnd).onSizeChanged { onHeightChanged(it.height) }
+    val playing = playback.playRequested && playback.error == null
+    Card(Modifier.testTag("floating-video").align(Alignment.BottomEnd).onSizeChanged { onHeightChanged(it.height) }
         .padding(12.dp).widthIn(max = 320.dp)) {
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
                 VideoSurface(player, Modifier.fillMaxSize())
-                if (muted) {
+                if (playback.muted) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerHighest,
                         shape = MaterialTheme.shapes.small,
@@ -81,9 +89,10 @@ fun BoxScope.FloatingVideo(
             Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)) {
                 Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(top = 8.dp))
-                Text(if (playing) "Đang phát · cửa sổ nổi" else "Tạm dừng · cửa sổ nổi",
+                Text(if (playback.playing) "Đang phát · cửa sổ nổi" else "Video · cửa sổ nổi",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
                 Row {
                     IconButton(onClick = onExpand) {
                         Icon(Icons.Filled.OpenInFull, contentDescription = "Mở rộng")

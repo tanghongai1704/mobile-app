@@ -51,6 +51,9 @@ internal fun VideoDetailScreen(
     related: List<Video>,
     playing: Boolean,
     muted: Boolean,
+    buffering: Boolean,
+    suppressed: Boolean,
+    error: String?,
     positionMs: Long,
     totalMs: Long,
     videoSurface: @Composable (Modifier, () -> Unit) -> Unit,
@@ -80,6 +83,7 @@ internal fun VideoDetailScreen(
                 }
             }
         }
+        item { PlaybackFeedback(buffering, suppressed, error) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onToggle) { Text(if (playing) "Tạm dừng" else "Phát") }

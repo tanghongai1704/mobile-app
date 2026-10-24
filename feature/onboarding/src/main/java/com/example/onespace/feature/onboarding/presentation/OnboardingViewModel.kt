@@ -1,69 +1,40 @@
 package com.example.onespace.feature.onboarding.presentation
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onespace.domain.session.repository.SessionPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/**
- * First-run flow state: picked interests (at least 3 to continue) and the
- * mock auth outcome. Persists everything, then the shell leaves onboarding.
- */
 @HiltViewModel
 internal class OnboardingViewModel @Inject constructor(
-    private val preferences: SessionPreferencesRepository
+    private val preferences: SessionPreferencesRepository,
+    private val savedState: SavedStateHandle
 ) : ViewModel() {
+    val topics = listOf("Thiên nhiên", "Đời sống", "Công nghệ", "Du lịch",
+        "Nhẹ nhàng", "Trò chơi", "Thể thao", "Ẩm thực")
+    val selected = savedState.getStateFlow("topics", arrayListOf<String>())
+    private val _saving = MutableStateFlow(false)
+    val saving = _saving.asStateFlow()
 
-    val topics = listOf(
-        "Thiên nhiên", "Đời sống", "Công nghệ", "Du lịch",
-        "Nhẹ nhàng", "Trò chơi", "Thể thao", "Ẩm thực"
-    )
+    fun toggle(topic: String) {
+        val next = selected.value.toMutableSet()
+        if (!next.add(topic)) next.remove(topic)
+        savedState["topics"] = ArrayList(next)
+    }
 
-    private val _selected = MutableStateFlow(emptySet<String>())
-    val selected: StateFlow<Set<String>> = _selected.asStateFlow()
-
-    private val _signingIn = MutableStateFlow(false)
-    val signingIn: StateFlow<Boolean> = _signingIn.asStateFlow()
-
-    fun toggle(topic: String) = _selected.update { if (topic in it) it - topic else it + topic }
-
-    fun isValidEmail(email: String): Boolean = EMAIL_REGEX.matches(email.trim())
-
-    /** Mock sign-in: shows the persisted "Đang đăng nhập..." state, then finishes. */
-    fun signIn(email: String, onFinished: () -> Unit) {
-        if (_signingIn.value) return
+    fun finish(skip: Boolean = false) {
+        if (_saving.value || (!skip && selected.value.size < 3)) return
+        _saving.value = true
         viewModelScope.launch {
-            _signingIn.value = true
-            delay(800)
-            preferences.setAuthEmail(email.trim())
-            finish()
-            _signingIn.value = false
-            onFinished()
+            try {
+                if (selected.value.isNotEmpty()) preferences.setSelectedTopics(selected.value.toSet())
+                preferences.setOnboarded(true)
+            } finally { _saving.value = false }
         }
-    }
-
-    fun continueAsGuest(onFinished: () -> Unit) {
-        viewModelScope.launch {
-            preferences.setAuthEmail(null)
-            finish()
-            onFinished()
-        }
-    }
-
-    private suspend fun finish() {
-        // Re-entering Login from Profile must not erase interests chosen earlier.
-        if (_selected.value.isNotEmpty()) preferences.setSelectedTopics(_selected.value)
-        preferences.setOnboarded(true)
-    }
-
-    companion object {
-        private val EMAIL_REGEX = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
     }
 }

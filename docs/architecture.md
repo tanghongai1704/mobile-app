@@ -1,98 +1,99 @@
-# Architecture review — OneSpace
+# Bản đồ kiến trúc OneSpace
 
-Ngày rà soát: 20/10/2026. Phạm vi: skeleton và navigation prototype; chưa đánh giá media runtime hoặc hiệu năng.
+**Nguồn chốt thiết kế:** [LaTeX Section 4 - Kiến trúc kỹ thuật](https://github.com/nhinguyen140809/mobile-report/blob/duy_1.2_1.5_parts/sections/4-technical-architecture/main.tex). File đó mô tả ranh giới, quyết định, lifecycle, audio policy và ma trận phần đã có/phần còn thiếu. File này hướng dẫn đọc implementation; khi code chưa đáp ứng một yêu cầu đích, ghi gap thay vì coi yêu cầu đã xong.
 
-## Kết luận
+## Quyết định tổ chức
 
-Cấu trúc phù hợp cho MVP gồm bốn phân hệ dùng chung session: feature modules độc lập, domain thuần Kotlin, repository implementation tách khỏi UI, app làm composition root. Ranh giới Gradle kiểm soát chiều dependency; đây không còn là chia package trong app.
+Ba layer Presentation–Domain–Data dùng MVVM/UDF; có 23 Gradle module leaf nằm ngoài app. Không có nguồn feature/core/domain/data đặt dưới app/src.
 
-Đây là quyết định thiết kế dựa trên hướng dẫn Android, không phải cấu trúc duy nhất Android bắt buộc. Domain/use case là tùy chọn theo độ phức tạp; dự án giữ domain vì yêu cầu ba lớp và quy tắc liên feature.
+- **app:** Activity/Application, shell, native splash startup, root flow, route execution và composition root Hilt.
+- **feature:home/video/music/news/games/account/onboarding/auth:** screens, UI state, ViewModel, typed routes và graph declarations.
+- **domain:** Kotlin/JVM thuần; package theo auth/video/music/news/games/session. Models, contracts, policies và use cases cần thiết.
+- **data:video/music/news/games/auth:** repository implementations, mapping và source orchestration. Chỉ app chọn factory trả domain interface.
+- **core:common/designsystem/session:** shared presentation types, design tokens/components và coordinator cho phiên nội dung.
+- **core:media/database/datastore/network/sync:** Android/media/storage adapters; network/sync vẫn là extension point. VideoSurface là phần hiển thị platform trong media adapter.
 
-## Những điểm đã sửa
+Core là nhóm module theo vai trò, không phải layer thứ tư. Feature không import feature khác hoặc data implementation; Domain không phụ thuộc Android/framework/implementation. Xem matrix dependency đầy đủ ở Section 4.3.2.
 
-| Vấn đề trước | Điều chỉnh hiện tại |
+## Navigation hiện tại
+
+Một NavController và một root NavHost được tạo tại app shell.
+
+| File/thành phần | Trách nhiệm |
 | --- | --- |
-| Core/domain/features đều ở app | Chuyển ra Gradle module riêng ở root |
-| App tạo catalog ViewModel và giữ bookmark | Feature graph sở hữu VM; News repository sở hữu bookmark |
-| App chọn bài nhạc kế tiếp | SelectNextTrack ở domain; Music điều phối màn Now Playing |
-| DI thủ công | Hilt Application/Activity, HiltViewModel và KSP; bindings ở app |
-| Repository trả List đồng bộ | Contract phát Flow, VM chuyển thành lifecycle-aware StateFlow |
-| Quy tắc session trong Android ViewModel | SessionPolicy thuần Kotlin; coordinator là state/saved-state adapter |
-| Public screens/VMs và mock classes | Feature công khai navigation API; presentation và implementation internal |
+| app/navigation/AppRoute.kt | Typed Root/Splash/Main |
+| app/navigation/AppNavigation.kt | Khai báo root, ghép graphs, quan sát auth/onboarding đã persist |
+| app/navigation/OneSpaceAppState.kt | Thực thi navigate/pop, detail, tab stack, settings và OTP |
+| app/navigation/Destinations.kt | Tab metadata và context title theo typed route |
+| feature/*/navigation/*Route.kt | Contract graph/feed/detail, argument nhỏ có kiểu dữ liệu |
+| feature/*/navigation/*NavGraph.kt | Destination bindings, state collection, VM scope và UI callbacks |
 
-## Đối chiếu hướng dẫn Android
+Feature graph không nhận NavController/NavHostController. App cung cấp callback cụ thể như onOpenVideo(id), onOpenArticle(id), onVerifyEmail(email), onBack(). Vì app là nơi ghép flow nên app biết các typed route public cần thiết; feature không biết route của feature khác.
 
-| Hướng dẫn | Áp dụng trong OneSpace | Đánh giá |
-| --- | --- | --- |
-| UI/data tách biệt, truy cập qua repository | UI → VM → use case/contract; data implementation ở module riêng | Đã áp dụng |
-| UDF, immutable UI state | Callbacks vào VM; read-only StateFlow ra UI | Đã áp dụng |
-| Thu thập state theo lifecycle | Feature routes và shell dùng collectAsStateWithLifecycle | Đã áp dụng |
-| ViewModel theo screen/graph | Catalog/detail dùng VM scope theo feature graph | Đã áp dụng |
-| Module ít phụ thuộc, rõ trách nhiệm | Không có feature → feature hoặc feature → data | Đã áp dụng |
-| App làm entry point/root navigation | Application, Activity, Hilt wiring, shell, NavHost ở app | Đã áp dụng |
-| Navigation truyền ID thay model | Detail routes dùng ID; screen composable nhận callbacks | Đã áp dụng |
-| Domain cho rule phức tạp/tái sử dụng | SessionPolicy và queue rule thuần Kotlin | Quyết định dự án |
-| Phục hồi state đúng tầng | SavedStateHandle/UI state hiện tại; persisted repository dự kiến | Chưa có persistence thật |
-| Playback owner ngoài UI lifecycle | Có boundary core:media; chưa có controller/service | Chờ triển khai |
+Catalog Video/Music/News/Games và Auth chia sẻ ViewModel theo parent graph. App cấp getGraphEntry callback, feature lấy owner trong remember(entry) rồi gọi hiltViewModel(owner). Provider này chỉ phục vụ scope, không cấp quyền navigate. Settings dùng destination-scoped ViewModel; onboarding giữ state theo destination của flow.
 
-Nguồn tham chiếu:
+Luồng:
+- Startup đọc preferences/session thật → onboarding, auth hoặc main.
+- Hoàn tất onboarding chỉ lưu sở thích/onboarding, không tự cấp guest.
+- Guest/OTP thành công ghi session → root quan sát rồi vào Main.
+- Sign-out ghi session → root dừng phiên phát và về Auth.
+- Root anchor giữ ổn định; child back stack bị bỏ khi đổi auth flow.
+- Năm tab dùng saveState/restoreState/launchSingleTop.
+- Music Next/Previous giữ nguyên destination, đọc track từ runtime playback và không tích lũy màn NowPlaying.
+- ViewModel không giữ callback NavController qua coroutine, nên recreate ngay lúc sign-out không điều hướng vào Activity cũ.
 
-- [Recommendations for Android architecture](https://developer.android.com/topic/architecture/recommendations): UDF, repository, StateFlow, lifecycle collection và scope ViewModel.
-- [Common modularization patterns](https://developer.android.com/topic/modularization/patterns?hl=en): module types, dependency inversion, giao tiếp qua navigation.
-- [Domain layer](https://developer.android.com/topic/architecture/domain-layer): domain tùy chọn, use case tái sử dụng.
-- [ViewModel scoping APIs](https://developer.android.com/topic/libraries/architecture/viewmodel/viewmodel-apis): owner và scope theo graph.
-- [UI layer](https://developer.android.com/topic/architecture/ui-layer): state holder, UI logic và business logic.
-- [Hilt Gradle setup](https://dagger.dev/hilt/gradle-setup) và [Dagger KSP](https://dagger.dev/dev-guide/ksp.html): cấu hình DI/code generation.
+## Luồng nghiệp vụ và state
 
-## Ownership theo nghiệp vụ
+Screens → UI callback/ViewModel → Domain use case/policy → Domain contract → Data/Android adapter → Flow/StateFlow → UI.
 
-| Phân hệ | Presentation | Domain | Data |
-| --- | --- | --- | --- |
-| Video | Feed/detail, args, controls gửi shared session | Video, repository contract, GetVideo | Catalog mock; metadata/progress/cache sau |
-| Music | Catalog/Now Playing, controls và route bài mới | Track, contract, GetMusic, SelectNextTrack | Catalog mock; queue/download metadata sau |
-| News | Feed/reader, saved filter, bookmark intent | Article, contract, GetNews, ObserveSavedArticles, ToggleBookmark | Catalog, in-memory bookmark source of truth |
-| Games | Catalog/board preview, pause/resume intent | Game, contract, GetGames | Catalog mock; gameplay/save game sau |
-| Shared session | Global players, lifecycle bridge, coordinator adapter | Audio exclusivity, tab/background policy | SavedStateHandle cho UI; durable repository chưa có |
+SessionCoordinator là Activity-scoped ViewModel adapter trong core:session, khác authentication session. Nó không điều hướng và không gọi feature ViewModel khác. SessionPolicy là luật Kotlin thuần. MediaSessionPort là contract. MediaPlaybackCoordinator thực thi engine và phát playback truth. Floating/dock trong app nhận state; không tự tạo player.
 
-Không để ViewModel gọi ViewModel khác. App nối graph và callbacks liên feature. Shell tạo một coordinator bằng Hilt, feature nhận cùng instance; không tạo coordinator mới theo graph.
+AuthRepository có demo implementation ở data:auth; request/verify/guest/sign-out đi qua use cases. DataStore ghi email/guest mode atomically. Email null khác với signed-out nhờ guestMode. Auth thật/provider chưa chọn; mã 123456 không gửi email thật và không xác minh danh tính server.
 
-Settings chỉ là UI preference preview nên giữ saveable state trong destination. Khi có DataStore, thêm contract/use case; không đọc DataStore trực tiếp trong composable.
+## Runtime đã có và giới hạn
 
-## Chiều dependency
+- Metadata mock; video/MP3 sample streams phát thật bằng Media3.
+- Hai engine dùng chung: video và audio, không tạo lại theo screen.
+- Room lưu video progress/watchlist; checkpoint video định kỳ hiện là 3 giây.
+- DataStore lưu settings, interests, last section/track ID và phiên demo.
+- C1 có ba lựa chọn, nhớ global trên thiết bị, reset ở Settings.
+- Native splash, themed shell, auth/onboarding và graph navigation có baseline.
+- News bookmark còn trong RAM; chưa phải durable/offline-first.
+- Game mới board preview; chưa có gameplay/snapshot.
+- Chưa có MediaSessionService, notification/lock-screen controls, đầy đủ audio focus/noisy cho video, real network sync, TTS/conversion/mixed queue.
+- Chọn tab không đổi playback; floating còn trên Music, dock còn trên Games. Nội dung chừa khoảng trống theo chiều cao floating thực tế.
+- Playback snapshot tách playing thực tế, playRequested, status, suppressed và error. SessionState không giữ cờ playing trùng lặp.
+- Domain tạo audio plans; adapter thực thi. Video mute không tạo C1 conflict.
+- Runtime queue do Media3 adapter sở hữu; UI Next/Previous dùng queue đó, auto-advance dùng cùng playlist repeat-all.
+- Đóng media/new intent vô hiệu request cũ còn chờ catalog/preferences.
+- Recreate UI test không chứng minh OS process death, lock-screen service, RAM 3 GB hoặc battery profile.
 
-```text
-app → feature:*, data:*, domain, core:designsystem, core:session
-feature:video/music/news/games → domain, core:common, core:designsystem, core:session
-feature:home/account → domain, core:designsystem
-data:* → domain
-core:session → domain
-core:designsystem → core:common
-domain → Kotlin/coroutines only
-```
+## Kiểm chứng và quy trình thay đổi
 
-Data trả public factory có kiểu repository interface; mock class internal. App chọn binding/scope, không chứa cách tải/lưu dữ liệu. Core media/network/database/datastore/sync là extension points; chỉ nối từ data/runtime khi thực sự sử dụng.
+[Hồ sơ baseline Section 4 ngày 24/10/2026](verification/section-4-baseline.md): build/architecture check, 35 unit tests, 12 emulator tests và kiểm tra render LaTeX.
 
-## Trade-offs
+Chạy từ root:
 
-- Một domain module, chia package theo nghiệp vụ. Chưa tách domain thành nhiều api/impl modules vì MVP còn nhỏ.
-- UI và graph chung feature module; data tách riêng để compiler ngăn UI gọi implementation.
-- Có 20 leaf modules; vài core hạ tầng là skeleton. Có chi phí Gradle/configuration để đổi lấy cấu trúc quản lý riêng. Chỉ thêm module khi có trách nhiệm rõ ràng.
-- Giữ Navigation Compose 2 theo baseline. Tài liệu Android hiện đề xuất Navigation 3 cho app mới; việc chuyển Nav3 là ADR riêng, không nằm trong lần tách module này.
-- Repository mock scope Singleton giữ bookmark qua đổi tab/recreation, không qua process death.
-- Coordinator là ViewModel của shell, chỉ mô phỏng UI. Background audio thật phải do MediaSessionService/controller sở hữu; UI quan sát/gửi lệnh tới runtime, không dùng VM thay service.
+~~~powershell
+./gradlew.bat verifyArchitecture
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1
+./gradlew.bat :domain:test :core:session:testDebugUnitTest :data:auth:testDebugUnitTest
+./gradlew.bat :app:connectedDebugAndroidTest --max-workers=1
+~~~
 
-## Điều chưa thể kết luận từ skeleton
+app:check phụ thuộc verifyArchitecture. Guardrail kiểm tra import/module dependencies và feature controller exposure; compiler và runtime tests kiểm tra phần còn lại.
 
-Chưa có Media3/Audio Focus, background music/notification, decoder dùng chung, persisted session, offline cache/download, game loop/save hoặc retry mạng thật. UI có play/pause/floating không chứng minh các cơ chế đó đã hoạt động.
+Khi thêm feature:
+1. Thêm module presentation và model/contract/use case/data adapter cần thực tế.
+2. Feature khai báo Route/NavGraph, không import feature khác.
+3. App đăng ký DI/graph và bind navigation callbacks.
+4. Nếu thay audio/lifecycle/persistence policy, cập nhật ADR/acceptance criteria tương ứng trước.
+5. Chạy architecture check và test chịu ảnh hưởng. Chưa cần thêm screen/service/manager rỗng để giữ chỗ.
 
-Tests kiểm tra policy Kotlin, queue và saved-state adapter. Đã chạy 6 instrumentation tests trên AOSP API 35, bao phủ năm tab, floating video, mini music player/Next, bookmark qua đổi tab, game Pause/Resume và settings sau Activity recreation. Đã chỉnh artwork Music và board Games theo chiều cao khả dụng để controls hiển thị trên màn hình 411×731 dp. Ảnh thực tế ở `docs/screenshots`; chạy lại bằng `scripts/smoke-test.ps1`.
+Build dùng Gradle daemon JDK 25 và bytecode JVM 11. Cần full JDK có jlink; JRE do editor đi kèm không đủ cho Android JdkImageTransform. Đường dẫn SDK/JDK của từng máy không được commit. Nếu auto-detect chọn nhầm JRE, đặt JAVA_HOME/Gradle JDK về full JDK rồi restart daemon; có thể giới hạn installations paths trong cấu hình local/lệnh chạy.
 
-Kiểm thử process death, service lifecycle, pin/RAM/decoder và mất mạng thực hiện sau khi có runtime. Kết quả navigation hiện tại chỉ xác nhận prototype với dữ liệu mock.
+## Tài liệu liên quan
 
-## Quy tắc triển khai tiếp
-
-1. Rule thay đổi hành vi sản phẩm ở domain; truy cập dữ liệu ở repository; navigation/layout ở feature/shell.
-2. Không thêm Context/Activity/Player vào domain hoặc feature ViewModel; platform adapter ở data/core.
-3. Feature mới đăng ký graph và Hilt bindings; không import feature cũ để phối hợp.
-4. Persisted state có một source of truth trong repository; không giữ thêm bản bookmark/game/queue tại app.
-5. Test nghiệp vụ JVM trước, adapter/lifecycle bằng Android tests; không suy diễn từ mock UI.
+- [Section 4 và các đối chiếu với mục 2.2/3.1](https://github.com/nhinguyen140809/mobile-report/blob/duy_1.2_1.5_parts/sections/4-technical-architecture/main.tex)
+- [Tổng quan project](../README.md)
+- Android: [architecture](https://developer.android.com/topic/architecture/recommendations), [modularization](https://developer.android.com/topic/modularization/patterns), [nested graphs](https://developer.android.com/guide/navigation/design/nested-graphs), [background playback](https://developer.android.com/media/media3/session/background-playback).

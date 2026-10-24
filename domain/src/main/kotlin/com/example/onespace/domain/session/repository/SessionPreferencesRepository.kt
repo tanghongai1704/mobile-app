@@ -13,10 +13,11 @@ data class SessionPreferences(
     val conflictRule: MediaConflictRule? = null,
     val dataSaver: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    /** First-run flow finished; the app goes straight to Home from then on. */
+    /** Interests/welcome completed; authentication is a separate persisted state. */
     val onboarded: Boolean = false,
-    /** null = guest mode; an email means the mock sign-in succeeded. */
+    /** Demo identity only; guestMode distinguishes guests from signed-out sessions. */
     val authEmail: String? = null,
+    val guestMode: Boolean = false,
     /** Interests picked during onboarding (topic names, at least 3 to continue). */
     val selectedTopics: Set<String> = emptySet(),
     val language: Language = Language.VI,
@@ -34,7 +35,7 @@ interface SessionPreferencesRepository {
     suspend fun setDataSaver(enabled: Boolean)
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setOnboarded(done: Boolean)
-    suspend fun setAuthEmail(email: String?)
+    suspend fun setAuthSession(email: String?, guest: Boolean)
     suspend fun setSelectedTopics(topics: Set<String>)
     suspend fun setLanguage(language: Language)
     suspend fun setSimulateOffline(enabled: Boolean)

@@ -1,8 +1,6 @@
 package com.example.onespace.feature.onboarding.presentation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.pager.HorizontalPager
@@ -15,39 +13,22 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-/** Splash: one brand beat, then onboarding. Never blocks the 3-second budget. */
-@Composable
-internal fun SplashScreen(onNext: () -> Unit) {
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(600); onNext() }
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
-        MaterialTheme.colorScheme.primaryContainer,
-        MaterialTheme.colorScheme.surface
-    ))), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("oneSpace", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary)
-            Text("4 trong 1 · liền mạch", style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
 /** Three value/permission/continuity steps; step 3 picks at least 3 topics. */
 @Composable
-internal fun OnboardingScreen(vm: OnboardingViewModel, onDone: () -> Unit) {
+internal fun OnboardingScreen(
+    topics: List<String>, selected: Set<String>, onToggle: (String) -> Unit,
+    saving: Boolean, onFinish: () -> Unit, onSkip: () -> Unit
+) {
     val pager = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
-    val selected by vm.selected.collectAsState()
     val enough = selected.size >= 3
 
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -56,12 +37,12 @@ internal fun OnboardingScreen(vm: OnboardingViewModel, onDone: () -> Unit) {
                 0 -> InfoStep("Tất cả trong một app",
                     "Video, nhạc, tin tức và minigame cùng một không gian giải trí.", null)
                 1 -> MultitaskStep()
-                else -> TopicsStep(vm.topics, selected, vm::toggle)
+                else -> TopicsStep(topics, selected, onToggle)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { vm.continueAsGuest(onDone) }) { Text("Bỏ qua") }
+            TextButton(onClick = { onSkip() }) { Text("Bỏ qua") }
             Spacer(Modifier.weight(1f))
         }
         Row(
@@ -71,8 +52,8 @@ internal fun OnboardingScreen(vm: OnboardingViewModel, onDone: () -> Unit) {
             if (index == pager.currentPage) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)) } }
         Button(
-            onClick = { if (pager.currentPage < 2) scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } else onDone() },
-            enabled = pager.currentPage < 2 || enough,
+            onClick = { if (pager.currentPage < 2) scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } else onFinish() },
+            enabled = !saving && (pager.currentPage < 2 || enough),
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
             Text(when {
@@ -143,74 +124,6 @@ private fun TopicsStep(topics: List<String>, selected: Set<String>, onToggle: (S
                     onClick = { onToggle(topic) },
                     label = { Text(topic) }
                 )
-            }
-        }
-    }
-}
-
-/** Mock login: email + OTP fields, Google button, and an explicit guest path. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun LoginScreen(vm: OnboardingViewModel, onDone: () -> Unit) {
-    var email by rememberSaveable { mutableStateOf("") }
-    var otp by rememberSaveable { mutableStateOf("") }
-    var showGuest by remember { mutableStateOf(false) }
-    var touched by remember { mutableStateOf(false) }
-    val signingIn by vm.signingIn.collectAsState()
-    val emailError = touched && !vm.isValidEmail(email)
-
-    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Spacer(Modifier.height(32.dp))
-        Text("Đăng nhập / Đăng ký", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-        Text("Một tài khoản cho cả bốn phân hệ.", style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = email, onValueChange = { email = it; touched = true },
-            label = { Text("Email") },
-            isError = emailError,
-            supportingText = { if (emailError) Text("Email chưa hợp lệ — kiểm tra lại giúp mình nhé.") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        OutlinedTextField(
-            value = otp, onValueChange = { otp = it },
-            label = { Text("Mã OTP (demo: bất kỳ)") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Button(
-            onClick = {
-                if (!vm.isValidEmail(email)) touched = true
-                else vm.signIn(email, onDone)
-            },
-            // TC07: the button stays enabled; validation shows inline on submit.
-            enabled = !signingIn,
-            modifier = Modifier.fillMaxWidth().height(48.dp)
-        ) {
-            Text(if (signingIn) "Đang đăng nhập..." else "Tiếp tục với email")
-        }
-        OutlinedButton(onClick = { vm.signIn(email.ifBlank { "demo.onespace@gmail.com" }, onDone) },
-            modifier = Modifier.fillMaxWidth().height(48.dp)) {
-            Text("Tiếp tục với Google")
-        }
-        TextButton(onClick = { showGuest = true }, modifier = Modifier.fillMaxWidth()) {
-            Text("Dùng thử không cần tài khoản")
-        }
-    }
-
-    if (showGuest) {
-        ModalBottomSheet(onDismissRequest = { showGuest = false }) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Dùng thử không cần tài khoản",
-                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text("Đủ 4 phân hệ ở mức cơ bản. Điểm và tiến độ sẽ được giữ khi bạn tạo tài khoản.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { showGuest = false; vm.continueAsGuest(onDone) },
-                    modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                    Text("Tiếp tục dùng thử")
-                }
-                Spacer(Modifier.height(16.dp))
             }
         }
     }

@@ -13,17 +13,14 @@ import androidx.compose.material.icons.filled.SportsEsports
 
 import com.example.onespace.feature.games.presentation.*
 
-object GamesNavigation {
-    const val GRAPH = "games"
-    const val FEED = "games/feed"
-    const val GAME = "games/play/{id}"
-    fun game(id: String) = "games/play/" + android.net.Uri.encode(id)
-}
-
-fun NavGraphBuilder.gamesGraph(nav: NavHostController, session: SessionCoordinator) {
-    navigation(startDestination = GamesNavigation.FEED, route = GamesNavigation.GRAPH) {
-        composable(GamesNavigation.FEED) { entry ->
-            val owner = remember(entry) { nav.getBackStackEntry(GamesNavigation.GRAPH) }
+fun NavGraphBuilder.gamesGraph(
+    session: SessionCoordinator,
+    getGraphEntry: () -> NavBackStackEntry,
+    onOpenGame: (String) -> Unit
+) {
+    navigation<GamesRoute.Graph>(startDestination = GamesRoute.Feed) {
+        composable<GamesRoute.Feed> { entry ->
+            val owner = remember(entry) { getGraphEntry() }
             val vm: GamesViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
             val offline by vm.offline.collectAsStateWithLifecycle()
@@ -33,17 +30,18 @@ fun NavGraphBuilder.gamesGraph(nav: NavHostController, session: SessionCoordinat
                 onRetry = vm::retry,
                 empty = EmptySpec(Icons.Filled.SportsEsports, "Chưa mở khoá game nào", "Chơi thử ngay", vm::retry)
             ) { games ->
-                GamesScreen(games) { nav.navigate(GamesNavigation.game(it)) }
+                GamesScreen(games, onOpenGame)
             }
         }
-        composable(GamesNavigation.GAME, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
-            val owner = remember(entry) { nav.getBackStackEntry(GamesNavigation.GRAPH) }
+        composable<GamesRoute.Game> { entry ->
+            val id = entry.toRoute<GamesRoute.Game>().id
+            val owner = remember(entry) { getGraphEntry() }
             val vm: GamesViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
             val playback by session.uiState.collectAsStateWithLifecycle()
             LaunchedEffect(entry) { session.resumeGame() }
             CatalogContent(state) { games ->
-                GameScreen(games.find { it.id == entry.arguments?.getString("id") },
+                GameScreen(games.find { it.id == id },
                     playback.gamePaused, session::pauseGame)
             }
         }
