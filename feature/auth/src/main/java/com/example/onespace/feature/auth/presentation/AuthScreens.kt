@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.onespace.core.designsystem.OneSpaceBrand
@@ -22,12 +23,19 @@ import com.example.onespace.core.designsystem.OneSpaceBrand
 @Composable
 internal fun LoginScreen(
     email: String,
+    phone: String = "",
     state: AuthUiState,
     onEmailChange: (String) -> Unit,
+    onPhoneChange: (String) -> Unit = {},
     onRequestCode: () -> Unit,
+    onRequestPhoneCode: () -> Unit = {},
     onGuest: () -> Unit
 ) {
     var showGuest by rememberSaveable { mutableStateOf(false) }
+    var password by rememberSaveable { mutableStateOf("") }
+    var showGoogle by rememberSaveable { mutableStateOf(false) }
+    // F-COM-01: phone-first login, email still available on the second tab.
+    var phoneMode by rememberSaveable { mutableStateOf(true) }
     Column(
         Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -42,28 +50,79 @@ internal fun LoginScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         ElevatedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
-                    value = email, onValueChange = onEmailChange, enabled = !state.loading,
-                    label = { Text("Email") }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Outlined.Email, null) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    isError = state.error != null,
-                    supportingText = { state.error?.let { Text(it) } },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(onClick = onRequestCode, enabled = !state.loading,
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = phoneMode,
+                        onClick = { phoneMode = true },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        label = { Text("Số điện thoại") }
+                    )
+                    SegmentedButton(
+                        selected = !phoneMode,
+                        onClick = { phoneMode = false },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        label = { Text("Email") }
+                    )
+                }
+                if (phoneMode) {
+                    OutlinedTextField(
+                        value = phone, onValueChange = onPhoneChange, enabled = !state.loading,
+                        label = { Text("Số điện thoại") }, singleLine = true,
+                        prefix = { Text("+84 ") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        isError = state.error != null,
+                        supportingText = { state.error?.let { Text(it) } },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(onClick = onRequestPhoneCode, enabled = !state.loading,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                        if (state.loading) LoadingIndicator() else Text("Gửi mã OTP")
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = email, onValueChange = onEmailChange, enabled = !state.loading,
+                        label = { Text("Email") }, singleLine = true,
+                        leadingIcon = { Icon(Icons.Outlined.Email, null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        isError = state.error != null,
+                        supportingText = { state.error?.let { Text(it) } },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = password, onValueChange = { password = it },
+                        enabled = !state.loading,
+                        label = { Text("Mật khẩu") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(onClick = onRequestCode, enabled = !state.loading && email.isNotBlank() && password.length >= 6,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                        if (state.loading) LoadingIndicator() else Text("Đăng nhập")
+                    }
+                }
+                // F-COM-01: Google is offered, the demo build only explains it.
+                OutlinedButton(onClick = { showGoogle = true }, enabled = !state.loading,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                    if (state.loading) LoadingIndicator() else Text("Tiếp tục với email")
+                    Text("Tiếp tục với Google")
                 }
             }
         }
-        Text("Bản thử nghiệm · Mã xác thực demo: 123456. Không gửi email thật.",
-            style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = { showGuest = true }, enabled = !state.loading) {
             Text("Dùng thử không cần tài khoản")
         }
         Spacer(Modifier.height(12.dp))
+    }
+
+    if (showGoogle) ModalBottomSheet(onDismissRequest = { showGoogle = false }) {
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Đăng nhập bằng Google", style = MaterialTheme.typography.headlineSmall)
+            Text("Bản demo của môn học chưa kết nối Google Sign-In. Trong bản phát hành, bước này mở cửa sổ chọn tài khoản Google của bạn.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = { showGoogle = false }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                Text("Đã hiểu")
+            }
+            Spacer(Modifier.height(16.dp))
+        }
     }
 
     if (showGuest) ModalBottomSheet(onDismissRequest = { showGuest = false }) {

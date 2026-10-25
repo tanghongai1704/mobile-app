@@ -25,7 +25,17 @@ fun NavGraphBuilder.authGraph(
                     onVerifyEmail(it)
                 }
             }
-            LoginScreen(email, state, vm::setEmail, vm::requestCode, vm::continueAsGuest)
+            val phone by vm.phone.collectAsStateWithLifecycle()
+            LoginScreen(
+                email = email,
+                phone = phone,
+                state = state,
+                onEmailChange = vm::setEmail,
+                onPhoneChange = vm::setPhone,
+                onRequestCode = vm::requestCode,
+                onRequestPhoneCode = vm::requestPhoneCode,
+                onGuest = vm::continueAsGuest
+            )
         }
         composable<AuthRoute.VerifyCode> { entry ->
             val email = entry.toRoute<AuthRoute.VerifyCode>().email

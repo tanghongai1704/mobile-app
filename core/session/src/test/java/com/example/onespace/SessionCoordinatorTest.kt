@@ -66,6 +66,14 @@ class SessionCoordinatorTest {
         override fun pauseMusic() { musicState.value = musicState.value.copy(playing = false, playRequested = false) }
         override fun stopMusic() { musicState.value = MusicPlayback() }
         override fun seekMusicTo(positionMs: Long) { musicState.value = musicState.value.copy(positionMs = positionMs) }
+        override fun removeTrackFromQueue(trackId: String) = Unit
+        override fun moveTrackInQueue(fromIndex: Int, toIndex: Int) {
+            val q = musicState.value.queue.toMutableList()
+            if (fromIndex in q.indices && toIndex in q.indices && fromIndex != toIndex) {
+                q.add(toIndex, q.removeAt(fromIndex))
+                musicState.value = musicState.value.copy(queue = q)
+            }
+        }
 
         override fun openVideo(video: Video, startPositionMs: Long, plan: VideoStartPlan) {
             if (plan.pauseMusic) pauseMusic()
@@ -78,6 +86,7 @@ class SessionCoordinatorTest {
         }
         override fun pauseVideo() { videoState.value = videoState.value.copy(playing = false, playRequested = false) }
         override fun seekVideoBy(deltaMs: Long) = Unit
+        override fun seekVideoTo(positionMs: Long) { videoState.value = videoState.value.copy(positionMs = positionMs) }
         override fun dismissVideo(toWatchlist: Boolean) { videoState.value = VideoPlayback() }
     }
 
@@ -107,6 +116,8 @@ class SessionCoordinatorTest {
         val videoRepository = object : VideoRepository { override fun observeCatalog() = flowOf(videos) }
         val viewing = object : ViewingSessionRepository {
             override fun observeContinue(): Flow<List<ContinueEntry>> = flowOf(emptyList())
+            override fun observeWatchlist(): Flow<List<ContinueEntry>> = flowOf(emptyList())
+            override fun observeHistory(): Flow<List<ContinueEntry>> = flowOf(emptyList())
             override suspend fun addToWatchlist(videoId: String, title: String) = Unit
             override suspend fun removeFromWatchlist(videoId: String) = Unit
             override suspend fun progressOf(videoId: String): Long = 0

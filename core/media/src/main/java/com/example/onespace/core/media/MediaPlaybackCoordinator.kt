@@ -6,6 +6,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.onespace.domain.music.model.Track
 import com.example.onespace.domain.session.VideoStartPlan
@@ -55,13 +56,18 @@ class MediaPlaybackCoordinator @Inject constructor(
         .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
         .build()
 
-    private val videoEngine: ExoPlayer = ExoPlayer.Builder(context)
+    // Emulator images (esp. ARM64) ship a fragile software avc decoder; falling
+    // back to the next decoder keeps real streams playing instead of erroring out.
+    private val renderersFactory = DefaultRenderersFactory(context)
+        .setEnableDecoderFallback(true)
+
+    private val videoEngine: ExoPlayer = ExoPlayer.Builder(context, renderersFactory)
         // The app arbitrates the video voice itself (case C1): muting must keep the
         // frames rolling, so the video player must not react to system audio focus.
         .setAudioAttributes(mediaAudioAttributes, /* handleAudioFocus = */ false)
         .build()
 
-    private val musicPlayer: ExoPlayer = ExoPlayer.Builder(context)
+    private val musicPlayer: ExoPlayer = ExoPlayer.Builder(context, renderersFactory)
         // Dock music yields to any other audible source (calls, other apps, video).
         .setAudioAttributes(mediaAudioAttributes, /* handleAudioFocus = */ true)
         .build()
@@ -156,6 +162,46 @@ class MediaPlaybackCoordinator @Inject constructor(
         syncMusicState()
     }
 
+    override fun removeTrackFromQueue(trackId: String) {
+        val old = _music.value.queue
+        val newQueue = old.filterNot { it.id == trackId }
+        if (newQueue.size == old.size) return
+        queue = newQueue
+        val currentId = _music.value.trackId
+        val currentPosition = musicPlayer.currentPosition
+        if (newQueue.isEmpty()) {
+            musicPlayer.stop()
+            musicPlayer.clearMediaItems()
+            _music.value = MusicPlayback()
+        } else {
+            val currentIndex = newQueue.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
+            musicPlayer.setMediaItems(newQueue.map(::mediaItem), currentIndex, currentPosition)
+            musicPlayer.prepare()
+            // Full rebuild to guarantee the state change propagates.
+            _music.value = MusicPlayback(
+                trackId = currentId,
+                title = _music.value.title,
+                artist = _music.value.artist,
+                playing = musicPlayer.isPlaying,
+                playRequested = musicPlayer.playWhenReady,
+                status = statusOf(musicPlayer),
+                queue = newQueue,
+                positionMs = currentPosition.coerceAtLeast(0),
+                totalMs = _music.value.totalMs
+            )
+        }
+    }
+
+    override fun moveTrackInQueue(fromIndex: Int, toIndex: Int) {
+        val old = _music.value.queue
+        if (fromIndex == toIndex || fromIndex !in old.indices || toIndex !in old.indices) return
+        val newQueue = old.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+        queue = newQueue
+        // Moving inside the player keeps the current item playing — no rebuild.
+        musicPlayer.moveMediaItem(fromIndex, toIndex)
+        syncMusicState()
+    }
+
     private fun playTrack(track: Track, queue: List<Track>) {
         val index = queue.indexOfFirst { it.id == track.id }
         if (index < 0) return
@@ -240,6 +286,10 @@ class MediaPlaybackCoordinator @Inject constructor(
         videoEngine.seekTo((videoEngine.currentPosition + deltaMs).coerceIn(0, durationOf(videoEngine)))
     }
 
+    override fun seekVideoTo(positionMs: Long) {
+        videoEngine.seekTo(positionMs.coerceIn(0, durationOf(videoEngine)))
+    }
+
     override fun dismissVideo(toWatchlist: Boolean) {
         val current = _video.value
         val videoId = current.videoId
@@ -304,4 +354,6 @@ class MediaPlaybackCoordinator @Inject constructor(
 object MediaModule {
     @Provides @Singleton
     fun provideMediaSessionPort(coordinator: MediaPlaybackCoordinator): MediaSessionPort = coordinator
+    @Provides @Singleton
+    fun provideTtsEngine(engine: AndroidTtsEngine): com.example.onespace.domain.news.repository.TtsEngine = engine
 }

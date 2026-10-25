@@ -19,6 +19,8 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
 import com.example.onespace.app.navigation.*
 import com.example.onespace.app.ui.*
+import com.example.onespace.core.designsystem.ReadingState
+import com.example.onespace.core.designsystem.FloatingArticleCard
 import com.example.onespace.core.session.SessionCoordinator
 import com.example.onespace.domain.session.MediaConflictRule
 import com.example.onespace.domain.session.Section
@@ -30,6 +32,8 @@ fun OneSpaceApp() {
     // One coordinator for the entire shell; catalog ViewModels live inside feature graphs.
     val coordinator: SessionCoordinator = hiltViewModel()
     val media: MediaViewModel = hiltViewModel()
+    val downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository =
+        hiltViewModel<DownloadsViewModel>().repository
     val musicState by coordinator.music.collectAsStateWithLifecycle()
     val videoState by coordinator.video.collectAsStateWithLifecycle()
     val conflict by coordinator.conflict.collectAsStateWithLifecycle()
@@ -70,8 +74,10 @@ fun OneSpaceApp() {
     val onHome = selected?.section == Section.HOME && contextTitle == null
     val videoId = videoState.videoId
     val trackId = musicState.trackId
-    val showFloat = inMain && videoId != null && contextTitle != "Video"
+    // F-GAME-08: inside a game the video renders as a split top half, not the floating window.
+    val showFloat = inMain && videoId != null && contextTitle != "Video" && contextTitle != "Games"
     val showMini = inMain && trackId != null && contextTitle != "Music"
+    val showArticleFloat = inMain && ReadingState.articleId != null && contextTitle != "News"
 
     Scaffold(
         snackbarHost = {
@@ -113,12 +119,20 @@ fun OneSpaceApp() {
                         coordinator.closeMusic()
                         scope.launch {
                             val result = snackbarHostState.showSnackbar(
-                                "Đã dừng phát nhạc", actionLabel = "Hoàn tác")
+                                "Đã dừng phát nhạc", actionLabel = "Hoàn tác",
+                                // With an action the default is Indefinite — it
+                                // would never leave; give it ~10s instead.
+                                duration = androidx.compose.material3.SnackbarDuration.Long)
                             if (result == SnackbarResult.ActionPerformed && lastId != null) {
                                 coordinator.playMusic(lastId, lastTitle.ifBlank { lastId })
                             }
                         }
                     }
+                )
+                if (showArticleFloat) FloatingArticleCard(
+                    title = ReadingState.title,
+                    onExpand = { ReadingState.articleId?.let { appState.openArticle(it) } },
+                    onClose = ReadingState::close
                 )
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                     TopLevelDestination.entries.forEach { tab ->
@@ -135,7 +149,8 @@ fun OneSpaceApp() {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             AppNavigation(appState, coordinator, ::select,
-                Modifier.fillMaxSize().padding(bottom = if (showFloat) with(density) { floatingPlayerHeight.toDp() } else 0.dp))
+                Modifier.fillMaxSize().padding(bottom = if (showFloat) with(density) { floatingPlayerHeight.toDp() } else 0.dp),
+                downloadedContent = downloadedContent)
             if (showFloat) FloatingVideo(
                 player = media.videoPlayer,
                 title = videoState.title,
@@ -155,17 +170,17 @@ fun OneSpaceApp() {
     conflict?.takeIf { inMain }?.let { request ->
         AlertDialog(
             onDismissRequest = coordinator::dismissMusicConflict,
-            title = { Text(videoState.title.ifEmpty { "Video đang phát" }) },
-            text = { Text("Bật \"" + request.track.title + "\" trong khi video vẫn chạy?") },
+            title = { Text("Phát \"" + request.track.title + "\"?") },
+            text = { Text("Video đang phát.") },
             confirmButton = {
                 Column {
-                    ConflictOption("Tắt tiếng video, phát nhạc", MediaConflictRule.MUTE_VIDEO) {
+                    ConflictOption("🔇 Tắt tiếng video", MediaConflictRule.MUTE_VIDEO) {
                         coordinator.resolveMusicConflict(it)
                     }
-                    ConflictOption("Dừng video, phát nhạc", MediaConflictRule.PAUSE_VIDEO) {
+                    ConflictOption("⏸ Dừng video", MediaConflictRule.PAUSE_VIDEO) {
                         coordinator.resolveMusicConflict(it)
                     }
-                    ConflictOption("Chỉ giữ video", MediaConflictRule.KEEP_VIDEO) {
+                    ConflictOption("▶ Chỉ giữ video", MediaConflictRule.KEEP_VIDEO) {
                         coordinator.resolveMusicConflict(it)
                     }
                 }
@@ -181,3 +196,9 @@ fun OneSpaceApp() {
 private fun ConflictOption(label: String, rule: MediaConflictRule, choose: (MediaConflictRule) -> Unit) {
     TextButton(onClick = { choose(rule) }) { Text(label) }
 }
+
+/** Simple wrapper so the shell can access the repository without a feature module. */
+@dagger.hilt.android.lifecycle.HiltViewModel
+class DownloadsViewModel @javax.inject.Inject constructor(
+    val repository: com.example.onespace.domain.session.repository.DownloadedContentRepository
+) : androidx.lifecycle.ViewModel()

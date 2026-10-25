@@ -30,10 +30,16 @@ enum class TopLevelDestination(
 internal fun NavDestination?.contextTitle(): String? = when {
     this == null -> null
     hasRoute<VideoRoute.Detail>() -> "Video"
+    hasRoute<VideoRoute.Artist>() -> "Video"
+    hasRoute<VideoRoute.Playlist>() -> "Video"
     hasRoute<MusicRoute.NowPlaying>() -> "Music"
+    hasRoute<MusicRoute.Playlist>() -> "Music"
     hasRoute<NewsRoute.Article>() -> "News"
     hasRoute<GamesRoute.Game>() -> "Games"
     hasRoute<AccountRoute.Profile>() -> "Tài khoản"
     hasRoute<AccountRoute.Settings>() -> "Tùy chỉnh"
+    hasRoute<AccountRoute.Wrapped>() -> "Hồ sơ"
+    hasRoute<AccountRoute.Notifications>() -> "Hồ sơ"
+    hasRoute<AccountRoute.Playlists>() -> "Hồ sơ"
     else -> null
 }

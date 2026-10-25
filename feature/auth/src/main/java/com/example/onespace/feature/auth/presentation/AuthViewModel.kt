@@ -30,12 +30,34 @@ internal class AuthViewModel @Inject constructor(
     private val guest: ContinueAsGuest
 ) : ViewModel() {
     val email = savedState.getStateFlow("email", "")
+    /** F-COM-01: phone login shares the demo OTP path of the email flow. */
+    val phone = savedState.getStateFlow("phone", "")
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState = _uiState.asStateFlow()
 
     fun setEmail(value: String) {
         savedState["email"] = value
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun setPhone(value: String) {
+        savedState["phone"] = value.filter(Char::isDigit).take(11)
+        _uiState.update { it.copy(error = null) }
+    }
+
+    fun requestPhoneCode() = submit {
+        val digits = phone.value
+        if (digits.length !in 9..11) {
+            _uiState.update { it.copy(error = "Số điện thoại không hợp lệ") }
+            return@submit
+        }
+        // The demo backend only knows email addresses, so the number gets a
+        // stable in-app address; the OTP is the same demo code.
+        val pseudo = digits + "@phone.onespace"
+        requestCode(pseudo).fold(
+            onSuccess = { _uiState.update { it.copy(codeSentTo = "0" + digits) } },
+            onFailure = ::showError
+        )
     }
 
     fun requestCode() = submit {

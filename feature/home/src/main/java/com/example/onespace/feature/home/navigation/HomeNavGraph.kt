@@ -9,10 +9,6 @@ import androidx.navigation.compose.navigation
 import com.example.onespace.feature.home.presentation.HomeScreen
 import com.example.onespace.feature.home.presentation.HomeViewModel
 
-/**
- * Cross-content deeplinks are injected from the app level so the home module
- * never depends on the other feature graphs.
- */
 fun NavGraphBuilder.homeGraph(
     onOpenVideo: (id: String, title: String) -> Unit,
     onPlayTrack: (id: String, title: String) -> Unit,
@@ -22,7 +18,18 @@ fun NavGraphBuilder.homeGraph(
         composable<HomeRoute.Feed> {
             val vm: HomeViewModel = hiltViewModel()
             val state by vm.uiState.collectAsStateWithLifecycle()
-            HomeScreen(state, onOpenVideo, onPlayTrack, onOpenArticle)
+            val gamification by vm.gamification.collectAsStateWithLifecycle()
+            val offline by vm.offline.collectAsStateWithLifecycle()
+            val watchLater by vm.watchLater.collectAsStateWithLifecycle()
+            HomeScreen(
+                state = state,
+                gamification = gamification,
+                offline = offline,
+                watchLater = watchLater,
+                onOpenVideo = onOpenVideo,
+                onPlayTrack = onPlayTrack,
+                onOpenArticle = onOpenArticle
+            )
         }
     }
 }

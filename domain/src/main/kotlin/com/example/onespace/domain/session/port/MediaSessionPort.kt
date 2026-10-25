@@ -53,10 +53,13 @@ interface MediaSessionPort {
     fun pauseMusic()
     fun stopMusic()
     fun seekMusicTo(positionMs: Long)
+    fun removeTrackFromQueue(trackId: String)
+    fun moveTrackInQueue(fromIndex: Int, toIndex: Int)
 
     fun openVideo(video: Video, startPositionMs: Long, plan: VideoStartPlan)
     fun resumeVideo(plan: VideoStartPlan)
     fun seekVideoBy(deltaMs: Long)
+    fun seekVideoTo(positionMs: Long)
     fun pauseVideo()
     fun dismissVideo(toWatchlist: Boolean)
 }

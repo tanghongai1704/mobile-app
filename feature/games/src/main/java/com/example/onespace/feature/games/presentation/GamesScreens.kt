@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.onespace.core.designsystem.*
 import com.example.onespace.domain.games.model.Game
@@ -68,5 +69,81 @@ internal fun GameScreen(game: Game?, paused: Boolean, onPause: () -> Unit) {
         }
         Button(onClick = onPause) { Text(if (paused) "Chơi bản demo" else "Tạm dừng bản demo") }
         if (paused) PrototypeNote("Đang tạm dừng · Tiếp tục khi bạn sẵn sàng.")
+    }
+}
+
+/** Guess the Song: play 5 seconds, pick the correct title from 4 options. */
+@Composable
+internal fun GuessSongScreen(
+    state: com.example.onespace.domain.games.model.GuessSongState,
+    onStart: () -> Unit,
+    onAnswer: (String) -> Unit,
+    onNext: () -> Unit
+) {
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Đoán bài hát", style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold)
+        Text("Nghe 5 giây và chọn tên bài hát đúng",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        // Score
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Điểm: ${state.score}", style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold)
+            Text("Ván: ${state.round}", style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        when {
+            state.question == null -> {
+                // Start screen
+                Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+                    Text("Bắt đầu chơi")
+                }
+            }
+            !state.hasAnswered -> {
+                // Playing state
+                Text(
+                    if (state.isPlaying) "Đang phát..." else "Chọn đáp án",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                // Options
+                val currentQuestion = state.question ?: return@Column
+                currentQuestion.options.forEach { option ->
+                    OutlinedButton(
+                        onClick = { onAnswer(option) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(option)
+                    }
+                }
+            }
+            else -> {
+                // Answered state
+                val question = state.question ?: return@Column
+                val isCorrect = state.isCorrect == true
+                Text(
+                    if (isCorrect) "Chính xác! +10 điểm" else "Sai rồi!",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (isCorrect) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Đáp án: ${question.trackTitle} — ${question.artist}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
+                    Text("Ván tiếp theo")
+                }
+            }
+        }
     }
 }

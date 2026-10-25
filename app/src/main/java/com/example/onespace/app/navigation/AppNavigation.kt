@@ -27,7 +27,8 @@ fun AppNavigation(
     session: SessionCoordinator,
     onSection: (Section) -> Unit,
     modifier: Modifier = Modifier,
-    startup: StartupViewModel = hiltViewModel()
+    startup: StartupViewModel = hiltViewModel(),
+    downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository? = null
 ) {
     val nav = appState.navController
     fun replaceRoot(route: Any) {
@@ -101,12 +102,15 @@ fun AppNavigation(
                 session = session,
                 getGraphEntry = { appState.graphEntry(VideoRoute.Graph) },
                 onOpenVideo = appState::openVideo,
-                onBrowseNews = { onSection(Section.NEWS) }
+                onBrowseNews = { onSection(Section.NEWS) },
+                onOpenArtist = appState::openVideoArtist,
+                onOpenFromPlaylist = appState::openVideoInPlaylist
             )
             musicGraph(
                 session = session,
                 getGraphEntry = { appState.graphEntry(MusicRoute.Graph) },
-                onOpenPlayer = appState::openMusicPlayer
+                onOpenPlayer = appState::openMusicPlayer,
+                onOpenArtist = appState::openMusicArtist
             )
             newsGraph(
                 getGraphEntry = { appState.graphEntry(NewsRoute.Graph) },
@@ -117,7 +121,20 @@ fun AppNavigation(
                 getGraphEntry = { appState.graphEntry(GamesRoute.Graph) },
                 onOpenGame = appState::openGame
             )
-            accountGraph(onOpenSettings = appState::openSettings)
+            accountGraph(
+                onOpenSettings = appState::openSettings,
+                onOpenWrapped = appState::openWrapped,
+                onOpenNotifications = appState::openNotifications,
+                onOpenPlaylists = appState::openPlaylists,
+                onDownloads = appState::openDownloads,
+                onBadges = appState::openBadges,
+                onOpenVideoPlaylist = appState::openVideoPlaylist,
+                onOpenMusicPlaylist = appState::openMusicPlaylist,
+                onOpenVideo = appState::openVideo,
+                onOpenMusic = appState::openMusicPlayer,
+                onOpenArticle = appState::openArticle,
+                downloadedContent = downloadedContent
+            )
         }
     }
 }

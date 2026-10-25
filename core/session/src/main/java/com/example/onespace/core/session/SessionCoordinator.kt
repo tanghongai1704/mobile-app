@@ -99,6 +99,12 @@ class SessionCoordinator @Inject constructor(
         }
     }
 
+    /** F-MUS-04: "Phát tất cả" / "Ngẫu nhiên" plays a playlist as the queue. */
+    fun playMusicPlaylist(track: com.example.onespace.domain.music.model.Track, queue: List<com.example.onespace.domain.music.model.Track>) {
+        val version = newPlaybackRequest()
+        viewModelScope.launch { startMusic(track, queue, version) }
+    }
+
     private fun newPlaybackRequest(): Long {
         cancelPendingRestore()
         _conflict.value = null
@@ -167,8 +173,33 @@ class SessionCoordinator @Inject constructor(
         viewModelScope.launch { startMusic(track, queue, version) }
     }
 
+    /** F-MUS-01: shuffle and repeat change how "next" is picked, not how audio plays. */
+    private val _musicShuffle = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val musicShuffle: kotlinx.coroutines.flow.StateFlow<Boolean> = _musicShuffle
+    private val _musicRepeat = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val musicRepeat: kotlinx.coroutines.flow.StateFlow<Boolean> = _musicRepeat
+
+    fun toggleShuffle() { _musicShuffle.value = !_musicShuffle.value }
+
+    fun toggleRepeat() { _musicRepeat.value = !_musicRepeat.value }
+
+    fun removeFromQueue(trackId: String) = port.removeTrackFromQueue(trackId)
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) = port.moveTrackInQueue(fromIndex, toIndex)
+
     fun nextTrack() {
         val playback = port.music.value
+        if (_musicRepeat.value) {
+            playback.queue.firstOrNull { it.id == playback.trackId }
+                ?.let { requestQueuedTrack(it, playback.queue) }
+            return
+        }
+        if (_musicShuffle.value && playback.queue.size > 1) {
+            playback.queue
+                .filter { it.id != playback.trackId }
+                .randomOrNull()
+                ?.let { requestQueuedTrack(it, playback.queue) }
+            return
+        }
         SelectNextTrack(playback.queue, playback.trackId)?.let { requestQueuedTrack(it, playback.queue) }
     }
 
@@ -178,6 +209,8 @@ class SessionCoordinator @Inject constructor(
     }
 
     fun seekVideoBy(deltaMs: Long) = port.seekVideoBy(deltaMs)
+
+    fun seekVideoTo(positionMs: Long) = port.seekVideoTo(positionMs)
     fun seekMusicTo(positionMs: Long) = port.seekMusicTo(positionMs)
 
     /** Floating window dismissal (case C3): stop and keep the video for later. */

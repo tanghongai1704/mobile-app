@@ -1,6 +1,7 @@
 package com.example.onespace
 
 import android.graphics.Bitmap
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.isOn
@@ -263,6 +264,10 @@ class NavigationSmokeTest {
         awaitText("Gần với thiên nhiên thêm chút")
         compose.onAllNodesWithText("Gần với thiên nhiên thêm chút").onFirst().performClick()
         compose.tapTab("Music")
+        // The engine publishes videoId asynchronously after the tab switch.
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("floating-video").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("floating-video").assertIsDisplayed()
         compose.onNodeWithContentDescription("Mở rộng").assertIsDisplayed()
         awaitText("Nắng sớm")

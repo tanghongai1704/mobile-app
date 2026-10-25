@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -66,6 +67,38 @@ fun BoxScope.FloatingVideo(
     onHeightChanged: (Int) -> Unit = {}
 ) {
     val playing = playback.playRequested && playback.error == null
+    // F-VID-09: sound-only mode renders a music-style mini player, no surface.
+    if (com.example.onespace.core.designsystem.AudioOnlyState.active) {
+        Card(Modifier.testTag("floating-video").align(Alignment.BottomEnd).onSizeChanged { onHeightChanged(it.height) }
+            .padding(12.dp).widthIn(max = 320.dp)) {
+            Column(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        Icons.Filled.Headphones,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.weight(1f))
+                }
+
+                // Controls aligned to the RIGHT edge of the card.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    IconButton(onClick = onExpand) {
+                        Icon(Icons.Filled.OpenInFull, contentDescription = "Mở rộng")
+                    }
+                    IconButton(onClick = onToggle) {
+                        Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (playing) "Tạm dừng" else "Phát")
+                    }
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Filled.Close, contentDescription = "Đóng")
+                    }
+                }
+            }
+        }
+        return
+    }
     Card(Modifier.testTag("floating-video").align(Alignment.BottomEnd).onSizeChanged { onHeightChanged(it.height) }
         .padding(12.dp).widthIn(max = 320.dp)) {
         Column {
@@ -93,7 +126,8 @@ fun BoxScope.FloatingVideo(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
-                Row {
+                // Controls aligned to the RIGHT edge of the card.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     IconButton(onClick = onExpand) {
                         Icon(Icons.Filled.OpenInFull, contentDescription = "Mở rộng")
                     }

@@ -30,6 +30,16 @@ internal class ViewingSessionRepositoryImpl(private val database: ContentDatabas
                 }
         }
 
+    override fun observeHistory(): Flow<List<ContinueEntry>> =
+        database.videoProgressDao().observeRecent().map { list ->
+            list.map { ContinueEntry(it.videoId, it.title, it.positionMs, it.updatedAt) }
+        }
+
+    override fun observeWatchlist(): Flow<List<ContinueEntry>> =
+        database.watchlistDao().observeAll().map { list ->
+            list.map { ContinueEntry(it.videoId, it.title, 0) }
+        }
+
     override suspend fun addToWatchlist(videoId: String, title: String) =
         database.watchlistDao().upsert(WatchlistEntity(videoId, title, System.currentTimeMillis()))
 
