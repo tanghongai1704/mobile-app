@@ -6,6 +6,8 @@ import com.example.onespace.core.common.ContentUiState
 import com.example.onespace.domain.news.model.TtsState
 import com.example.onespace.domain.news.repository.NewsRepository
 import com.example.onespace.domain.news.repository.TtsEngine
+import com.example.onespace.domain.session.model.MissionType
+import com.example.onespace.domain.session.usecase.TrackMissionAction
 import com.example.onespace.domain.news.usecase.ListenArticle
 import com.example.onespace.domain.news.usecase.PauseTts
 import com.example.onespace.domain.news.usecase.StopTts
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -35,6 +38,7 @@ internal class NewsViewModel @Inject constructor(
     private val extractedAudio: com.example.onespace.domain.music.repository.ExtractedAudioRepository,
     private val pauseTts: PauseTts,
     private val stopTts: StopTts,
+    private val trackMissionAction: TrackMissionAction,
     ttsEngine: TtsEngine
 ) : ViewModel() {
     private val refresh = MutableStateFlow(0)
@@ -62,10 +66,28 @@ internal class NewsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     /** F-NEWS-05: convert article to audio, save to Music library. */
+    /** A news extract plays demo audio from the same verified pool the
+     *  mock music catalog uses; the article's own voice stays the TTS Nghe button. */
+    private val demoAudio = listOf(
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" to "9:19",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" to "10:38",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" to "8:36",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" to "7:33"
+    )
+
     fun addExtractedAudio(articleId: String, title: String, category: String) {
+        val (url, duration) = demoAudio[kotlin.math.abs(articleId.hashCode()) % demoAudio.size]
         viewModelScope.launch {
-            extractedAudio.add(articleId, title, category, "", "")
+            // F-NEWS-05: only the first extraction of an article pays the bonus.
+            val existing = extractedAudio.observeAll().first().any { it.videoId == articleId }
+            extractedAudio.add(articleId, title, category, url, duration)
+            if (!existing) pointRepository.add("extract_audio", 5)
         }
+    }
+
+    /** F-COM-05: a real read (time on screen or scrolled to the end) counts. */
+    fun onArticleRead() {
+        viewModelScope.launch { trackMissionAction(MissionType.READ) }
     }
 
     fun toggleDownload(id: String, title: String = "", subtitle: String = "") {

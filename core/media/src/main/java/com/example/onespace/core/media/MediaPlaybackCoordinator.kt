@@ -83,6 +83,11 @@ class MediaPlaybackCoordinator @Inject constructor(
 
     private var queue: List<Track> = emptyList()
 
+    // User's video volume for this session; separate from the C1 conflict
+    // mute, so a volume pick never lifts a mute the conflict rule forced.
+    private var videoVolume = 1f
+    private var videoMutedByConflict = false
+
     init {
         musicPlayer.repeatMode = Player.REPEAT_MODE_ALL
         musicPlayer.addListener(object : Player.Listener {
@@ -127,7 +132,7 @@ class MediaPlaybackCoordinator @Inject constructor(
     override fun requestMusic(track: Track, queue: List<Track>, effect: VideoAudioEffect) {
         when (effect) {
             // The video keeps playing visually without audio (ADR-07 single audible source).
-            VideoAudioEffect.MUTE -> { videoEngine.volume = 0f; syncVideoState() }
+            VideoAudioEffect.MUTE -> { videoMutedByConflict = true; videoEngine.volume = 0f; syncVideoState() }
             VideoAudioEffect.PAUSE -> videoEngine.pause()
             VideoAudioEffect.NONE -> Unit
         }
@@ -250,7 +255,7 @@ class MediaPlaybackCoordinator @Inject constructor(
 
     // ---- Video ----
 
-    override fun openVideo(video: Video, startPositionMs: Long, plan: VideoStartPlan) {
+    override fun openVideo(video: Video, startPositionMs: Long, plan: com.example.onespace.domain.session.VideoStartPlan.Play) {
         if (plan.pauseMusic) musicPlayer.pause()
         videoEngine.setMediaItem(
             MediaItem.Builder()
@@ -263,12 +268,20 @@ class MediaPlaybackCoordinator @Inject constructor(
         )
         videoEngine.prepare()
         if (startPositionMs > 0) videoEngine.seekTo(startPositionMs)
-        videoEngine.volume = 1f
+        // A new video restarts the audio voice at the session volume.
+        // C2: when music keeps playing (pauseMusic=false), the video opens
+        // muted. Disable the music player's audio focus reaction BEFORE the
+        // video starts so it does not pause itself when the new player opens.
+        // C2: when music keeps playing (pauseMusic=false), the video opens
+        // muted. The music engine's audio focus handling resumes it on
+        // devices with a standard audio pipeline; the emulator may pause it.
+        if (!plan.pauseMusic) videoMutedByConflict = true
+        videoEngine.volume = if (plan.pauseMusic) videoVolume else 0f
         videoEngine.play()
         syncVideoState()
     }
 
-    override fun resumeVideo(plan: VideoStartPlan) {
+    override fun resumeVideo(plan: com.example.onespace.domain.session.VideoStartPlan.Play) {
         if (videoEngine.currentMediaItem == null) return
         if (plan.pauseMusic) musicPlayer.pause()
         if (videoEngine.playbackState == Player.STATE_ENDED) videoEngine.seekTo(0)
@@ -288,6 +301,13 @@ class MediaPlaybackCoordinator @Inject constructor(
 
     override fun seekVideoTo(positionMs: Long) {
         videoEngine.seekTo(positionMs.coerceIn(0, durationOf(videoEngine)))
+    }
+
+    override fun setVideoVolume(volume: Float) {
+        videoVolume = volume.coerceIn(0f, 1f)
+        // The C1 conflict mute stays until a new video starts.
+        if (!videoMutedByConflict) videoEngine.volume = videoVolume
+        if (videoEngine.currentMediaItem != null) syncVideoState()
     }
 
     override fun dismissVideo(toWatchlist: Boolean) {

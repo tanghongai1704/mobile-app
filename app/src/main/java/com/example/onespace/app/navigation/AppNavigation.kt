@@ -15,6 +15,7 @@ import com.example.onespace.feature.music.navigation.*
 import com.example.onespace.feature.news.navigation.*
 import com.example.onespace.feature.games.navigation.GamesRoute
 import com.example.onespace.feature.games.navigation.gamesGraph
+import com.example.onespace.feature.account.navigation.AccountRoute
 import com.example.onespace.feature.account.navigation.accountGraph
 import com.example.onespace.feature.onboarding.navigation.*
 import com.example.onespace.feature.auth.navigation.*
@@ -96,6 +97,17 @@ fun AppNavigation(
                 onOpenArticle = {
                     session.enter(Section.NEWS)
                     appState.openArticle(it)
+                },
+                onMissionClick = { id ->
+                    // F-COM-05: a mission deep-links to the tab where it can be done.
+                    onSection(
+                        when (id) {
+                            "listen" -> Section.MUSIC
+                            "read" -> Section.NEWS
+                            "play" -> Section.GAMES
+                            else -> Section.HOME
+                        }
+                    )
                 }
             )
             videoGraph(
@@ -114,7 +126,8 @@ fun AppNavigation(
             )
             newsGraph(
                 getGraphEntry = { appState.graphEntry(NewsRoute.Graph) },
-                onOpenArticle = appState::openArticle
+                onOpenArticle = appState::openArticle,
+                onListenTts = session::toggleMusicOff
             )
             gamesGraph(
                 session = session,
@@ -122,6 +135,7 @@ fun AppNavigation(
                 onOpenGame = appState::openGame
             )
             accountGraph(
+                getGraphEntry = { appState.graphEntry(AccountRoute.Graph) },
                 onOpenSettings = appState::openSettings,
                 onOpenWrapped = appState::openWrapped,
                 onOpenNotifications = appState::openNotifications,

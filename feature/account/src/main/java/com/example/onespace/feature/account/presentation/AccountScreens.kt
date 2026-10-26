@@ -1,11 +1,17 @@
 package com.example.onespace.feature.account.presentation
 
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
@@ -26,6 +32,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +57,12 @@ data class AccountGamificationState(
     val pet: PetState = PetState(),
     val shop: ShopState = ShopState()
 )
+
+/** Phone accounts travel under an in-app address; show the number instead. */
+internal fun displayIdentity(identity: String?): String =
+    if (identity != null && identity.endsWith("@phone.onespace"))
+        "0" + identity.removeSuffix("@phone.onespace")
+    else identity ?: "Khách"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,10 +99,14 @@ internal fun AccountScreen(
                         ),
                         contentAlignment = Alignment.Center
                     ) {
+                        val avatarGlyph = AvatarFrameStore.avatar
+                            ?: (authEmail?.take(1) ?: "K").uppercase()
                         Text(
-                            (authEmail?.take(1) ?: "K").uppercase(),
+                            avatarGlyph,
                             style = MaterialTheme.typography.headlineMedium,
-                            color = androidx.compose.ui.graphics.Color(frame.color)
+                            color = if (AvatarFrameStore.avatar == null)
+                                androidx.compose.ui.graphics.Color(frame.color)
+                            else androidx.compose.ui.graphics.Color.Unspecified
                         )
                     }
                     Surface(
@@ -105,7 +124,7 @@ internal fun AccountScreen(
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        authEmail ?: "Khách",
+                        displayIdentity(authEmail),
                         style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold
                     )
                     Text(
@@ -204,12 +223,6 @@ internal fun AccountScreen(
 
 @Composable
 private fun PetCard(pet: PetState, onFeed: () -> Unit) {
-    val stageEmoji = when (pet.stage) {
-        PetStage.EGG -> "🥚"
-        PetStage.BABY -> "🐣"
-        PetStage.TEEN -> "🐥"
-        PetStage.ADULT -> "🦜"
-    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -221,21 +234,9 @@ private fun PetCard(pet: PetState, onFeed: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.padding(16.dp)
         ) {
-            // Pet visual: large emoji + gradient circle
-            Box(
-                Modifier.size(72.dp).background(
-                    androidx.compose.ui.graphics.Brush.radialGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.tertiaryContainer,
-                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-                        )
-                    ),
-                    CircleShape
-                ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(stageEmoji, style = androidx.compose.ui.text.TextStyle(fontSize = 36.sp))
-            }
+            // F-COM-07: the pet is drawn (2D) and alive: it breathes,
+            // blinks and sways while waiting.
+            PetArt(pet.stage, Modifier.size(112.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     pet.stage.displayName,
@@ -272,33 +273,55 @@ private fun ShopSheet(state: ShopState, totalPoints: Int, onPurchase: (ShopItem)
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // F-COM-15: each item reads as a mini poster: themed gradient
+            // tile, emoji illustration, then name and price.
             state.items.forEach { item ->
                 val owned = state.isOwned(item)
-                ListItem(
-                    leadingContent = {
-                        // Emoji visual per item
+                val tint = shopTint(item.id)
+                Card(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
                         Box(
-                            Modifier.size(40.dp).background(
-                                if (owned) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                                CircleShape
+                            Modifier.size(56.dp).background(
+                                androidx.compose.ui.graphics.Brush.linearGradient(
+                                    listOf(
+                                        tint.copy(alpha = 0.9f),
+                                        tint.copy(alpha = 0.45f)
+                                    )
+                                ),
+                                androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
                             ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(item.emoji, style = MaterialTheme.typography.titleLarge)
+                            Text(item.emoji, style = MaterialTheme.typography.headlineMedium)
                         }
-                    },
-                    headlineContent = { Text(item.name) },
-                    supportingContent = { Text(item.description) },
-                    trailingContent = {
+                        Column(Modifier.weight(1f)) {
+                            Text(item.name, style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold)
+                            Text(item.description, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         when {
-                            owned -> Text("Đã có", color = MaterialTheme.colorScheme.primary)
+                            owned -> Surface(
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    "Đã có",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
                             else -> OutlinedButton(onClick = { onPurchase(item) }) {
                                 Text("${item.price} điểm")
                             }
                         }
                     }
-                )
+                }
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -327,7 +350,8 @@ internal fun SettingsScreen(
     onLanguage: (Language) -> Unit,
     onNotifications: (Boolean) -> Unit,
     onSimulateOffline: (Boolean) -> Unit,
-    onResetConflictRule: () -> Unit
+    onResetConflictRule: () -> Unit,
+    onSetConflictRule: (com.example.onespace.domain.session.MediaConflictRule) -> Unit = {}
 ) {
     FeaturePage {
         item {
@@ -404,28 +428,79 @@ internal fun SettingsScreen(
             )
         }
         item {
+            // F-COM-13/F-COM-14: the row itself is the picker — the tick
+            // list always shows the current rule, "Luôn hỏi" included.
+            var showConflictPicker by remember { mutableStateOf(false) }
             ListItem(
-                headlineContent = { Text("Quy tắc video + nhạc") },
-                supportingContent = {
-                    Text(if (prefs.conflictRule == null)
-                        "Chưa có quy tắc đã nhớ — sẽ hỏi ở lần va chạm đầu tiên"
-                    else "Đã nhớ: " + labelOf(prefs.conflictRule))
-                },
+                headlineContent = { Text("Xung đột âm thanh") },
+                supportingContent = { Text(labelOf(prefs.conflictRule)) },
                 trailingContent = {
-                    TextButton(onClick = onResetConflictRule, enabled = prefs.conflictRule != null) {
-                        Text("Hỏi lại")
+                    TextButton(onClick = { showConflictPicker = true }) {
+                        Text(if (prefs.conflictRule == null) "Luôn hỏi" else "Mặc định")
                     }
-                }
+                },
+                modifier = Modifier.clickable { showConflictPicker = true }
             )
+            if (showConflictPicker) {
+                AlertDialog(
+                    onDismissRequest = { showConflictPicker = false },
+                    title = { Text("Xung đột âm thanh") },
+                    text = {
+                        Column {
+                            conflictOption(null, "Luôn hỏi", prefs.conflictRule) {
+                                onResetConflictRule(); showConflictPicker = false
+                            }
+                            conflictOption(
+                                com.example.onespace.domain.session.MediaConflictRule.MUTE_VIDEO,
+                                labelOf(com.example.onespace.domain.session.MediaConflictRule.MUTE_VIDEO),
+                                prefs.conflictRule
+                            ) { onSetConflictRule(com.example.onespace.domain.session.MediaConflictRule.MUTE_VIDEO); showConflictPicker = false }
+                            conflictOption(
+                                com.example.onespace.domain.session.MediaConflictRule.PAUSE_VIDEO,
+                                labelOf(com.example.onespace.domain.session.MediaConflictRule.PAUSE_VIDEO),
+                                prefs.conflictRule
+                            ) { onSetConflictRule(com.example.onespace.domain.session.MediaConflictRule.PAUSE_VIDEO); showConflictPicker = false }
+                            conflictOption(
+                                com.example.onespace.domain.session.MediaConflictRule.KEEP_VIDEO,
+                                labelOf(com.example.onespace.domain.session.MediaConflictRule.KEEP_VIDEO),
+                                prefs.conflictRule
+                            ) { onSetConflictRule(com.example.onespace.domain.session.MediaConflictRule.KEEP_VIDEO); showConflictPicker = false }
+                        }
+                    },
+                    confirmButton = {}
+                )
+            }
         }
     }
 }
 
+/** One radio row of the conflict picker; ticks the current rule. */
+@Composable
+private fun conflictOption(
+    rule: com.example.onespace.domain.session.MediaConflictRule?,
+    label: String,
+    current: com.example.onespace.domain.session.MediaConflictRule?,
+    onPick: (com.example.onespace.domain.session.MediaConflictRule?) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .clickable { onPick(rule) }
+            .padding(vertical = 10.dp)
+    ) {
+        RadioButton(selected = rule == current, onClick = { onPick(rule) })
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
 private fun labelOf(rule: com.example.onespace.domain.session.MediaConflictRule?): String = when (rule) {
-    com.example.onespace.domain.session.MediaConflictRule.MUTE_VIDEO -> "tắt tiếng video khi mở nhạc"
-    com.example.onespace.domain.session.MediaConflictRule.PAUSE_VIDEO -> "dừng video khi mở nhạc"
-    com.example.onespace.domain.session.MediaConflictRule.KEEP_VIDEO -> "chỉ giữ video"
-    null -> ""
+    com.example.onespace.domain.session.MediaConflictRule.MUTE_VIDEO -> "Ưu tiên nhạc — tắt tiếng video"
+    com.example.onespace.domain.session.MediaConflictRule.PAUSE_VIDEO -> "Ưu tiên nhạc — dừng video"
+    com.example.onespace.domain.session.MediaConflictRule.KEEP_VIDEO -> "Ưu tiên video"
+    null -> "Luôn hỏi mỗi khi hai luồng cùng phát"
 }
 
 
@@ -473,7 +548,7 @@ internal fun WrappedScreen(
                     Text("OneSpace của bạn tháng này", style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text(
-                        (authEmail ?: "Khách"),
+                        displayIdentity(authEmail),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -497,39 +572,55 @@ internal fun WrappedScreen(
                 }
             }
         }
-        // Per-section visual breakdown
+        // F-COM-10: per-section breakdown — what the month looked like
+        // in each entertainment area, with the share of total activity.
+        item { SectionTitle("Tháng này của bạn ở từng mảng") }
         item {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🎬", style = MaterialTheme.typography.headlineLarge)
-                    Text("Video", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🎵", style = MaterialTheme.typography.headlineLarge)
-                    Text("Nhạc", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("📰", style = MaterialTheme.typography.headlineLarge)
-                    Text("Tin", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🎮", style = MaterialTheme.typography.headlineLarge)
-                    Text("Game", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                WrappedSection(
+                    emoji = "🎬", name = "Video", tint = 0xFFE65100,
+                    statLine = "12 video · 3,4 giờ xem",
+                    favLine = "Kênh hay nhất: Hành Trình 500 Blues",
+                    share = 0.42f
+                )
+                WrappedSection(
+                    emoji = "🎵", name = "Nhạc", tint = 0xFF6A1B9A,
+                    statLine = "45 bài đã nghe · 3,2 giờ",
+                    favLine = "Nghệ sĩ hay nhất: Mưa Tháng Sáu",
+                    share = 0.31f
+                )
+                WrappedSection(
+                    emoji = "📰", name = "Tin tức", tint = 0xFF0277BD,
+                    statLine = "28 bài đọc · 96 phút",
+                    favLine = "Chuyên mục hay nhất: Công nghệ",
+                    share = 0.17f
+                )
+                WrappedSection(
+                    emoji = "🎮", name = "Games", tint = 0xFF2E7D32,
+                    statLine = "15 ván thắng · 4 huy hiệu",
+                    favLine = "Chơi nhiều nhất: Đoán bài hát",
+                    share = 0.10f
+                )
+            }
+        }
+        // F-COM-10: the month's little milestones.
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Khoảnh khắc đáng nhớ", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold)
+                    WrappedMoment(Icons.Outlined.LocalFireDepartment,
+                        "Giữ chuỗi ${gamification.streak.currentStreak} ngày liền")
+                    WrappedMoment(Icons.Filled.MusicNote, "Trích xuất bài MP3 đầu tiên từ video")
+                    WrappedMoment(Icons.Outlined.Star, "Lần đầu thắng game Đoán bài hát")
                 }
             }
         }
         item {
             Button(
                 onClick = {
-                    val text = "Tháng này tôi đạt " + gamification.totalPoints + " điểm và giữ chuỗi " +
-                        gamification.streak.currentStreak + " ngày trên OneSpace!"
+                    val text = "Tháng này tôi đạt " + gamification.totalPoints + " điểm, giữ chuỗi " +
+                        gamification.streak.currentStreak + " ngày và đủ cả xem - nghe - đọc - chơi trên OneSpace!"
                     val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                         type = "text/plain"
                         putExtra(android.content.Intent.EXTRA_TEXT, text)
@@ -542,14 +633,16 @@ internal fun WrappedScreen(
     }
 }
 
-/** F-COM-12: reminder hub with a global switch, per-day reminders stay local. */
+/** F-COM-12: reminder hub; every switch persists in DataStore. */
 @Composable
 internal fun NotificationsScreen(
     notificationsEnabled: Boolean,
-    onToggle: (Boolean) -> Unit
+    streakReminder: Boolean,
+    quietHours: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onToggleStreakReminder: (Boolean) -> Unit,
+    onToggleQuietHours: (Boolean) -> Unit
 ) {
-    var quietHours by remember { mutableStateOf(true) }
-    var streakReminder by remember { mutableStateOf(true) }
     FeaturePage {
         item {
             Row(
@@ -578,7 +671,7 @@ internal fun NotificationsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = streakReminder && notificationsEnabled, onCheckedChange = { streakReminder = it })
+                Switch(checked = streakReminder && notificationsEnabled, onCheckedChange = onToggleStreakReminder)
             }
         }
         item {
@@ -593,7 +686,7 @@ internal fun NotificationsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = quietHours, onCheckedChange = { quietHours = it })
+                Switch(checked = quietHours, onCheckedChange = onToggleQuietHours)
             }
         }
         item { PrototypeNote("Bản demo hiển thị nhắc trong ứng dụng; thông báo đẩy nằm trong bản phát hành.") }
@@ -750,12 +843,250 @@ internal fun BadgeGridScreen(totalPoints: Int, currentStreak: Int, petStage: Pet
     }
 }
 
+/** One entertainment area of the wrapped card. */
+@Composable
+private fun WrappedSection(
+    emoji: String, name: String, tint: Long, statLine: String, favLine: String, share: Float
+) {
+    val tintColor = androidx.compose.ui.graphics.Color(tint)
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier.size(44.dp).background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            listOf(tintColor.copy(alpha = 0.85f), tintColor.copy(alpha = 0.45f))
+                        ),
+                        CircleShape
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(emoji, style = MaterialTheme.typography.titleLarge)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(statLine, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(favLine, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text((share * 100).toInt().toString() + "%",
+                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold,
+                    color = tintColor)
+            }
+            LinearProgressIndicator(
+                progress = { share },
+                color = tintColor,
+                trackColor = tintColor.copy(alpha = 0.15f),
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape)
+            )
+        }
+    }
+}
+
+/** One milestone line inside the wrapped card. */
+@Composable
+private fun WrappedMoment(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Per-item accent so the shop tiles feel illustrated, not enumerated. */
+private fun shopTint(id: String): androidx.compose.ui.graphics.Color = when {
+    id.startsWith("game_") -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
+    id.startsWith("pet_") -> androidx.compose.ui.graphics.Color(0xFFAD1457)
+    id.endsWith("gold") -> androidx.compose.ui.graphics.Color(0xFFF9A825)
+    id.endsWith("silver") -> androidx.compose.ui.graphics.Color(0xFF78909C)
+    else -> androidx.compose.ui.graphics.Color(0xFF8D6E63)
+}
+
+/** F-COM-07: the pet drawn with 2D shapes, alive with idle animations. */
+@Composable
+internal fun PetArt(stage: PetStage, modifier: Modifier = Modifier) {
+    val idle = rememberInfiniteTransition(label = "pet-idle")
+    val scaleY by idle.animateFloat(
+        initialValue = 1f, targetValue = 1.035f,
+        animationSpec = infiniteRepeatable(
+            tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse
+        ), label = "breath"
+    )
+    val tilt by idle.animateFloat(
+        initialValue = -2.5f, targetValue = 3f,
+        animationSpec = infiniteRepeatable(
+            tween(2300, easing = androidx.compose.animation.core.LinearOutSlowInEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse
+        ), label = "tilt"
+    )
+    val eyeOpen by idle.animateFloat(
+        initialValue = 1f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            keyframes {
+                durationMillis = 3600
+                1f at 2850
+                0.14f at 2990
+                1f at 3140
+            }
+        ), label = "blink"
+    )
+    androidx.compose.foundation.Canvas(
+        modifier.then(
+            Modifier.graphicsLayer {
+                this.scaleY = scaleY
+                rotationZ = tilt
+            }
+        )
+    ) {
+        val r = size.minDimension / 2f
+        // ground shadow keeps the pet planted while it moves
+        drawCircle(
+            androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.10f),
+            radius = r * 0.46f,
+            center = Offset(size.width / 2f, size.height * 0.90f)
+        )
+        when (stage) {
+            PetStage.EGG -> drawEgg(r)
+            PetStage.BABY -> drawChick(r, scale = 0.66f, eyeOpen = eyeOpen, teen = false)
+            PetStage.TEEN -> drawChick(r, scale = 0.82f, eyeOpen = eyeOpen, teen = true)
+            PetStage.ADULT -> drawParrot(r, eyeOpen)
+        }
+    }
+}
+
+/** Egg with soft spots; the idle tilt makes it look like something stirs inside. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEgg(r: Float) {
+    val cx = size.width / 2f
+    val cy = size.height * 0.56f
+    drawOval(
+        color = androidx.compose.ui.graphics.Color(0xFFFFF6E3),
+        topLeft = Offset(cx - r * 0.58f, cy - r * 0.80f),
+        size = androidx.compose.ui.geometry.Size(r * 1.16f, r * 1.6f)
+    )
+    drawCircle(androidx.compose.ui.graphics.Color(0xFFF3E3B8), r * 0.09f,
+        Offset(cx - r * 0.22f, cy - r * 0.34f))
+    drawCircle(androidx.compose.ui.graphics.Color(0xFFF3E3B8), r * 0.06f,
+        Offset(cx + r * 0.26f, cy + r * 0.12f))
+    drawCircle(androidx.compose.ui.graphics.Color(0xFFF3E3B8), r * 0.05f,
+        Offset(cx + r * 0.05f, cy - r * 0.6f))
+}
+
+/** Round chick for BABY/TEEN: tuft, cheeks appear when older. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawChick(
+    r: Float, scale: Float, eyeOpen: Float, teen: Boolean
+) {
+    val cx = size.width / 2f
+    val cy = size.height * 0.56f
+    val bodyR = r * 0.52f * scale
+    val body = androidx.compose.ui.graphics.Color(0xFFFFD75E)
+    val belly = androidx.compose.ui.graphics.Color(0xFFFFF0C2)
+    val foot = androidx.compose.ui.graphics.Color(0xFFF09A2D)
+    // feet
+    drawLine(foot, Offset(cx - bodyR * 0.38f, cy + bodyR * 0.86f),
+        Offset(cx - bodyR * 0.38f, cy + bodyR * 1.18f), strokeWidth = r * 0.05f)
+    drawLine(foot, Offset(cx + bodyR * 0.38f, cy + bodyR * 0.86f),
+        Offset(cx + bodyR * 0.38f, cy + bodyR * 1.18f), strokeWidth = r * 0.05f)
+    // tuft feathers on the head
+    val tuft = androidx.compose.ui.graphics.Path().apply {
+        moveTo(cx - bodyR * 0.05f, cy - bodyR * 0.95f)
+        quadraticTo(cx - bodyR * 0.34f, cy - bodyR * (if (teen) 1.45f else 1.25f), cx - bodyR * 0.16f, cy - bodyR * (if (teen) 1.5f else 1.3f))
+        quadraticTo(cx + bodyR * 0.02f, cy - bodyR * (if (teen) 1.4f else 1.2f), cx + bodyR * 0.08f, cy - bodyR * 0.92f)
+    }
+    drawPath(tuft, body)
+    // body
+    drawCircle(body, bodyR, Offset(cx, cy))
+    // wings
+    drawArc(belly, 100f, 110f, useCenter = true,
+        topLeft = Offset(cx - bodyR * 1.42f, cy - bodyR * 0.5f),
+        size = androidx.compose.ui.geometry.Size(bodyR * 1.25f, bodyR * 1.25f))
+    drawArc(belly, -30f, 110f, useCenter = true,
+        topLeft = Offset(cx + bodyR * 0.17f, cy - bodyR * 0.5f),
+        size = androidx.compose.ui.geometry.Size(bodyR * 1.25f, bodyR * 1.25f))
+    // cheeks only when older
+    if (teen) {
+        drawCircle(androidx.compose.ui.graphics.Color(0xFFF8BBD0).copy(alpha = 0.85f), bodyR * 0.13f,
+            Offset(cx - bodyR * 0.52f, cy - bodyR * 0.12f))
+        drawCircle(androidx.compose.ui.graphics.Color(0xFFF8BBD0).copy(alpha = 0.85f), bodyR * 0.13f,
+            Offset(cx + bodyR * 0.52f, cy - bodyR * 0.12f))
+    }
+    // eyes with blink
+    val eyeY = cy - bodyR * 0.22f
+    listOf(-1, 1).forEach { side ->
+        val ex = cx + side * bodyR * 0.34f
+        drawCircle(androidx.compose.ui.graphics.Color.White, bodyR * 0.155f, Offset(ex, eyeY))
+        drawCircle(androidx.compose.ui.graphics.Color(0xFF33261A),
+            bodyR * 0.10f * eyeOpen.coerceIn(0.14f, 1f), Offset(ex, eyeY + bodyR * 0.01f))
+        drawCircle(androidx.compose.ui.graphics.Color.White, bodyR * 0.032f, Offset(ex - bodyR * 0.02f, eyeY - bodyR * 0.028f))
+    }
+    // beak
+    drawPath(androidx.compose.ui.graphics.Path().apply {
+        moveTo(cx - bodyR * 0.14f, cy - bodyR * 0.04f)
+        lineTo(cx + bodyR * 0.14f, cy - bodyR * 0.04f)
+        lineTo(cx, cy + bodyR * 0.14f)
+        close()
+    }, androidx.compose.ui.graphics.Color(0xFFF57C00))
+}
+
+/** ADULT parrot: red head, green body, hooked beak, blue tail feathers. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawParrot(r: Float, eyeOpen: Float) {
+    val cx = size.width / 2f
+    val cy = size.height * 0.54f
+    val bodyR = r * 0.5f
+    val green = androidx.compose.ui.graphics.Color(0xFF66BB6A)
+    val darkGreen = androidx.compose.ui.graphics.Color(0xFF3E8E41)
+    val red = androidx.compose.ui.graphics.Color(0xFFEF5350)
+    val tailBlue = androidx.compose.ui.graphics.Color(0xFF42A5F5)
+    // tail feathers behind the body
+    drawLine(tailBlue, Offset(cx - bodyR * 0.1f, cy + bodyR * 0.55f),
+        Offset(cx - bodyR * 0.85f, cy + bodyR * 1.5f), strokeWidth = r * 0.075f)
+    drawLine(red, Offset(cx + bodyR * 0.02f, cy + bodyR * 0.55f),
+        Offset(cx - bodyR * 0.30f, cy + bodyR * 1.62f), strokeWidth = r * 0.075f)
+    drawLine(androidx.compose.ui.graphics.Color(0xFFFFCA28), Offset(cx + bodyR * 0.12f, cy + bodyR * 0.55f),
+        Offset(cx + bodyR * 0.42f, cy + bodyR * 1.45f), strokeWidth = r * 0.075f)
+    // feet
+    val foot = androidx.compose.ui.graphics.Color(0xFF8D6E63)
+    drawLine(foot, Offset(cx - bodyR * 0.3f, cy + bodyR * 0.95f),
+        Offset(cx - bodyR * 0.3f, cy + bodyR * 1.2f), strokeWidth = r * 0.045f)
+    drawLine(foot, Offset(cx + bodyR * 0.3f, cy + bodyR * 0.95f),
+        Offset(cx + bodyR * 0.3f, cy + bodyR * 1.2f), strokeWidth = r * 0.045f)
+    // body + wing
+    drawOval(green, topLeft = Offset(cx - bodyR * 0.78f, cy - bodyR * 0.5f),
+        size = androidx.compose.ui.geometry.Size(bodyR * 1.56f, bodyR * 1.55f))
+    drawArc(darkGreen, -25f, 130f, useCenter = true,
+        topLeft = Offset(cx - bodyR * 1.05f, cy - bodyR * 0.42f),
+        size = androidx.compose.ui.geometry.Size(bodyR * 1.15f, bodyR * 1.15f))
+    // head
+    drawCircle(red, bodyR * 0.56f, Offset(cx, cy - bodyR * 0.72f))
+    // cream face patch + eye
+    drawCircle(androidx.compose.ui.graphics.Color(0xFFFFF3E0), bodyR * 0.40f, Offset(cx + bodyR * 0.06f, cy - bodyR * 0.70f))
+    val ex = cx + bodyR * 0.10f
+    val ey = cy - bodyR * 0.74f
+    drawCircle(androidx.compose.ui.graphics.Color(0xFF33261A),
+        bodyR * 0.085f * eyeOpen.coerceIn(0.14f, 1f), Offset(ex, ey))
+    drawCircle(androidx.compose.ui.graphics.Color.White, bodyR * 0.028f, Offset(ex - bodyR * 0.02f, ey - bodyR * 0.025f))
+    // hooked beak pointing right
+    drawPath(androidx.compose.ui.graphics.Path().apply {
+        moveTo(cx + bodyR * 0.28f, cy - bodyR * 0.86f)
+        quadraticTo(cx + bodyR * 0.92f, cy - bodyR * 0.80f, cx + bodyR * 0.62f, cy - bodyR * 0.40f)
+        quadraticTo(cx + bodyR * 0.50f, cy - bodyR * 0.68f, cx + bodyR * 0.26f, cy - bodyR * 0.74f)
+        close()
+    }, androidx.compose.ui.graphics.Color(0xFFB0BEC5))
+    // crest feather on top
+    drawPath(androidx.compose.ui.graphics.Path().apply {
+        moveTo(cx - bodyR * 0.05f, cy - bodyR * 1.24f)
+        quadraticTo(cx - bodyR * 0.1f, cy - bodyR * 1.5f, cx + bodyR * 0.18f, cy - bodyR * 1.56f)
+        quadraticTo(cx + bodyR * 0.06f, cy - bodyR * 1.4f, cx + bodyR * 0.12f, cy - bodyR * 1.22f)
+        close()
+    }, androidx.compose.ui.graphics.Color(0xFFFFCA28))
+}
+
 /** F-COM-09: bottom sheet to change avatar + pick a frame. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AvatarEditorSheet(totalPoints: Int, onDismiss: () -> Unit) {
     val avatars = listOf("😀", "😎", "🦊", "🐼", "🦁", "🐧", "🍀", "⭐")
-    var selectedAvatar by remember { mutableStateOf(avatars.first()) }
+    val selectedAvatar = AvatarFrameStore.avatar ?: avatars.first()
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
@@ -775,7 +1106,7 @@ internal fun AvatarEditorSheet(totalPoints: Int, onDismiss: () -> Unit) {
                                     else MaterialTheme.colorScheme.surfaceVariant,
                                     CircleShape
                                 )
-                                .clickable { selectedAvatar = emoji },
+                                .clickable { AvatarFrameStore.avatar = emoji },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(emoji, style = MaterialTheme.typography.headlineMedium)

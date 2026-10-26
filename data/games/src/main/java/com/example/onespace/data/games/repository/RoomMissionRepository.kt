@@ -22,8 +22,8 @@ class RoomMissionRepository(
     override suspend fun recordAction(type: MissionType): DailyMission? {
         val today = todayString()
         ensureTodayMissions(today)
-        val missions = dao.forDate(today) ?: return null
-        val target = missions.find { it.targetType == type.name && !it.completed } ?: return null
+        val target = dao.forDate(today).find { it.targetType == type.name && !it.completed }
+            ?: return null
         val newProgress = target.progress + 1
         val completed = newProgress >= target.target
         dao.updateProgress(target.id, today, newProgress, completed)
@@ -36,8 +36,8 @@ class RoomMissionRepository(
     }
 
     override suspend fun ensureTodayMissions(date: String) {
-        val existing = dao.forDate(date)
-        if (existing != null) return
+        // Room returns an empty list (never null) before the rows are seeded.
+        if (dao.forDate(date).isNotEmpty()) return
         dao.upsertAll(defaultMissions(date))
     }
 

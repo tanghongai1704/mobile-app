@@ -16,7 +16,7 @@ class FeedPet(
     private val petRepository: PetRepository,
     private val pointRepository: PointRepository
 ) {
-    /** Feed the pet: costs 30 points, can only do 2 feeds per day. */
+    /** Feed the pet: costs 30 points, once per day. */
     suspend operator fun invoke(): FeedResult {
         if (!petRepository.canFeedToday()) return FeedResult.LIMIT_REACHED
         val spent = pointRepository.spend(FEED_COST, "feed_pet")

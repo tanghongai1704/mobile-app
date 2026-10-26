@@ -4,15 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onespace.domain.music.usecase.GetMusic
 import com.example.onespace.domain.news.usecase.GetNews
+import com.example.onespace.domain.session.usecase.EnsureTodayMissions
+import com.example.onespace.domain.session.usecase.ObserveDailyMissions
+import com.example.onespace.domain.session.usecase.ObserveStreak
 import com.example.onespace.domain.session.usecase.ObserveTotalPoints
 import com.example.onespace.domain.video.usecase.GetVideo
 import com.example.onespace.domain.video.usecase.ObserveContinueWatching
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -26,6 +28,9 @@ internal class HomeViewModel @Inject constructor(
     getNews: GetNews,
     observeContinue: ObserveContinueWatching,
     observeTotalPoints: ObserveTotalPoints,
+    observeStreak: ObserveStreak,
+    observeDailyMissions: ObserveDailyMissions,
+    ensureTodayMissions: EnsureTodayMissions,
     preferences: com.example.onespace.domain.session.repository.SessionPreferencesRepository,
     viewingSession: com.example.onespace.domain.video.repository.ViewingSessionRepository
 ) : ViewModel() {
@@ -41,16 +46,25 @@ internal class HomeViewModel @Inject constructor(
     }.catch { emit(HomeUiState()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
-    private val _gamification = MutableStateFlow(defaultMissions())
-    val gamification: StateFlow<GamificationUiState> = _gamification.asStateFlow()
+    private val today = LocalDate.now().toString()
 
     init {
-        viewModelScope.launch {
-            observeTotalPoints().collect { points ->
-                _gamification.value = _gamification.value.copy(totalPoints = points)
-            }
-        }
+        // F-COM-05: seed today's mission rows so the banner has live data.
+        viewModelScope.launch { ensureTodayMissions(today) }
     }
+
+    /** F-COM-05/06: real missions, streak and points from Room/DataStore. */
+    val gamification: StateFlow<GamificationUiState> = combine(
+        observeTotalPoints(), observeStreak(), observeDailyMissions(today)
+    ) { points, streak, missions ->
+        GamificationUiState(
+            totalPoints = points,
+            streak = streak.currentStreak,
+            missions = missions.map {
+                MissionUi(it.id, it.title, it.progress, it.target, it.completed)
+            }
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GamificationUiState())
 
     /** F-VID-04: the watchlist lives on Home, next to the global search. */
     val watchLater = viewingSession.observeWatchlist()
@@ -60,12 +74,4 @@ internal class HomeViewModel @Inject constructor(
     /** Demo switch from Settings: renders the offline banner while on. */
     val offline = preferences.preferences.map { it.simulateOffline }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
-    private fun defaultMissions() = GamificationUiState(
-        missions = listOf(
-            MissionUi(id = "listen", title = "Nghe 1 bài nhạc"),
-            MissionUi(id = "read", title = "Đọc 1 bài tin"),
-            MissionUi(id = "play", title = "Thắng 1 ván game")
-        )
-    )
 }

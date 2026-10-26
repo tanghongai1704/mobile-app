@@ -32,11 +32,15 @@ class DataStorePetRepository(
         context.petDataStore.data, pointRepository.totalPoints
     ) { prefs, totalPoints ->
         val missions = prefs[Keys.MISSIONS_COMPLETED] ?: 0
+        val hatched = prefs[Keys.HAS_HATCHED] ?: (missions >= 3)
+        // F-COM-07: hatching promotes the egg to BABY even below 500 points,
+        // so the feed button is reachable once the 3 missions are done.
+        val pointsStage = PetStage.fromPoints(totalPoints)
         PetState(
-            stage = PetStage.fromPoints(totalPoints),
+            stage = if (hatched && pointsStage == PetStage.EGG) PetStage.BABY else pointsStage,
             totalPoints = totalPoints,
             missionsCompleted = missions,
-            hasHatched = prefs[Keys.HAS_HATCHED] ?: (missions >= 3)
+            hasHatched = hatched
         )
     }
 
@@ -47,12 +51,10 @@ class DataStorePetRepository(
         }
     }
 
+    /** F-COM-07: one feed per calendar day. */
     override suspend fun canFeedToday(): Boolean {
         val today = LocalDate.now().toString()
-        val prefs = context.petDataStore.data.first()
-        val feedDate = prefs[Keys.FEED_DATE]
-        val feedCount = prefs[Keys.FEED_COUNT] ?: 0
-        return feedDate != today || feedCount < 2
+        return context.petDataStore.data.first()[Keys.FEED_DATE] != today
     }
 
     override suspend fun recordFeed() {

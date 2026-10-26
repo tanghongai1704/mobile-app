@@ -21,10 +21,13 @@ internal class MockNewsRepository : NewsRepository {
 
     override fun observeCatalog() = flow {
         delay(400)
-        emit(listOf(
+        emit(catalog)
+    }
+
+    private val rawCatalog = listOf(
             Article(
                 "n1", "Thành phố xanh bắt đầu từ ý nhỏ", "Đời sống", "4 phút đọc",
-                "Khắp thành phố, những khu vườn cộng đồng nhỏ đang gắn kết mọi người lại với nhau.\\n\\nỞ góc hẻm trên đường Nguyễn Thị Minh Khai, một mảnh đất trống hai năm trước giờ xanh mướt rau sạch và hoa hồng. Chị Lan – người khởi xướng – chỉ mới chuyển đến đây ba năm nhưng đã kéo được hai mươi hàng xóm cùng làm.\\n\\n\\\"Ban đầu chỉ định trồng mấy chậu rau cho vui, ai ngờ cả xóm xúm vào giúp, giờ thành điểm hẹn mỗi sáng thứ bảy\\\", chị kể. Trẻ con phụ tưới nước, người già góp hạt giống, người trẻ chụp ảnh khoe lên mạng xã hội.\\n\\nMột không gian chung có thể bắt đầu từ vài cây xanh, một chút kiên nhẫn và một lần trò chuyện với hàng xóm. Mô hình vườn cộng đồng đang được Nhận định là một trong những cách hiệu quả nhất để cải thiện chất lượng sống đô thị mà không cần ngân sách lớn.\\n\\nTheo Sở Xanh Hà Nội, thành phố hiện có hơn 200 khu vườn cộng đồng tương tự, con số này tăng 40% so với hai năm trước.",
+                "Khắp thành phố, những khu vườn cộng đồng nhỏ đang gắn kết mọi người lại với nhau.\\n\\nỞ góc hẻm trên đường Nguyễn Thị Minh Khai, một mảnh đất trống hai năm trước giờ xanh mướt rau sạch và hoa hồng. Chị Lan – người khởi xướng – chỉ mới chuyển đến đây ba năm nhưng đã kéo được hai mươi hàng xóm cùng làm.\\n\\n\"Ban đầu chỉ định trồng mấy chậu rau cho vui, ai ngờ cả xóm xúm vào giúp, giờ thành điểm hẹn mỗi sáng thứ bảy\", chị kể. Trẻ con phụ tưới nước, người già góp hạt giống, người trẻ chụp ảnh khoe lên mạng xã hội.\\n\\nMột không gian chung có thể bắt đầu từ vài cây xanh, một chút kiên nhẫn và một lần trò chuyện với hàng xóm. Mô hình vườn cộng đồng đang được Nhận định là một trong những cách hiệu quả nhất để cải thiện chất lượng sống đô thị mà không cần ngân sách lớn.\\n\\nTheo Sở Xanh Hà Nội, thành phố hiện có hơn 200 khu vườn cộng đồng tương tự, con số này tăng 40% so với hai năm trước.",
                 quiz = listOf(
                     QuizQuestion(
                         "Bài viết nói về chủ đề gì?",
@@ -45,7 +48,7 @@ internal class MockNewsRepository : NewsRepository {
             ),
             Article(
                 "n2", "Công nghệ nhường chỗ cho cuộc sống", "Công nghệ", "6 phút đọc",
-                "Công nghệ chu đáo nên làm các việc hằng ngày đơn giản hơn.\\n\\nNhắc đến từ \\\"smart\\\", nhiều người nghĩ ngay đến nhà đầy cảm biến, đèn tự bật, rèm tự đóng. Nhưng thực ra, công nghệ hữu ích nhất là loại ta không nhận ra nó tồn tại.\\n\\nMột ứng dụng nhắc uống nước mỗi giờ, một cái đồng hồ đếm bước chân, một trình đọc tin gom hết tin tức và nhạc vào một chỗ – đó là những \\\"người trợ giú\\\" thầm lặng của đời sống hiện đại.\\n\\nNghiên cứu của Decision Lab cho thấy 73% người dùng Việt Nam cảm thấy bị \\\"quá tải thông tin\\\", và xu hướng đang chuyển sang các sản phẩm tối giản, làm đúng một việc nhưng làm thật tốt.",
+                "Công nghệ chu đáo nên làm các việc hằng ngày đơn giản hơn.\\n\\nNhắc đến từ \"smart\", nhiều người nghĩ ngay đến nhà đầy cảm biến, đèn tự bật, rèm tự đóng. Nhưng thực ra, công nghệ hữu ích nhất là loại ta không nhận ra nó tồn tại.\\n\\nMột ứng dụng nhắc uống nước mỗi giờ, một cái đồng hồ đếm bước chân, một trình đọc tin gom hết tin tức và nhạc vào một chỗ – đó là những \"người trợ giú\" thầm lặng của đời sống hiện đại.\\n\\nNghiên cứu của Decision Lab cho thấy 73% người dùng Việt Nam cảm thấy bị \"quá tải thông tin\", và xu hướng đang chuyển sang các sản phẩm tối giản, làm đúng một việc nhưng làm thật tốt.",
                 quiz = listOf(
                     QuizQuestion(
                         "Quan điểm chính của bài là gì?",
@@ -61,15 +64,15 @@ internal class MockNewsRepository : NewsRepository {
             ),
             Article(
                 "n3", "Chạy trốn cuối tuần kế tiếp", "Du lịch", "3 phút đọc",
-                "Một chuyến đi ngắn cũng có thể mang đến góc nhìn mới.\\n\\nChỉ cần một chiếc xe máy, hai chai nước và một bản đồ giấy, bạn đã có đủ cho một ngày \\\"trốn\\\" khỏi thành phố. Cung đường Tam Đảo – Vĩnh Yên – Sơn Dương dài chưa đến 100km nhưng đủ núi, enough rừng và ruộng.\\n\\nNghỉ chân ở một quán cà phê dân dọc quốc lộ, ly cà phê chỉ 15.000 đồng nhưng view núi mây miễn phí. Chủ quán kể khách đô về cuối tuần nhiều, ai cũng bảo \\\"thở được\\\".\\n\\nNếu bạn tìm sự yên tĩnh thật sự, hãy đi trước khi nơi này thay đổi."
+                "Một chuyến đi ngắn cũng có thể mang đến góc nhìn mới.\\n\\nChỉ cần một chiếc xe máy, hai chai nước và một bản đồ giấy, bạn đã có đủ cho một ngày \"trốn\" khỏi thành phố. Cung đường Tam Đảo – Vĩnh Yên – Sơn Dương dài chưa đến 100km nhưng đủ núi, enough rừng và ruộng.\\n\\nNghỉ chân ở một quán cà phê dân dọc quốc lộ, ly cà phê chỉ 15.000 đồng nhưng view núi mây miễn phí. Chủ quán kể khách đô về cuối tuần nhiều, ai cũng bảo \"thở được\".\\n\\nNếu bạn tìm sự yên tĩnh thật sự, hãy đi trước khi nơi này thay đổi."
             ),
             Article(
                 "n4", "Góc làm việc nhỏ trong thành phố lớn", "Đời sống", "5 phút đọc",
-                "Một bàn làm việc gọn cũng đủ để tập trung.\\n\\nSắp xếp góc làm việc tại nhà không cần đắt tiền – một tấm ván gỗ, hai chồng gạch, một cái đèn bàn là đủ khởi đầu. Điều quan trọng là thói quen dọn dẹp cuối ngày.\\n\\nChuyên gia tổ chức không gian Marie Kondo từng nói: \\\"Giữ lại những gì mang lại niềm vui, cảm ơn và chia tay những thứ còn lại\\\". Nguyên tắc này áp dụng được cả cho bàn làm việc lẫn hộp thư điện tử."
+                "Một bàn làm việc gọn cũng đủ để tập trung.\\n\\nSắp xếp góc làm việc tại nhà không cần đắt tiền – một tấm ván gỗ, hai chồng gạch, một cái đèn bàn là đủ khởi đầu. Điều quan trọng là thói quen dọn dẹp cuối ngày.\\n\\nChuyên gia tổ chức không gian Marie Kondo từng nói: \"Giữ lại những gì mang lại niềm vui, cảm ơn và chia tay những thứ còn lại\". Nguyên tắc này áp dụng được cả cho bàn làm việc lẫn hộp thư điện tử."
             ),
             Article(
                 "n5", "Ứng dụng nhẹ cho ngày ít thời gian", "Công nghệ", "4 phút đọc",
-                "Không cần cài nhiều ứng dụng.\\n\\nMột số công cụ nhỏ giúp đọc tin, nghe nhạc và giải trí trong cùng một chỗ, tiết kiệm pin và bộ nhớ máy. Trong khi các siêu ứng dụng cạnh tranh bằng cách thêm nhiều tính năng, nhóm người dùng \\\"tối giản\\\" ngày càng lớn – họ chọn ít app hơn nhưng dùng thường xuyên hơn.\\n\\nTheo thống kê của App Annie, người Việt trung bình cài 80 ứng dụng nhưng chỉ dùng 25 trong đó hằng ngày."
+                "Không cần cài nhiều ứng dụng.\\n\\nMột số công cụ nhỏ giúp đọc tin, nghe nhạc và giải trí trong cùng một chỗ, tiết kiệm pin và bộ nhớ máy. Trong khi các siêu ứng dụng cạnh tranh bằng cách thêm nhiều tính năng, nhóm người dùng \"tối giản\" ngày càng lớn – họ chọn ít app hơn nhưng dùng thường xuyên hơn.\\n\\nTheo thống kê của App Annie, người Việt trung bình cài 80 ứng dụng nhưng chỉ dùng 25 trong đó hằng ngày."
             ),
             Article(
                 "n6", "Đường ven sông buổi sáng", "Du lịch", "4 phút đọc",
@@ -221,6 +224,38 @@ internal class MockNewsRepository : NewsRepository {
                 "Không cần bằng lái, không tốn xăng, chỉ cần một đôi chân mạnh và trái tim yêu khám phá.\n\nXe đạp cũng là phương tiện hoàn hảo để khám phá những cung đường mới mỗi cuối tuần."),
             Article("n50", "Thiền - môn thể thao cho tâm trí", "Thể thao", "4 phút đọc",
                 "Ngồi yên một chỗ nghe có vẻ dễ, nhưng thuần hoá tâm trí khó hơn chạy marathon. Mười phút mỗi ngày là đủ để cảm nhận khác biệt.\n\nĐây là bài cuối trong bộ sưu tập mẫu của OneSpace - cảm ơn bạn đã đọc đến đây.")
-        ))
+    )
+
+    /** Handwritten quizzes win; every other article gets a generated pair. */
+    private val catalog: List<Article> = rawCatalog.mapIndexed { index, article ->
+        if (article.quiz.isNotEmpty()) article
+        else article.copy(quiz = fallbackQuiz(article, index))
+    }
+
+    private fun fallbackQuiz(article: Article, index: Int): List<QuizQuestion> {
+        val otherCategories = rawCatalog.map { it.category }.distinct().filter { it != article.category }
+        val catOptions = listOf(
+            otherCategories[index % otherCategories.size],
+            otherCategories[(index + 3) % otherCategories.size],
+            article.category
+        ).distinct().shuffled(kotlin.random.Random(index))
+        val others = rawCatalog.filter { it.id != article.id }
+        val titleOptions = listOf(
+            others[index % others.size].title,
+            others[(index + 7) % others.size].title,
+            article.title
+        ).distinct().shuffled(kotlin.random.Random(index + 1))
+        return listOf(
+            QuizQuestion(
+                "Bài \"" + article.title + "\" thuộc chuyên mục nào?",
+                catOptions,
+                catOptions.indexOf(article.category)
+            ),
+            QuizQuestion(
+                "Bài vừa đọc có tiêu đề nào?",
+                titleOptions,
+                titleOptions.indexOf(article.title)
+            )
+        )
     }
 }

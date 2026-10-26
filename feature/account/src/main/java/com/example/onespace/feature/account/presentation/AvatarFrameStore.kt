@@ -20,6 +20,9 @@ internal object AvatarFrameStore {
 
     var selected by mutableStateOf("basic")
 
+    /** F-COM-09: the picked avatar emoji; null keeps the initial-letter avatar. */
+    var avatar by mutableStateOf<String?>(null)
+
     fun unlocked(totalPoints: Int): List<AvatarFrame> = frames.filter { it.unlockPoints <= totalPoints }
 
     fun frameOf(id: String): AvatarFrame = frames.first { it.id == id }

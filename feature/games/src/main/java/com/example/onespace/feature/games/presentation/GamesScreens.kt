@@ -30,7 +30,7 @@ internal fun GamesScreen(games: List<Game>, onOpen: (String) -> Unit) {
 
 /** Game detail: score status, board, pause control. Identity is in the top bar ("← Games"). */
 @Composable
-internal fun GameScreen(game: Game?, paused: Boolean, onPause: () -> Unit) {
+internal fun GameScreen(game: Game?) {
     if (game == null) { Text("Chưa có game này"); return }
     val is2048 = game.id == "g1"
     val cells = if (is2048) listOf("2", "", "4", "", "", "8", "", "2", "16", "", "4", "", "", "2", "", "")
@@ -60,15 +60,13 @@ internal fun GameScreen(game: Game?, paused: Boolean, onPause: () -> Unit) {
                                 else cellColor,
                                 MaterialTheme.shapes.small),
                             contentAlignment = Alignment.Center) {
-                            Text(if (paused) "·" else value, style = MaterialTheme.typography.headlineSmall,
+                            Text(value, style = MaterialTheme.typography.headlineSmall,
                                 color = if (value.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else cellTextColor)
                         }
                     }
                 }
             }
         }
-        Button(onClick = onPause) { Text(if (paused) "Chơi bản demo" else "Tạm dừng bản demo") }
-        if (paused) PrototypeNote("Đang tạm dừng · Tiếp tục khi bạn sẵn sàng.")
     }
 }
 

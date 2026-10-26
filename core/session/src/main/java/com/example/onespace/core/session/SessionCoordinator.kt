@@ -12,14 +12,20 @@ import com.example.onespace.domain.session.MusicStartPlan
 import com.example.onespace.domain.session.Section
 import com.example.onespace.domain.session.SessionPolicy
 import com.example.onespace.domain.session.SessionState
+import com.example.onespace.domain.session.model.MissionType
 import com.example.onespace.domain.session.port.PlaybackStatus
 import com.example.onespace.domain.session.port.MediaSessionPort
+import com.example.onespace.domain.session.VideoStartPlan
 import com.example.onespace.domain.session.port.MusicConflictRequest
+import com.example.onespace.domain.session.port.VideoConflictRequest
 import com.example.onespace.domain.session.port.MusicPlayback
 import com.example.onespace.domain.session.port.VideoPlayback
 import com.example.onespace.domain.session.repository.SessionPreferencesRepository
+import com.example.onespace.domain.session.usecase.TrackMissionAction
+import com.example.onespace.domain.session.usecase.UpdateStreak
 import com.example.onespace.domain.video.repository.ViewingSessionRepository
 import com.example.onespace.domain.video.usecase.GetVideo
+import java.time.LocalDate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +49,9 @@ class SessionCoordinator @Inject constructor(
     private val preferences: SessionPreferencesRepository,
     private val getMusic: GetMusic,
     private val getVideo: GetVideo,
-    private val viewingSession: ViewingSessionRepository
+    private val viewingSession: ViewingSessionRepository,
+    private val trackMissionAction: TrackMissionAction,
+    updateStreak: UpdateStreak
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(restoreFromSavedState())
@@ -56,6 +64,10 @@ class SessionCoordinator @Inject constructor(
     /** First-time video+music collision; the shell renders it as the C1 dialog. */
     private val _conflict = MutableStateFlow<MusicConflictRequest?>(null)
     val conflict: StateFlow<MusicConflictRequest?> = _conflict.asStateFlow()
+
+    /** C2: opening a video while music plays also asks, mirroring C1. */
+    private val _videoConflict = MutableStateFlow<VideoConflictRequest?>(null)
+    val videoConflict: StateFlow<VideoConflictRequest?> = _videoConflict.asStateFlow()
 
     /** One-shot restored tab after a cold start (TC10 restore chain). */
     private val _restoredSection = MutableStateFlow<Section?>(null)
@@ -71,6 +83,12 @@ class SessionCoordinator @Inject constructor(
             port.video.collect { playback -> updateVideo(playback) }
         }
         viewModelScope.launch { restoreColdStartSession() }
+        // F-COM-06: opening the app is today's streak activity — the
+        // calculator keeps the count, increments or resets by date itself.
+        viewModelScope.launch {
+            val today = LocalDate.now()
+            updateStreak(today.toString(), today.minusDays(1).toString())
+        }
     }
 
     fun enter(section: Section) {
@@ -84,11 +102,36 @@ class SessionCoordinator @Inject constructor(
         viewModelScope.launch {
             val video = getVideo().firstOrNull()?.firstOrNull { it.id == id } ?: return@launch
             val resumeFrom = viewingSession.progressOf(id)
-            if (version == requestVersion) {
-                port.openVideo(video, resumeFrom, SessionPolicy.resolveVideoStart(muted = false))
+            if (version != requestVersion) return@launch
+            // C2: if music is playing, ask before opening the video.
+            val music = port.music.value
+            val musicPlaying = music.playRequested && music.error == null && music.trackId != null
+            if (musicPlaying) {
+                // C2: check saved preference first — null = still asking.
+                val savedChoice = preferences.preferences.first().videoConflictPauseMusic
+                if (savedChoice != null) {
+                    port.openVideo(video, resumeFrom, VideoStartPlan.Play(pauseMusic = savedChoice))
+                } else {
+                    _videoConflict.value = VideoConflictRequest(id, title, resumeFrom)
+                }
+            } else {
+                port.openVideo(video, resumeFrom, VideoStartPlan.Play(pauseMusic = true))
             }
         }
     }
+
+    /** Resolve the C2 video conflict: open the video with or without pausing music. */
+    fun resolveVideoConflict(pauseMusic: Boolean, remember: Boolean = false) {
+        val request = _videoConflict.value ?: return
+        _videoConflict.value = null
+        viewModelScope.launch {
+            val video = getVideo().firstOrNull()?.firstOrNull { it.id == request.videoId } ?: return@launch
+            port.openVideo(video, request.resumeFrom, VideoStartPlan.Play(pauseMusic = pauseMusic))
+            if (remember) preferences.setVideoConflictChoice(pauseMusic)
+        }
+    }
+
+    fun dismissVideoConflict() { _videoConflict.value = null }
 
     fun playMusic(id: String, title: String = id) {
         val version = newPlaybackRequest()
@@ -122,18 +165,25 @@ class SessionCoordinator @Inject constructor(
             is MusicStartPlan.Start -> {
                 port.requestMusic(request.track, request.queue, plan.videoEffect)
                 viewModelScope.launch { preferences.setLastTrackId(request.track.id) }
+                // F-COM-05: a track the user actually started counts toward
+                // the daily listen mission (auto-advance lands here too).
+                viewModelScope.launch { trackMissionAction(MissionType.LISTEN) }
             }
             MusicStartPlan.DoNotStart -> Unit
             MusicStartPlan.AskUser -> _conflict.value = request
         }
     }
 
-    /** Re-evaluate against current playback; the video may have stopped while the dialog was open. */
-    fun resolveMusicConflict(rule: MediaConflictRule) {
+    /**
+     * Re-evaluate against current playback; the video may have stopped while
+     * the dialog was open. The choice applies now; "remember" (the dialog's
+     * "Không hỏi lại" tick) also saves it as the device rule.
+     */
+    fun resolveMusicConflict(rule: MediaConflictRule, remember: Boolean = false) {
         val request = _conflict.value ?: return
         _conflict.value = null
         applyMusicPlan(request, SessionPolicy.resolveMusicChoice(port.video.value.audible, rule))
-        viewModelScope.launch { preferences.setConflictRule(rule) }
+        if (remember) viewModelScope.launch { preferences.setConflictRule(rule) }
     }
 
     fun dismissMusicConflict() { _conflict.value = null }
@@ -154,9 +204,12 @@ class SessionCoordinator @Inject constructor(
         if (playback.playRequested && playback.error == null && playback.status != PlaybackStatus.ENDED) {
             port.pauseVideo()
         } else {
-            port.resumeVideo(SessionPolicy.resolveVideoStart(playback.muted))
+            port.resumeVideo(VideoStartPlan.Play(pauseMusic = !playback.muted))
         }
     }
+
+    /** Pause dock music so a spoken stream (TTS) can take the voice. */
+    fun toggleMusicOff() = port.pauseMusic()
 
     fun toggleMusic() {
         val playback = port.music.value
@@ -212,6 +265,15 @@ class SessionCoordinator @Inject constructor(
 
     fun seekVideoTo(positionMs: Long) = port.seekVideoTo(positionMs)
     fun seekMusicTo(positionMs: Long) = port.seekMusicTo(positionMs)
+
+    /** User's video volume for this session; independent of the C1 conflict mute. */
+    private val _videoVolume = MutableStateFlow(1f)
+    val videoVolume: StateFlow<Float> = _videoVolume.asStateFlow()
+
+    fun setVideoVolume(volume: Float) {
+        _videoVolume.value = volume.coerceIn(0f, 1f)
+        port.setVideoVolume(_videoVolume.value)
+    }
 
     /** Floating window dismissal (case C3): stop and keep the video for later. */
     fun closeVideo() {

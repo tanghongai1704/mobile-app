@@ -39,6 +39,14 @@ internal class DemoAuthRepository(
         Result.success(Unit)
     }
 
+    /** Demo accepts any password of valid length; the identity becomes the account. */
+    override suspend fun signInWithPassword(identity: String, password: String): Result<Unit> = mutex.withLock {
+        if (password.length < 6) return@withLock Result.failure(AuthException(AuthError.WEAK_PASSWORD))
+        preferences.setAuthSession(identity, guest = false)
+        challenge = null
+        Result.success(Unit)
+    }
+
     override suspend fun continueAsGuest() {
         mutex.withLock {
             preferences.setAuthSession(null, guest = true)

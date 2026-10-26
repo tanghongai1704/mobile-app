@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onespace.domain.news.model.QuizQuestion
 import com.example.onespace.domain.news.repository.NewsRepository
+import com.example.onespace.domain.session.model.MissionType
 import com.example.onespace.domain.session.repository.PointRepository
+import com.example.onespace.domain.session.usecase.TrackMissionAction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,12 +42,17 @@ internal class NewsQuizViewModel @Inject constructor(
 @HiltViewModel
 internal class PlayAwardViewModel @Inject constructor(
     private val points: PointRepository,
+    private val trackMissionAction: TrackMissionAction,
     media: com.example.onespace.core.media.MediaPlaybackCoordinator
 ) : ViewModel() {
     /** F-GAME-08: the shared video player renders on top of the game board. */
     val player: androidx.media3.common.Player = media.videoPlayer
 
+    /** A won game pays XP (F-GAME-09) and completes the PLAY mission (F-COM-05). */
     fun awardGame(source: String, amount: Int) {
-        viewModelScope.launch { points.add(source, amount) }
+        viewModelScope.launch {
+            points.add(source, amount)
+            trackMissionAction(MissionType.PLAY)
+        }
     }
 }

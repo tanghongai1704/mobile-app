@@ -150,6 +150,8 @@ fun NavGraphBuilder.videoGraph(
                 val downloads by vm.downloads.collectAsStateWithLifecycle()
                 val speed by vm.speed.collectAsStateWithLifecycle()
                 val quality by vm.quality.collectAsStateWithLifecycle()
+                // Session volume lives on the coordinator, not per-video state.
+                val volume by session.videoVolume.collectAsStateWithLifecycle()
                 var mp3Offer by remember { mutableStateOf(false) }
                 val context = androidx.compose.ui.platform.LocalContext.current
                 VideoDetailScreen(
@@ -173,6 +175,8 @@ fun NavGraphBuilder.videoGraph(
                     },
                     speed = speed,
                     onSpeed = vm::setSpeed,
+                    volume = volume,
+                    onVolume = session::setVideoVolume,
                     quality = quality,
                     onQuality = vm::setQuality,
                     onSeekTo = session::seekVideoTo,
@@ -207,10 +211,11 @@ fun NavGraphBuilder.videoGraph(
                     },
                     onWatchLater = {
                         video?.let { v ->
+                            val wasSaved = vm.watchLaterIds.value.contains(v.id)
                             vm.toggleWatchLater(v.id, v.title)
                             android.widget.Toast.makeText(
                                 context,
-                                if (vm.watchLaterIds.value.contains(v.id)) "Đã thêm vào Xem sau" else "Đã bỏ khỏi Xem sau",
+                                if (wasSaved) "Đã bỏ khỏi Xem sau" else "Đã thêm vào Xem sau",
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                         }

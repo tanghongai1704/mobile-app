@@ -15,7 +15,8 @@ internal class MockGamesRepository : GamesRepository {
         Game("g2", "Tic-Tac-Toe", "Trò cổ điển cho hai người.", 12),
         Game("g3", "Đoán bài hát", "Nghe 5 giây, chọn tên bài đúng.", 0),
         Game("g4", "Quiz tin tức", "Trả lời câu hỏi từ các bài báo đã đọc.", 0),
-        Game("g5", "Rắn săn mồi", "Vuốt để điều khiển, ăn thật nhiều điểm.", 0)
+        Game("g5", "Rắn săn mồi", "Vuốt để điều khiển, ăn thật nhiều điểm.", 0),
+        Game("g6", "Beat Tiles", "Nốt nhạc rơi theo bài đang phát, chạm đúng nhịp.", 0)
         ))
     }
 }

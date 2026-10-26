@@ -14,7 +14,8 @@ import com.example.onespace.feature.news.presentation.*
 
 fun NavGraphBuilder.newsGraph(
     getGraphEntry: () -> androidx.navigation.NavBackStackEntry,
-    onOpenArticle: (String) -> Unit
+    onOpenArticle: (String) -> Unit,
+    onListenTts: () -> Unit = {}
 ) {
     navigation<NewsRoute.Graph>(startDestination = NewsRoute.Feed) {
         composable<NewsRoute.Feed> { entry ->
@@ -38,6 +39,15 @@ fun NavGraphBuilder.newsGraph(
             val state by vm.uiState.collectAsStateWithLifecycle()
             val savedIds by vm.savedIds.collectAsStateWithLifecycle()
             val ttsState by vm.ttsState.collectAsStateWithLifecycle()
+            // Leaving the app stops the reading voice, like the video (ADR-12).
+            val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+            androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+                val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) vm.stopTts()
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
             val quizAnswers by vm.quizAnswers.collectAsStateWithLifecycle()
             val downloads by vm.downloads.collectAsStateWithLifecycle()
             CatalogContent(state) { articles ->
@@ -59,8 +69,13 @@ fun NavGraphBuilder.newsGraph(
                     onExtractAudio = {
                         article?.let { vm.addExtractedAudio(it.id, it.title, it.category) }
                     },
+                    onReadComplete = vm::onArticleRead,
                     ttsState = ttsState,
-                    onListen = { article?.let { vm.listen(it) } },
+                    onListen = {
+                        // TTS takes the voice: dock music steps aside while the article reads.
+                        onListenTts()
+                        article?.let { vm.listen(it) }
+                    },
                     onTtsStop = vm::stopTts,
                     onBookmark = { vm.bookmark(id) },
                     quizAnswers = quizAnswers[id] ?: emptyMap(),

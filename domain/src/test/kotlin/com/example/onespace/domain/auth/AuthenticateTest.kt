@@ -42,6 +42,10 @@ class AuthenticateTest {
             this.email = email
             return Result.success(Unit)
         }
+        override suspend fun signInWithPassword(identity: String, password: String): Result<Unit> {
+            this.email = identity
+            return Result.success(Unit)
+        }
         override suspend fun continueAsGuest() = Unit
         override suspend fun signOut() = Unit
     }

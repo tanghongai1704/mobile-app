@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.example.onespace.core.common.ContentUiState
 import com.example.onespace.core.media.MediaPlaybackCoordinator
+import com.example.onespace.domain.session.VideoStartPlan
 import com.example.onespace.domain.session.repository.SessionPreferencesRepository
+import com.example.onespace.domain.video.model.VideoQuality
 import com.example.onespace.domain.video.repository.ContinueEntry
 import com.example.onespace.domain.video.usecase.GetVideo
 import com.example.onespace.domain.video.usecase.ObserveContinueWatching
@@ -67,11 +69,29 @@ internal class VideoViewModel @Inject constructor(
         player.playbackParameters = androidx.media3.common.PlaybackParameters(value)
     }
 
-    /** F-VID-06: manual quality pick; "Auto" leaves Media3 adaptive streaming in charge. */
-    private val _quality = MutableStateFlow("Auto")
+    /** F-VID-06: manual quality pick; "Auto" leaves the default stream in charge. */
+    private val _quality = MutableStateFlow(VideoQuality.AUTO)
     val quality = _quality.asStateFlow()
 
-    fun setQuality(value: String) { _quality.value = value }
+    /**
+     * F-VID-06: the pick is bound to the stream — when the source has a real
+     * variant (test-videos 360/720, mux high/low) playback restarts on the
+     * variant URL at the current position; sources without one keep playing.
+     */
+    fun setQuality(value: String) {
+        _quality.value = value
+        val playingId = engine.video.value.videoId ?: return
+        val current = uiState.value.items.firstOrNull { it.id == playingId } ?: return
+        val variantUrl = VideoQuality.variantUrl(current.url, value) ?: return
+        if (variantUrl == current.url) return
+        val wasPlaying = engine.videoPlayer.isPlaying
+        engine.openVideo(
+            current.copy(url = variantUrl),
+            engine.videoPlayer.currentPosition,
+            VideoStartPlan.Play(pauseMusic = false)
+        )
+        if (!wasPlaying) engine.pauseVideo()
+    }
 
     /** F-VID-04: videos saved for later. */
     val watchLaterIds = viewingSession.observeWatchlist()
@@ -90,9 +110,14 @@ internal class VideoViewModel @Inject constructor(
         }
     }
 
-    /** F-VID-10: recording the extraction makes the library entry real. */
+    /** F-VID-10: recording the extraction makes the library entry real;
+     *  only the first extraction of a video pays the bonus. */
     fun addExtracted(videoId: String, title: String, creator: String, url: String, duration: String) {
-        viewModelScope.launch { extractedAudio.add(videoId, title, creator, url, duration) }
+        viewModelScope.launch {
+            val existing = extractedAudio.observeAll().first().any { it.videoId == videoId }
+            extractedAudio.add(videoId, title, creator, url, duration)
+            if (!existing) addPoints("extract_mp3", 5)
+        }
     }
 
     /** F-VID-18: reward for answering the end-of-video quiz correctly. */

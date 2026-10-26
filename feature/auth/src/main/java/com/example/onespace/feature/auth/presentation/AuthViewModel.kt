@@ -7,6 +7,7 @@ import com.example.onespace.domain.auth.model.AuthError
 import com.example.onespace.domain.auth.model.AuthException
 import com.example.onespace.domain.auth.usecase.ContinueAsGuest
 import com.example.onespace.domain.auth.usecase.RequestSignInCode
+import com.example.onespace.domain.auth.usecase.SignInWithPassword
 import com.example.onespace.domain.auth.usecase.VerifySignInCode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -27,6 +28,7 @@ internal class AuthViewModel @Inject constructor(
     private val savedState: SavedStateHandle,
     private val requestCode: RequestSignInCode,
     private val verifyCode: VerifySignInCode,
+    private val signIn: SignInWithPassword,
     private val guest: ContinueAsGuest
 ) : ViewModel() {
     val email = savedState.getStateFlow("email", "")
@@ -45,17 +47,51 @@ internal class AuthViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
 
+    /** Stable in-app address so the demo backend can key a phone account. */
+    private fun pseudoEmail(digits: String) = digits + "@phone.onespace"
+
+    /** F-COM-01: phone + password signs in directly, no OTP round-trip. */
+    fun signInWithPhonePassword(password: String) = submit {
+        val digits = phone.value
+        if (digits.length !in 9..11) {
+            _uiState.update { it.copy(error = "Số điện thoại không hợp lệ") }
+            return@submit
+        }
+        if (password.length < 6) {
+            _uiState.update { it.copy(error = "Mật khẩu cần ít nhất 6 ký tự") }
+            return@submit
+        }
+        signIn(pseudoEmail(digits), password).fold(
+            onSuccess = { },
+            onFailure = ::showError
+        )
+    }
+
+    fun signInWithEmailPassword(password: String) = submit {
+        if (email.value.isBlank()) {
+            _uiState.update { it.copy(error = "Email chưa hợp lệ") }
+            return@submit
+        }
+        if (password.length < 6) {
+            _uiState.update { it.copy(error = "Mật khẩu cần ít nhất 6 ký tự") }
+            return@submit
+        }
+        signIn(email.value.trim().lowercase(), password).fold(
+            onSuccess = { },
+            onFailure = ::showError
+        )
+    }
+
     fun requestPhoneCode() = submit {
         val digits = phone.value
         if (digits.length !in 9..11) {
             _uiState.update { it.copy(error = "Số điện thoại không hợp lệ") }
             return@submit
         }
-        // The demo backend only knows email addresses, so the number gets a
-        // stable in-app address; the OTP is the same demo code.
-        val pseudo = digits + "@phone.onespace"
+        // The code must be verified under the same key it was issued to.
+        val pseudo = pseudoEmail(digits)
         requestCode(pseudo).fold(
-            onSuccess = { _uiState.update { it.copy(codeSentTo = "0" + digits) } },
+            onSuccess = { _uiState.update { it.copy(codeSentTo = pseudo) } },
             onFailure = ::showError
         )
     }
@@ -101,6 +137,7 @@ internal class AuthViewModel @Inject constructor(
             AuthError.INVALID_CODE -> "Mã xác thực chưa đúng. Nhập 6 chữ số, mã demo là 123456."
             AuthError.CODE_EXPIRED -> "Mã đã hết hạn. Vui lòng gửi lại mã."
             AuthError.TOO_MANY_ATTEMPTS -> "Bạn đã thử quá nhiều lần. Vui lòng gửi lại mã."
+            AuthError.WEAK_PASSWORD -> "Mật khẩu cần ít nhất 6 ký tự."
             else -> "Chưa thể đăng nhập. Vui lòng thử lại."
         }
         _uiState.update { it.copy(error = message) }

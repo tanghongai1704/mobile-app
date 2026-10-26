@@ -34,6 +34,8 @@ fun NavGraphBuilder.authGraph(
                 onPhoneChange = vm::setPhone,
                 onRequestCode = vm::requestCode,
                 onRequestPhoneCode = vm::requestPhoneCode,
+                onPhonePasswordSignIn = vm::signInWithPhonePassword,
+                onEmailPasswordSignIn = vm::signInWithEmailPassword,
                 onGuest = vm::continueAsGuest
             )
         }

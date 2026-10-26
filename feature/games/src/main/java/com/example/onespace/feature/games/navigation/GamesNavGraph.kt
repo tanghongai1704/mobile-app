@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Close
@@ -84,7 +86,7 @@ fun NavGraphBuilder.gamesGraph(
                 } else {
                     val filtered = when (gameFilter) {
                         "suy_luan" -> games.items.filter { it.id in listOf("g1", "g2", "g4") }
-                        "am_nhac" -> games.items.filter { it.id in listOf("g3") }
+                        "am_nhac" -> games.items.filter { it.id in listOf("g3", "g6") }
                         "hanh_dong" -> games.items.filter { it.id in listOf("g5") }
                         else -> games.items
                     }
@@ -136,13 +138,22 @@ fun NavGraphBuilder.gamesGraph(
             val awardVm: PlayAwardViewModel = hiltViewModel()
             Column(Modifier.fillMaxSize()) {
                 if (videoActive) {
-                    com.example.onespace.core.media.VideoSurface(
-                        awardVm.player,
-                        Modifier.fillMaxWidth().height(170.dp),
-                        { session.seekVideoBy(10_000) }
-                    )
+                    // F-GAME-07: a real split — the video owns roughly the top
+                    // two-fifths with its own controls, the game the rest.
+                    Column(Modifier.fillMaxWidth().weight(0.38f)) {
+                        com.example.onespace.core.media.VideoSurface(
+                            awardVm.player,
+                            Modifier.fillMaxWidth().weight(1f),
+                            { session.seekVideoBy(10_000) }
+                        )
+                        VideoSplitControls(
+                            player = awardVm.player,
+                            onToggle = session::toggleVideo,
+                            onSeek = session::seekVideoTo
+                        )
+                    }
                 }
-                Box(Modifier.weight(1f)) {
+                Box(Modifier.weight(if (videoActive) 0.62f else 1f)) {
                     when (id) {
                         "g1" -> Game2048DemoScreen()
                         "g2" -> {
@@ -172,11 +183,71 @@ fun NavGraphBuilder.gamesGraph(
                                 if (score > 0) awardVm.awardGame("ran_san_moi", score * 2)
                             })
                         }
+                        "g6" -> {
+                            BeatTilesScreen(onGameOver = { score ->
+                                if (score > 0) awardVm.awardGame("beat_tiles", score / 2)
+                            })
+                        }
                         else -> Text("Không tìm thấy game")
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Compact control row under the split video: pause, scrub, time. The
+ * position polls the shared player directly — the session flow only
+ * updates on player events, not continuously.
+ */
+@Composable
+private fun VideoSplitControls(
+    player: androidx.media3.common.Player?,
+    onToggle: () -> Unit,
+    onSeek: (Long) -> Unit
+) {
+    var pos by remember { mutableLongStateOf(0L) }
+    var dur by remember { mutableLongStateOf(0L) }
+    var playing by remember { mutableStateOf(false) }
+    var scrub by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(player) {
+        while (true) {
+            if (player != null) {
+                pos = player.currentPosition.coerceAtLeast(0)
+                dur = player.duration.coerceAtLeast(0)
+                playing = player.isPlaying
+            }
+            kotlinx.coroutines.delay(500)
+        }
+    }
+    val shown = scrub ?: if (dur > 0) pos.toFloat() / dur.toFloat() else 0f
+    Row(
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+    ) {
+        androidx.compose.material3.IconButton(onClick = onToggle) {
+            androidx.compose.material3.Icon(
+                if (playing) androidx.compose.material.icons.Icons.Filled.Pause
+                else androidx.compose.material.icons.Icons.Filled.PlayArrow,
+                contentDescription = if (playing) "Tạm dừng" else "Phát"
+            )
+        }
+        androidx.compose.material3.Slider(
+            value = shown.coerceIn(0f, 1f),
+            onValueChange = { scrub = it },
+            onValueChangeFinished = {
+                scrub?.let { onSeek((it * dur).toLong()) }
+                scrub = null
+            },
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            com.example.onespace.core.common.formatMsWhole(pos) + " / " +
+                com.example.onespace.core.common.formatMsWhole(dur),
+            style = androidx.compose.material3.MaterialTheme.typography.labelSmall
+        )
     }
 }
 
@@ -187,15 +258,14 @@ private fun gameIcon(id: String): androidx.compose.ui.graphics.vector.ImageVecto
     "g3" -> androidx.compose.material.icons.Icons.Filled.MusicNote
     "g4" -> androidx.compose.material.icons.Icons.Filled.Quiz
     "g5" -> androidx.compose.material.icons.Icons.Filled.Pets
+    "g6" -> androidx.compose.material.icons.Icons.Filled.MusicNote
     else -> androidx.compose.material.icons.Icons.Filled.SportsEsports
 }
 
 @androidx.compose.runtime.Composable
 private fun Game2048DemoScreen() {
     com.example.onespace.feature.games.presentation.GameScreen(
-        game = com.example.onespace.domain.games.model.Game("g1", "2048", "Tập trung chút, số lớn hơn.", 2048),
-        paused = false,
-        onPause = {}
+        game = com.example.onespace.domain.games.model.Game("g1", "2048", "Tập trung chút, số lớn hơn.", 2048)
     )
 }
 

@@ -27,8 +27,10 @@ internal fun LoginScreen(
     state: AuthUiState,
     onEmailChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit = {},
-    onRequestCode: () -> Unit,
+    onRequestCode: () -> Unit = {},
     onRequestPhoneCode: () -> Unit = {},
+    onPhonePasswordSignIn: (String) -> Unit = {},
+    onEmailPasswordSignIn: (String) -> Unit = {},
     onGuest: () -> Unit
 ) {
     var showGuest by rememberSaveable { mutableStateOf(false) }
@@ -36,6 +38,8 @@ internal fun LoginScreen(
     var showGoogle by rememberSaveable { mutableStateOf(false) }
     // F-COM-01: phone-first login, email still available on the second tab.
     var phoneMode by rememberSaveable { mutableStateOf(true) }
+    // Password is the primary path; OTP stays as the alternative.
+    var otpMode by rememberSaveable { mutableStateOf(false) }
     Column(
         Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -74,10 +78,6 @@ internal fun LoginScreen(
                         supportingText = { state.error?.let { Text(it) } },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Button(onClick = onRequestPhoneCode, enabled = !state.loading,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                        if (state.loading) LoadingIndicator() else Text("Gửi mã OTP")
-                    }
                 } else {
                     OutlinedTextField(
                         value = email, onValueChange = onEmailChange, enabled = !state.loading,
@@ -88,17 +88,44 @@ internal fun LoginScreen(
                         supportingText = { state.error?.let { Text(it) } },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+                if (otpMode) {
+                    Button(
+                        onClick = if (phoneMode) onRequestPhoneCode else onRequestCode,
+                        enabled = !state.loading,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                    ) {
+                        if (state.loading) LoadingIndicator() else Text("Gửi mã OTP")
+                    }
+                } else {
                     OutlinedTextField(
                         value = password, onValueChange = { password = it },
                         enabled = !state.loading,
                         label = { Text("Mật khẩu") }, singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        isError = state.error != null,
+                        supportingText = { state.error?.let { Text(it) } },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Button(onClick = onRequestCode, enabled = !state.loading && email.isNotBlank() && password.length >= 6,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                    Button(
+                        onClick = {
+                            if (phoneMode) onPhonePasswordSignIn(password)
+                            else onEmailPasswordSignIn(password)
+                        },
+                        enabled = !state.loading && (if (phoneMode) phone.length in 9..11 else email.isNotBlank())
+                            && password.length >= 6,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                    ) {
                         if (state.loading) LoadingIndicator() else Text("Đăng nhập")
                     }
+                }
+                TextButton(
+                    onClick = { otpMode = !otpMode },
+                    enabled = !state.loading,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(if (otpMode) "Dùng mật khẩu" else "Dùng mã OTP")
                 }
                 // F-COM-01: Google is offered, the demo build only explains it.
                 OutlinedButton(onClick = { showGoogle = true }, enabled = !state.loading,
@@ -147,19 +174,22 @@ internal fun VerifyCodeScreen(
 ) {
     var code by rememberSaveable(email) { mutableStateOf("") }
     var resent by rememberSaveable { mutableStateOf(false) }
+    // Phone accounts travel under an in-app address; show the number instead.
+    val display = if (email.endsWith("@phone.onespace"))
+        "0" + email.removeSuffix("@phone.onespace") else email
     Column(
         Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         IconButton(onClick = onBack, enabled = !state.loading) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Đổi email")
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
         }
         Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.extraLarge) {
             Icon(Icons.Outlined.MarkEmailRead, null, Modifier.padding(24.dp).size(40.dp),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
         Text("Kiểm tra mã xác thực", style = MaterialTheme.typography.headlineLarge)
-        Text(email, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        Text(display, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
         Text("Nhập 6 chữ số để tiếp tục. Mã có hiệu lực trong 5 phút.",
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(
@@ -176,9 +206,7 @@ internal fun VerifyCodeScreen(
             if (state.loading) LoadingIndicator() else Text("Xác nhận & tiếp tục")
         }
         TextButton(onClick = { onResend(); resent = true }, enabled = !state.loading) { Text("Gửi lại mã") }
-        if (resent && state.error == null) Text("Đã tạo lại mã demo.", color = MaterialTheme.colorScheme.primary)
-        Text("Chế độ demo · Nhập 123456. Không gửi email thật.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (resent && state.error == null) Text("Đã tạo lại mã.", color = MaterialTheme.colorScheme.primary)
     }
 }
 

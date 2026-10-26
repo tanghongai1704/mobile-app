@@ -25,6 +25,7 @@ import com.example.onespace.domain.session.usecase.ObserveTotalPoints
 import com.example.onespace.domain.session.usecase.SpendPoints
 import com.example.onespace.domain.session.usecase.TrackMissionAction
 import com.example.onespace.domain.session.usecase.ObserveDailyMissions
+import com.example.onespace.domain.session.usecase.EnsureTodayMissions
 import com.example.onespace.domain.session.usecase.ObserveStreak
 import com.example.onespace.domain.session.usecase.UpdateStreak
 import com.example.onespace.domain.session.usecase.ObservePet
@@ -59,6 +60,7 @@ object RepositoryModule {
     @Provides @Singleton fun auth(preferences: SessionPreferencesRepository): AuthRepository = createAuthRepository(preferences)
     @Provides fun requestCode(repository: AuthRepository) = RequestSignInCode(repository)
     @Provides fun verifyCode(repository: AuthRepository) = VerifySignInCode(repository)
+    @Provides fun passwordSignIn(repository: AuthRepository) = SignInWithPassword(repository)
     @Provides fun guest(repository: AuthRepository) = ContinueAsGuest(repository)
     @Provides fun signOut(repository: AuthRepository) = SignOut(repository)
     @Provides @Singleton fun videos(): VideoRepository = createVideoRepository()
@@ -90,8 +92,9 @@ object RepositoryModule {
     fun shop(@ApplicationContext context: android.content.Context): ShopRepository =
         createShopRepository(context)
 
-    @Provides fun trackMissionAction(missions: MissionRepository, points: PointRepository) = TrackMissionAction(missions, points)
+    @Provides fun trackMissionAction(missions: MissionRepository, points: PointRepository, pet: PetRepository) = TrackMissionAction(missions, points, pet)
     @Provides fun observeDailyMissions(repository: MissionRepository) = ObserveDailyMissions(repository)
+    @Provides fun ensureTodayMissions(repository: MissionRepository) = EnsureTodayMissions(repository)
     @Provides fun observeStreak(repository: StreakRepository) = ObserveStreak(repository)
     @Provides fun updateStreak(repository: StreakRepository) = UpdateStreak(repository)
     @Provides fun observePet(repository: PetRepository, points: PointRepository) = ObservePet(repository, points)

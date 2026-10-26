@@ -23,6 +23,14 @@ class VerifySignInCode(private val repository: AuthRepository) {
     }
 }
 
+class SignInWithPassword(private val repository: AuthRepository) {
+    suspend operator fun invoke(identity: String, password: String): Result<Unit> {
+        val normalized = identity.trim().lowercase()
+        if (password.length < 6) return Result.failure(AuthException(AuthError.WEAK_PASSWORD))
+        return repository.signInWithPassword(normalized, password)
+    }
+}
+
 class ContinueAsGuest(private val repository: AuthRepository) {
     suspend operator fun invoke() = repository.continueAsGuest()
 }

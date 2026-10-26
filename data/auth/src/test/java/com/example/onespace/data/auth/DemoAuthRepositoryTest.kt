@@ -74,8 +74,11 @@ class DemoAuthRepositoryTest {
         override suspend fun setThemeMode(mode: ThemeMode) = Unit
         override suspend fun setOnboarded(done: Boolean) = Unit
         override suspend fun setSelectedTopics(topics: Set<String>) = Unit
+        override suspend fun setFavoriteTrackIds(ids: Set<String>) = Unit
         override suspend fun setLanguage(language: Language) = Unit
         override suspend fun setSimulateOffline(enabled: Boolean) = Unit
         override suspend fun setNotificationsEnabled(enabled: Boolean) = Unit
+        override suspend fun setStreakReminder(enabled: Boolean) = Unit
+        override suspend fun setQuietHours(enabled: Boolean) = Unit
     }
 }

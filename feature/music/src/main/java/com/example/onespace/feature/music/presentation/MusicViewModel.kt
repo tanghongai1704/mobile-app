@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 internal class MusicViewModel @Inject constructor(
     getMusic: GetMusic,
-    preferences: SessionPreferencesRepository,
+    private val preferences: SessionPreferencesRepository,
     extractedAudio: com.example.onespace.domain.music.repository.ExtractedAudioRepository,
     private val downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository
 ) : ViewModel() {
@@ -34,12 +34,17 @@ internal class MusicViewModel @Inject constructor(
 
     fun retry() { refresh.value = refresh.value + 1 }
 
-    /** F-MUS-07: favorites drive the "Thư viện" badges and suggestions. */
-    private val _favorites = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
-    val favorites = _favorites.asStateFlow()
+    /** F-MUS-07: favorites drive the "Thư viện" badges and suggestions;
+     *  persisted in DataStore so they survive restarts. */
+    val favorites: StateFlow<Set<String>> = preferences.preferences
+        .map { it.favoriteTrackIds }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     fun toggleFavorite(id: String) {
-        _favorites.value = if (id in _favorites.value) _favorites.value - id else _favorites.value + id
+        viewModelScope.launch {
+            val current = favorites.value
+            preferences.setFavoriteTrackIds(if (id in current) current - id else current + id)
+        }
     }
 
     /** F-MUS-12: downloaded tracks, persisted in Room (DB v5). */
@@ -57,7 +62,7 @@ internal class MusicViewModel @Inject constructor(
 
     /** F-MUS-08: suggest tracks from the artists the listener already loves. */
     fun suggested(tracks: List<Track>): List<Track> {
-        val loved = _favorites.value
+        val loved = favorites.value
         if (loved.isEmpty()) return emptyList()
         val artists = tracks.filter { it.id in loved }.map { it.artist }.toSet()
         return tracks.filter { it.artist in artists && it.id !in loved }.take(5)

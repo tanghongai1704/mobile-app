@@ -3,7 +3,10 @@ package com.example.onespace.domain.session
 /** Device-wide C1 choice; resettable in Settings. */
 enum class MediaConflictRule { MUTE_VIDEO, PAUSE_VIDEO, KEEP_VIDEO }
 enum class VideoAudioEffect { NONE, MUTE, PAUSE }
-data class VideoStartPlan(val pauseMusic: Boolean)
+sealed interface VideoStartPlan {
+    data class Play(val pauseMusic: Boolean) : VideoStartPlan
+    data object AskUser : VideoStartPlan
+}
 
 sealed interface MusicStartPlan {
     data class Start(val videoEffect: VideoAudioEffect) : MusicStartPlan
@@ -18,7 +21,10 @@ object SessionPolicy {
     )
     fun background(state: SessionState) = state.copy(gamePaused = true)
 
-    fun resolveVideoStart(muted: Boolean) = VideoStartPlan(pauseMusic = !muted)
+    fun resolveVideoStart(musicPlaying: Boolean, muted: Boolean): VideoStartPlan = when {
+        !musicPlaying -> VideoStartPlan.Play(pauseMusic = !muted)
+        else -> VideoStartPlan.AskUser
+    }
 
     /** An explicit cancellation must remain a cancellation even if the video stopped meanwhile. */
     fun resolveMusicChoice(videoAudible: Boolean, choice: MediaConflictRule): MusicStartPlan =

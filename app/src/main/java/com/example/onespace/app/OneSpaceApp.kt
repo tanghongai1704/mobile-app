@@ -1,12 +1,16 @@
 package com.example.onespace.app
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -37,6 +41,7 @@ fun OneSpaceApp() {
     val musicState by coordinator.music.collectAsStateWithLifecycle()
     val videoState by coordinator.video.collectAsStateWithLifecycle()
     val conflict by coordinator.conflict.collectAsStateWithLifecycle()
+    val videoConflict by coordinator.videoConflict.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -81,9 +86,7 @@ fun OneSpaceApp() {
 
     Scaffold(
         snackbarHost = {
-            SnackbarHost(snackbarHostState, Modifier.padding(
-                bottom = if (showFloat) with(density) { floatingPlayerHeight.toDp() } else 0.dp
-            ))
+            SnackbarHost(snackbarHostState)
         },
         topBar = {
             if (inMain) TopAppBar(
@@ -147,9 +150,41 @@ fun OneSpaceApp() {
             }
         }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // Swipe left/right flips between the five sections —
+                // continuous browsing, even from a player screen where
+                // content keeps running. Games opt out: they own swipes.
+                .pointerInput(inMain, contextTitle, selected) {
+                    // Games own their swipes (Snake, tiles); everywhere else
+                    // the horizontal swipe keeps the five sections flowing.
+                    if (inMain && contextTitle != "Games" && selected != null) {
+                        val order = TopLevelDestination.entries
+                        val idx = order.indexOfFirst { it.section == selected!!.section }
+                        val next = order.getOrNull(idx + 1)?.section
+                        val prev = order.getOrNull(idx - 1)?.section
+                        val threshold = 80.dp.toPx()
+                        var acc = 0f
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                when {
+                                    acc <= -threshold && next != null -> select(next)
+                                    acc >= threshold && prev != null -> select(prev)
+                                }
+                                acc = 0f
+                            },
+                            onDragCancel = { acc = 0f }
+                        ) { change, amount ->
+                            change.consume()
+                            acc += amount
+                        }
+                    }
+                }
+        ) {
             AppNavigation(appState, coordinator, ::select,
-                Modifier.fillMaxSize().padding(bottom = if (showFloat) with(density) { floatingPlayerHeight.toDp() } else 0.dp),
+                Modifier.fillMaxSize(),
                 downloadedContent = downloadedContent)
             if (showFloat) FloatingVideo(
                 player = media.videoPlayer,
@@ -166,35 +201,100 @@ fun OneSpaceApp() {
         }
     }
 
-    // Case C1: the first time music collides with a playing video, ask once and remember.
+    // Case C1: while music collides with a playing video, one of three
+    // choices must be picked; "Không hỏi lại" is a tick combined with the
+    // choice so the remembered rule is never ambiguous.
     conflict?.takeIf { inMain }?.let { request ->
+        var dontAskAgain by remember(request) { mutableStateOf(false) }
+        fun choose(rule: MediaConflictRule) =
+            coordinator.resolveMusicConflict(rule, remember = dontAskAgain)
         AlertDialog(
-            onDismissRequest = coordinator::dismissMusicConflict,
+            onDismissRequest = { /* one of the three must be chosen */ },
             title = { Text("Phát \"" + request.track.title + "\"?") },
-            text = { Text("Video đang phát.") },
-            confirmButton = {
-                Column {
-                    ConflictOption("🔇 Tắt tiếng video", MediaConflictRule.MUTE_VIDEO) {
-                        coordinator.resolveMusicConflict(it)
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Video đang phát",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable { dontAskAgain = !dontAskAgain }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Checkbox(checked = dontAskAgain, onCheckedChange = { dontAskAgain = it })
+                        Text("Không hỏi lại", style = MaterialTheme.typography.bodyMedium)
                     }
-                    ConflictOption("⏸ Dừng video", MediaConflictRule.PAUSE_VIDEO) {
-                        coordinator.resolveMusicConflict(it)
+                    ConflictRow("Tắt tiếng video", MediaConflictRule.MUTE_VIDEO, ::choose)
+                    ConflictRow("Dừng video", MediaConflictRule.PAUSE_VIDEO, ::choose)
+                }
+            },
+            confirmButton = {},
+            dismissButton = {}
+        )
+    }
+    // C2: opening a video while music plays asks, mirroring C1.
+    videoConflict?.takeIf { inMain }?.let { request ->
+        var c2DontAsk by remember(request) { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { /* must choose */ },
+            title = { Text("Mở \"" + request.title + "\"?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Nhạc đang phát",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable { c2DontAsk = !c2DontAsk }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Checkbox(checked = c2DontAsk, onCheckedChange = { c2DontAsk = it })
+                        Text("Không hỏi lại", style = MaterialTheme.typography.bodyMedium)
                     }
-                    ConflictOption("▶ Chỉ giữ video", MediaConflictRule.KEEP_VIDEO) {
-                        coordinator.resolveMusicConflict(it)
+                    VideoConflictRow("Tắt tiếng video, nhạc vẫn phát") {
+                        coordinator.resolveVideoConflict(pauseMusic = false, remember = c2DontAsk)
+                    }
+                    VideoConflictRow("Tắt tiếng nhạc, video có tiếng") {
+                        coordinator.resolveVideoConflict(pauseMusic = true, remember = c2DontAsk)
                     }
                 }
             },
-            dismissButton = {
-                TextButton(onClick = coordinator::dismissMusicConflict) { Text("Bỏ qua") }
-            }
+            confirmButton = {},
+            dismissButton = {}
         )
     }
 }
 
 @Composable
-private fun ConflictOption(label: String, rule: MediaConflictRule, choose: (MediaConflictRule) -> Unit) {
-    TextButton(onClick = { choose(rule) }) { Text(label) }
+private fun VideoConflictRow(label: String, choose: () -> Unit) {
+    FilledTonalButton(
+        onClick = choose,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(label)
+    }
+}
+
+/** One full-width text line: the choice reads as a sentence, not a picture. */
+@Composable
+private fun ConflictRow(
+    label: String, rule: MediaConflictRule,
+    choose: (MediaConflictRule) -> Unit
+) {
+    FilledTonalButton(
+        onClick = { choose(rule) },
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(label)
+    }
 }
 
 /** Simple wrapper so the shell can access the repository without a feature module. */

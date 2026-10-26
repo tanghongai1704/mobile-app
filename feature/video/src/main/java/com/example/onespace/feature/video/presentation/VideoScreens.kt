@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Forward10
@@ -45,12 +46,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.dp
 import com.example.onespace.core.common.formatMsWhole
 import com.example.onespace.core.designsystem.*
 import com.example.onespace.domain.video.model.Video
+import com.example.onespace.domain.video.model.VideoQuality
 import com.example.onespace.domain.video.repository.ContinueEntry
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /**
  * F-VID-02: YouTube-style filter chips. "Tất cả" is the default and lists
@@ -433,6 +437,8 @@ internal fun VideoDetailScreen(
     audioOnly: Boolean = false,
     onAudioOnly: () -> Unit = {},
     onSoundOnly: () -> Unit = {},
+    volume: Float = 1f,
+    onVolume: (Float) -> Unit = {},
     speed: Float = 1f,
     onSpeed: (Float) -> Unit = {},
     quality: String = "Auto",
@@ -466,7 +472,6 @@ internal fun VideoDetailScreen(
     val ended = totalMs > 0 && positionMs >= totalMs
     // F-VID-18: the end-of-video game must ask first, never auto-show.
     // Inside a playlist the video rolls into the next one instead.
-    var quizOfferDone by rememberSaveable(video.id) { mutableStateOf(false) }
     var showQuiz by rememberSaveable(video.id) { mutableStateOf(false) }
 
     FeaturePage {
@@ -506,68 +511,12 @@ internal fun VideoDetailScreen(
                             )
                         }
                 )
-                // F-VID-06 / F-VID-17: one gear — speed as a slider,
-                // quality as a list, two visually distinct sections.
+                // F-VID-06 / F-VID-17: one gear opens the playback settings
+                // sheet — volume, speed and quality in three clean sections.
                 Box(Modifier.align(Alignment.TopEnd)) {
                     IconButton(onClick = { showGear = true }) {
                         Icon(Icons.Filled.Settings, contentDescription = "Cài đặt phát",
                             tint = MaterialTheme.colorScheme.onPrimary)
-                    }
-                    DropdownMenu(expanded = showGear, onDismissRequest = { showGear = false }) {
-                        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth(0.72f)
-                            ) {
-                                Text("Tốc độ phát", style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(
-                                    if (speed == 1f) "1x" else speed.toString() + "x",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                                )
-                            }
-                            // Four steps only: a compact slider beats a list.
-                            val steps = listOf(0.5f, 1f, 1.5f, 2f)
-                            Slider(
-                                value = steps.indexOf(speed).coerceAtLeast(0).toFloat(),
-                                onValueChange = { onSpeed(steps[it.toInt()]) },
-                                valueRange = 0f..3f,
-                                steps = 2,
-                                modifier = Modifier.fillMaxWidth(0.72f)
-                            )
-                            Row(
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth(0.72f)
-                            ) {
-                                steps.forEach {
-                                    Text(it.toString() + "x", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                            Text("Chất lượng", style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        listOf("Auto", "360p", "480p", "720p", "1080p").forEach { q ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        if (q == "Auto") "Auto (theo băng thông)" else q,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                },
-                                onClick = { onQuality(q); showGear = false },
-                                trailingIcon = {
-                                    if (quality == q) Icon(
-                                        Icons.Filled.CheckCircle, contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            )
-                        }
                     }
                 }
                 // F-VID-17: speed badge on the video while not default.
@@ -743,6 +692,21 @@ internal fun VideoDetailScreen(
                 }
             }
         }
+        // F-VID-15: the end-of-video game offer sits below the player,
+        // on the viewer's terms — never on top of them.
+        if (ended && !inPlaylist && !showQuiz) {
+            item(key = "quiz-offer") {
+                OutlinedButton(
+                    onClick = { showQuiz = true },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                ) {
+                    Icon(Icons.Filled.SportsEsports, contentDescription = null,
+                        modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Chơi nhanh — câu đố về video này, nhận 20 điểm")
+                }
+            }
+        }
         if (showQuiz) {
             item { EndOfVideoQuiz(video = video, others = related, onCorrect = onQuizCorrect) }
         }
@@ -760,20 +724,6 @@ internal fun VideoDetailScreen(
             )
         }
     }
-    // F-VID-18: offer the game once, on the viewer's terms.
-    if (ended && !inPlaylist && !quizOfferDone && !showQuiz) {
-        AlertDialog(
-            onDismissRequest = { quizOfferDone = true },
-            title = { Text("Xem xong rồi!") },
-            text = { Text("Chơi thử câu đố nhỏ về video này để nhận thêm 20 điểm?") },
-            confirmButton = {
-                TextButton(onClick = { showQuiz = true; quizOfferDone = true }) { Text("Chơi ngay") }
-            },
-            dismissButton = {
-                TextButton(onClick = { quizOfferDone = true }) { Text("Để sau") }
-            }
-        )
-    }
     if (showSave) {
         SaveSheet(
             video = video,
@@ -781,6 +731,134 @@ internal fun VideoDetailScreen(
             onToggleWatchLater = onWatchLater,
             onDismiss = { showSave = false }
         )
+    }
+    if (showGear) {
+        PlaybackSettingsSheet(
+            volume = volume,
+            onVolume = onVolume,
+            speed = speed,
+            onSpeed = onSpeed,
+            quality = quality,
+            onQuality = { onQuality(it); showGear = false },
+            onDismiss = { showGear = false }
+        )
+    }
+}
+
+/**
+ * F-VID-06 / F-VID-17: the playback settings sheet — volume, speed and
+ * quality as three evenly spaced label + control sections split by thin
+ * dividers. Section labels share one typography and never shrink below the
+ * option text they introduce.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaybackSettingsSheet(
+    volume: Float,
+    onVolume: (Float) -> Unit,
+    speed: Float,
+    onSpeed: (Float) -> Unit,
+    quality: String,
+    onQuality: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SheetSectionLabel("Âm lượng")
+            // 0 = mute, 1 = full volume; session state, never persisted.
+            Slider(value = volume, onValueChange = onVolume, valueRange = 0f..1f)
+            HorizontalDivider()
+            SheetSectionLabel("Tốc độ phát")
+            SpeedPicker(speed, onSpeed)
+            HorizontalDivider()
+            SheetSectionLabel("Chất lượng")
+            QualityPicker(quality, onQuality)
+        }
+    }
+}
+
+/** One playback sheet section heading — one style for every section. */
+@Composable
+private fun SheetSectionLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall)
+}
+
+/** F-VID-17: four discrete speeds on one stepped slider, marks under the stops. */
+@Composable
+private fun SpeedPicker(speed: Float, onSpeed: (Float) -> Unit) {
+    // Four steps only: a compact slider beats a list.
+    val steps = listOf(0.5f, 1f, 1.5f, 2f)
+    Column {
+        Slider(
+            value = steps.indexOf(speed).coerceAtLeast(0).toFloat(),
+            onValueChange = { onSpeed(steps[it.toInt()]) },
+            valueRange = 0f..3f,
+            steps = 2
+        )
+        // Same width as the slider above, so each mark sits under its stop.
+        StepMarks(Modifier.fillMaxWidth(), steps.map { it.toString() + "x" })
+    }
+}
+
+// Mirrors the Material3 Slider geometry: the 4dp handle rests 2dp inside
+// each end and the middle stops inset by the 8dp track corner.
+private val SliderHandleWidth = 4.dp
+private val SliderTrackCorner = 8.dp
+
+/** Marks centered exactly under each thumb stop of an evenly stepped slider. */
+@Composable
+private fun StepMarks(modifier: Modifier, marks: List<String>) {
+    Layout(content = {
+        marks.forEach {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }, modifier = modifier) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
+        val width = constraints.maxWidth
+        val inset = SliderHandleWidth.roundToPx() / 2
+        val corner = SliderTrackCorner.roundToPx()
+        val track = width - 2 * inset
+        val last = placeables.lastIndex
+        layout(width, placeables.maxOf { it.height }) {
+            placeables.forEachIndexed { index, placeable ->
+                val center = when (index) {
+                    0 -> inset
+                    last -> width - inset
+                    else -> inset + corner + (track - 2 * corner) * index / last
+                }
+                placeable.placeRelative(center - placeable.width / 2, 0)
+            }
+        }
+    }
+}
+
+/** F-VID-06: four equal cells — two rows of two, Auto first. */
+@Composable
+private fun QualityPicker(quality: String, onQuality: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        VideoQuality.options.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { q ->
+                    FilterChip(
+                        selected = quality == q,
+                        onClick = { onQuality(q) },
+                        label = {
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text(q, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
     }
 }
 

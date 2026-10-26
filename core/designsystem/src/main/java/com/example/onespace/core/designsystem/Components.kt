@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MusicNote
@@ -23,8 +25,9 @@ import androidx.compose.ui.unit.dp
  * content immediately — no per-screen hero or marketing header.
  */
 @Composable
-fun FeaturePage(content: LazyListScope.() -> Unit) {
+fun FeaturePage(state: LazyListState = rememberLazyListState(), content: LazyListScope.() -> Unit) {
     LazyColumn(
+        state = state,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)

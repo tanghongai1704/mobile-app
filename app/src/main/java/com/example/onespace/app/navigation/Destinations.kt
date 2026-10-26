@@ -41,5 +41,7 @@ internal fun NavDestination?.contextTitle(): String? = when {
     hasRoute<AccountRoute.Wrapped>() -> "Hồ sơ"
     hasRoute<AccountRoute.Notifications>() -> "Hồ sơ"
     hasRoute<AccountRoute.Playlists>() -> "Hồ sơ"
+    hasRoute<AccountRoute.Downloads>() -> "Hồ sơ"
+    hasRoute<AccountRoute.Badges>() -> "Hồ sơ"
     else -> null
 }

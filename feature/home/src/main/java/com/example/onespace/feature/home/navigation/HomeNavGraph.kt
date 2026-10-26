@@ -12,7 +12,8 @@ import com.example.onespace.feature.home.presentation.HomeViewModel
 fun NavGraphBuilder.homeGraph(
     onOpenVideo: (id: String, title: String) -> Unit,
     onPlayTrack: (id: String, title: String) -> Unit,
-    onOpenArticle: (id: String) -> Unit
+    onOpenArticle: (id: String) -> Unit,
+    onMissionClick: (String) -> Unit = {}
 ) {
     navigation<HomeRoute.Graph>(startDestination = HomeRoute.Feed) {
         composable<HomeRoute.Feed> {
@@ -28,7 +29,8 @@ fun NavGraphBuilder.homeGraph(
                 watchLater = watchLater,
                 onOpenVideo = onOpenVideo,
                 onPlayTrack = onPlayTrack,
-                onOpenArticle = onOpenArticle
+                onOpenArticle = onOpenArticle,
+                onMissionClick = onMissionClick
             )
         }
     }

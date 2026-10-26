@@ -84,7 +84,7 @@ internal fun MusicScreen(
     val visible = when {
         filter == "foryou" -> base.filter { it.id in suggestedIds || it.id in favorites }
         filter == "loved" -> loved
-        filter == "downloaded" -> base.filter { it.id in downloaded }
+        filter == "extracted" -> emptyList() // only the extracted section shows
         filter != "all" -> base.filter { it.artist.contains(filter, true) }
         else -> base
     }
@@ -112,7 +112,7 @@ internal fun MusicScreen(
                     item { FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text("Tất cả") }) }
                     item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text("Dành cho bạn") }) }
                     item { FilterChip(selected = filter == "loved", onClick = { filter = "loved" }, label = { Text("Yêu thích") }) }
-                    item { FilterChip(selected = filter == "downloaded", onClick = { filter = "downloaded" }, label = { Text("Đã tải") }) }
+                    item { FilterChip(selected = filter == "extracted", onClick = { filter = "extracted" }, label = { Text("Từ video") }) }
                     items(genreChips, key = { it }) { g ->
                         FilterChip(selected = filter == g, onClick = { filter = g }, label = { Text(g) })
                     }
@@ -127,8 +127,8 @@ internal fun MusicScreen(
                     onOpenArtist
                 )
             }
-            // "Từ video của bạn" sits at the bottom, separated.
-            if (extracted.isNotEmpty()) {
+            // "Từ video" is a filter chip, not a bottom section.
+            if (filter == "extracted" && extracted.isNotEmpty()) {
                 item { SectionTitle("Từ video của bạn") }
                 items(extracted, key = { "ext-" + it.videoId }) { entry ->
                     Row(

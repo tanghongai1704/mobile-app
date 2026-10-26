@@ -43,6 +43,9 @@ data class VideoPlayback(
 /** A user request awaiting the C1 decision; it is not a second active queue. */
 data class MusicConflictRequest(val track: Track, val queue: List<Track>)
 
+/** A user request awaiting the C2 decision: open video while music is playing. */
+data class VideoConflictRequest(val videoId: String, val title: String, val resumeFrom: Long)
+
 /** Adapters execute explicit effects; policy and navigation stay outside the engine. */
 interface MediaSessionPort {
     val music: StateFlow<MusicPlayback>
@@ -56,10 +59,13 @@ interface MediaSessionPort {
     fun removeTrackFromQueue(trackId: String)
     fun moveTrackInQueue(fromIndex: Int, toIndex: Int)
 
-    fun openVideo(video: Video, startPositionMs: Long, plan: VideoStartPlan)
-    fun resumeVideo(plan: VideoStartPlan)
+    fun openVideo(video: Video, startPositionMs: Long, plan: com.example.onespace.domain.session.VideoStartPlan.Play)
+    fun resumeVideo(plan: com.example.onespace.domain.session.VideoStartPlan.Play)
     fun seekVideoBy(deltaMs: Long)
     fun seekVideoTo(positionMs: Long)
     fun pauseVideo()
     fun dismissVideo(toWatchlist: Boolean)
+
+    /** User's video volume, 0 (mute) to 1 (full); session state, never persisted. */
+    fun setVideoVolume(volume: Float)
 }

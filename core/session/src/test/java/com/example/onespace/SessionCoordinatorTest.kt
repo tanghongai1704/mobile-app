@@ -16,6 +16,17 @@ import com.example.onespace.domain.session.port.VideoPlayback
 import com.example.onespace.domain.session.repository.SessionPreferences
 import com.example.onespace.domain.session.repository.SessionPreferencesRepository
 import com.example.onespace.domain.session.repository.ThemeMode
+import com.example.onespace.domain.session.model.DailyMission
+import com.example.onespace.domain.session.model.MissionType
+import com.example.onespace.domain.session.model.PetState
+import com.example.onespace.domain.session.model.StreakState
+import com.example.onespace.domain.session.model.PointEntry
+import com.example.onespace.domain.session.repository.MissionRepository
+import com.example.onespace.domain.session.repository.PetRepository
+import com.example.onespace.domain.session.repository.PointRepository
+import com.example.onespace.domain.session.repository.StreakRepository
+import com.example.onespace.domain.session.usecase.TrackMissionAction
+import com.example.onespace.domain.session.usecase.UpdateStreak
 import com.example.onespace.domain.video.model.Video
 import com.example.onespace.domain.video.repository.ContinueEntry
 import com.example.onespace.domain.video.repository.VideoRepository
@@ -75,12 +86,12 @@ class SessionCoordinatorTest {
             }
         }
 
-        override fun openVideo(video: Video, startPositionMs: Long, plan: VideoStartPlan) {
+        override fun openVideo(video: Video, startPositionMs: Long, plan: com.example.onespace.domain.session.VideoStartPlan.Play) {
             if (plan.pauseMusic) pauseMusic()
             videoState.value = VideoPlayback(video.id, video.title, playing = true, positionMs = startPositionMs)
         }
 
-        override fun resumeVideo(plan: VideoStartPlan) {
+        override fun resumeVideo(plan: com.example.onespace.domain.session.VideoStartPlan.Play) {
             if (plan.pauseMusic) pauseMusic()
             videoState.value = videoState.value.copy(playing = true, playRequested = true, status = PlaybackStatus.READY, error = null)
         }
@@ -88,6 +99,8 @@ class SessionCoordinatorTest {
         override fun seekVideoBy(deltaMs: Long) = Unit
         override fun seekVideoTo(positionMs: Long) { videoState.value = videoState.value.copy(positionMs = positionMs) }
         override fun dismissVideo(toWatchlist: Boolean) { videoState.value = VideoPlayback() }
+        val volumeRequests = mutableListOf<Float>()
+        override fun setVideoVolume(volume: Float) { volumeRequests.add(volume) }
     }
 
     private class FakePrefs : SessionPreferencesRepository {
@@ -103,13 +116,51 @@ class SessionCoordinatorTest {
         override suspend fun setOnboarded(done: Boolean) = Unit
         override suspend fun setAuthSession(email: String?, guest: Boolean) = Unit
         override suspend fun setSelectedTopics(topics: Set<String>) = Unit
+        override suspend fun setFavoriteTrackIds(ids: Set<String>) = Unit
         override suspend fun setLanguage(language: com.example.onespace.domain.session.repository.Language) = Unit
         override suspend fun setSimulateOffline(enabled: Boolean) = Unit
         override suspend fun setNotificationsEnabled(enabled: Boolean) = Unit
+        override suspend fun setStreakReminder(enabled: Boolean) = Unit
+        override suspend fun setQuietHours(enabled: Boolean) = Unit
+    }
+
+    private class FakeMissions : MissionRepository {
+        val actions = mutableListOf<MissionType>()
+        override fun missionsFor(date: String): Flow<List<DailyMission>> = flowOf(emptyList())
+        override suspend fun recordAction(type: MissionType): DailyMission? {
+            actions.add(type)
+            return null
+        }
+        override suspend fun ensureTodayMissions(date: String) = Unit
+    }
+
+    private class FakePoints : PointRepository {
+        override val totalPoints = MutableStateFlow(0)
+        override val recentEntries = flowOf(emptyList<PointEntry>())
+        override suspend fun add(source: String, amount: Int) = Unit
+        override suspend fun spend(amount: Int, description: String) = false
+    }
+
+    private class FakePet : PetRepository {
+        override val petState = flowOf(PetState())
+        override suspend fun onMissionsCompleted(count: Int) = Unit
+        override suspend fun canFeedToday() = false
+        override suspend fun recordFeed() = Unit
+    }
+
+    private class FakeStreak : StreakRepository {
+        val updates = mutableListOf<Pair<String, String>>()
+        override val streak = flowOf(StreakState())
+        override suspend fun onMissionCompleted(today: String, yesterday: String) {
+            updates.add(today to yesterday)
+        }
     }
 
     private val tracks = listOf(Track("m1", "A track", "Artist", "3:00", "https://example.com/m1.mp3"))
     private val videos = listOf(Video("v1", "A video", "Studio", "9:00", "https://example.com/v1.mp4"))
+
+    private val fakeMissions = FakeMissions()
+    private val fakeStreak = FakeStreak()
 
     private fun coordinator(handle: SavedStateHandle, port: FakePort, prefs: FakePrefs = FakePrefs()): SessionCoordinator {
         val musicRepository = object : MusicRepository { override fun observeCatalog() = flowOf(tracks) }
@@ -124,7 +175,8 @@ class SessionCoordinatorTest {
             override suspend fun saveProgress(videoId: String, positionMs: Long) = Unit
         }
         return SessionCoordinator(
-            handle, port, prefs, GetMusic(musicRepository), GetVideo(videoRepository), viewing
+            handle, port, prefs, GetMusic(musicRepository), GetVideo(videoRepository), viewing,
+            TrackMissionAction(fakeMissions, FakePoints(), FakePet()), UpdateStreak(fakeStreak)
         )
     }
 
@@ -168,7 +220,8 @@ class SessionCoordinatorTest {
         assertTrue(port.musicRequests.isEmpty())
         assertNotNull(coordinator.conflict.value)
 
-        coordinator.resolveMusicConflict(MediaConflictRule.MUTE_VIDEO)
+        // The "Không hỏi lại" tick (remember = true) persists the choice (C1).
+        coordinator.resolveMusicConflict(MediaConflictRule.MUTE_VIDEO, remember = true)
         advanceUntilIdle()
         assertEquals("m1" to VideoAudioEffect.MUTE, port.musicRequests.single())
         assertEquals(MediaConflictRule.MUTE_VIDEO, prefs.state.value.conflictRule)
@@ -189,6 +242,21 @@ class SessionCoordinatorTest {
         advanceUntilIdle()
         assertEquals("v1", port.videoState.value.videoId)
         assertTrue(port.videoState.value.playing)
+    }
+
+    @Test fun plainConflictChoiceAppliesNowWithoutSavingTheRule() = runTest(dispatcher) {
+        val port = FakePort()
+        val prefs = FakePrefs()
+        val coordinator = coordinator(SavedStateHandle(), port, prefs)
+        port.videoState.value = VideoPlayback("v1", "A video", playing = true)
+        coordinator.playMusic("m1", "A track")
+        advanceUntilIdle()
+        assertNotNull(coordinator.conflict.value)
+        coordinator.resolveMusicConflict(MediaConflictRule.MUTE_VIDEO)
+        advanceUntilIdle()
+        assertEquals("m1" to VideoAudioEffect.MUTE, port.musicRequests.single())
+        // No tick: the choice applies once and is not remembered.
+        assertNull(prefs.state.value.conflictRule)
     }
 
     @Test fun coldStartRestoresTheLastTabAndPreparesMusicPaused() = runTest(dispatcher) {
@@ -306,5 +374,27 @@ class SessionCoordinatorTest {
         advanceUntilIdle()
         assertTrue(port.musicRequests.isEmpty())
         assertTrue(port.video.value.playing)
+    }
+
+    @Test fun startingMusicCountsTowardTheDailyListenMission() = runTest(dispatcher) {
+        val coordinator = coordinator(SavedStateHandle(), FakePort())
+        coordinator.playMusic("m1", "A track")
+        advanceUntilIdle()
+        assertEquals(listOf(MissionType.LISTEN), fakeMissions.actions)
+    }
+
+    @Test fun coldStartUpdatesTheDailyStreakExactlyOnce() = runTest(dispatcher) {
+        coordinator(SavedStateHandle(), FakePort())
+        advanceUntilIdle()
+        assertEquals(1, fakeStreak.updates.size)
+    }
+
+    @Test fun videoVolumeIsSessionStateForwardedToTheEngine() = runTest(dispatcher) {
+        val port = FakePort()
+        val coordinator = coordinator(SavedStateHandle(), port)
+        assertEquals(1f, coordinator.videoVolume.value)
+        coordinator.setVideoVolume(0.4f)
+        assertEquals(0.4f, coordinator.videoVolume.value)
+        assertEquals(listOf(0.4f), port.volumeRequests)
     }
 }

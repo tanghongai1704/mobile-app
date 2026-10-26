@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Newspaper
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.onespace.core.designsystem.*
 import com.example.onespace.domain.news.model.Article
+import kotlinx.coroutines.flow.first
 
 /** First story gets an editorial featured treatment; the rest stay compact cards. */
 @Composable
@@ -173,6 +175,7 @@ internal fun ArticleScreen(
     downloaded: Boolean = false,
     onToggleDownload: () -> Unit = {},
     onExtractAudio: () -> Unit = {},
+    onReadComplete: () -> Unit = {},
     quizAnswers: Map<Int, Int> = emptyMap(),
     onQuizAnswer: (Int, Int) -> Unit = { _, _ -> },
     onOpenRelated: (String) -> Unit = {}
@@ -181,11 +184,34 @@ internal fun ArticleScreen(
     var fontScale by rememberSaveable(article.id) { mutableStateOf(1f) }
     var quizOfferDone by rememberSaveable(article.id) { mutableStateOf(false) }
     var showQuiz by rememberSaveable(article.id) { mutableStateOf(false) }
+    var readCounted by rememberSaveable(article.id) { mutableStateOf(false) }
     val bodyStyle = MaterialTheme.typography.bodyLarge.copy(
         fontSize = MaterialTheme.typography.bodyLarge.fontSize * fontScale,
         lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * fontScale
     )
-    FeaturePage {
+    // The quiz section is appended below the article; jump to it when opened.
+    val quizListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    androidx.compose.runtime.LaunchedEffect(showQuiz, quizAnswers.size) {
+        if (showQuiz && quizListState.layoutInfo.totalItemsCount > 0) {
+            quizListState.animateScrollToItem(quizListState.layoutInfo.totalItemsCount - 1)
+        }
+    }
+    // F-COM-05: the READ mission counts once the reader reaches the end of
+    // the article or stays on it for 20 seconds — whichever comes first.
+    androidx.compose.runtime.LaunchedEffect(article.id, readCounted) {
+        if (readCounted) return@LaunchedEffect
+        kotlinx.coroutines.withTimeoutOrNull(20_000) {
+            androidx.compose.runtime.snapshotFlow {
+                val info = quizListState.layoutInfo
+                info.totalItemsCount > 0 &&
+                    (info.visibleItemsInfo.lastOrNull()?.index ?: -1) >= info.totalItemsCount - 1
+            }.first { it }
+        }
+        readCounted = true
+        onReadComplete()
+    }
+    FeaturePage(quizListState) {
         // Compact header: category + title + icon-only actions on the right.
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -237,6 +263,14 @@ internal fun ArticleScreen(
                         if (ttsState.isPlaying) Icons.Filled.Pause else Icons.Filled.Headphones,
                         contentDescription = if (ttsState.isPlaying) "Dừng đọc" else "Nghe bài này",
                         tint = if (ttsState.isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                // F-NEWS-05 / F-VID-10: visible button to extract as MP3.
+                IconButton(onClick = onExtractAudio) {
+                    Icon(
+                        Icons.Filled.LibraryMusic,
+                        contentDescription = "Trích MP3 vào nhạc",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

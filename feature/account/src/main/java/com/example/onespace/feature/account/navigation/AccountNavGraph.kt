@@ -30,6 +30,14 @@ fun NavGraphBuilder.accountGraph(
             val avm: AccountViewModel = hiltViewModel()
             val prefs by vm.uiState.collectAsStateWithLifecycle()
             val gamification by avm.gamification.collectAsStateWithLifecycle()
+            val feedback by avm.feedback.collectAsStateWithLifecycle()
+            val context = androidx.compose.ui.platform.LocalContext.current
+            androidx.compose.runtime.LaunchedEffect(feedback) {
+                feedback?.let {
+                    android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+                    avm.consumeFeedback()
+                }
+            }
             AccountScreen(
                 authEmail = prefs.authEmail,
                 gamification = gamification,
@@ -87,7 +95,11 @@ fun NavGraphBuilder.accountGraph(
             val prefs by vm.uiState.collectAsStateWithLifecycle()
             NotificationsScreen(
                 notificationsEnabled = prefs.notificationsEnabled,
-                onToggle = vm::setNotificationsEnabled
+                streakReminder = prefs.streakReminder,
+                quietHours = prefs.quietHours,
+                onToggle = vm::setNotificationsEnabled,
+                onToggleStreakReminder = vm::setStreakReminder,
+                onToggleQuietHours = vm::setQuietHours
             )
         }
         composable<AccountRoute.Settings> {
@@ -100,7 +112,8 @@ fun NavGraphBuilder.accountGraph(
                 onLanguage = vm::setLanguage,
                 onNotifications = vm::setNotificationsEnabled,
                 onSimulateOffline = vm::setSimulateOffline,
-                onResetConflictRule = vm::resetConflictRule
+                onResetConflictRule = vm::resetConflictRule,
+                onSetConflictRule = vm::setConflictRule
             )
         }
     }

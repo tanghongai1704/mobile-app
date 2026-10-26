@@ -1,8 +1,12 @@
 package com.example.onespace.feature.home.presentation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
@@ -10,8 +14,12 @@ import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -250,16 +258,14 @@ internal fun HomeScreen(
 
 @Composable
 private fun GamificationBanner(state: GamificationUiState, onMissionClick: (String) -> Unit = {}) {
-    Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    // Neutral card with small tonal accents so the banner blends into the
+    // feed instead of shouting over it.
+    ElevatedCard(shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
         Column(
             Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Header: points + streak
+            // Header: points + streak chip
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -277,26 +283,49 @@ private fun GamificationBanner(state: GamificationUiState, onMissionClick: (Stri
                     )
                 }
                 if (state.streak > 0) {
-                    Text(
-                        "Streak ${state.streak} ngày",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                        Row(
+                            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.LocalFireDepartment, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "${state.streak} ngày",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
                 }
             }
+            Spacer(Modifier.height(2.dp))
 
-            // Missions
+            // Missions: each row jumps to the tab where it can be completed.
             state.missions.forEach { mission ->
+                val done = mission.completed
                 Row(
-                    Modifier.fillMaxWidth(),
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onMissionClick(mission.id) }
+                        .background(
+                            if (done) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                            else Color.Transparent
+                        )
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Icon(
-                        Icons.Filled.CheckCircle,
+                        if (done) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
                         contentDescription = null,
-                        tint = if (mission.completed) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outline
+                        tint = if (done) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         mission.title,
@@ -306,8 +335,13 @@ private fun GamificationBanner(state: GamificationUiState, onMissionClick: (Stri
                     Text(
                         mission.progressText,
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (mission.completed) MaterialTheme.colorScheme.primary
+                        color = if (done) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

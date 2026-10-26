@@ -144,7 +144,7 @@ interface DailyMissionDao {
     fun observeForDate(date: String): Flow<List<DailyMissionEntity>>
 
     @Query("SELECT * FROM daily_missions WHERE date = :date")
-    suspend fun forDate(date: String): List<DailyMissionEntity>?
+    suspend fun forDate(date: String): List<DailyMissionEntity>
 
     @Upsert
     suspend fun upsertAll(missions: List<DailyMissionEntity>)
