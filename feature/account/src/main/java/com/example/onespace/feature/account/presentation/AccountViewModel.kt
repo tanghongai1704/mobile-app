@@ -11,6 +11,8 @@ import com.example.onespace.domain.session.usecase.ObserveStreak
 import com.example.onespace.domain.session.usecase.ObserveTotalPoints
 import com.example.onespace.domain.session.usecase.PurchaseItem
 import com.example.onespace.domain.session.usecase.PurchaseResult
+import com.example.onespace.domain.video.repository.ContinueEntry
+import com.example.onespace.domain.video.usecase.ObserveContinueWatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,12 +31,17 @@ internal class AccountViewModel @Inject constructor(
     observeStreak: ObserveStreak,
     observePet: ObservePet,
     observeShop: ObserveShop,
+    observeContinue: ObserveContinueWatching,
     private val feedPet: FeedPet,
     private val purchaseItem: PurchaseItem,
     preferences: SessionPreferencesRepository
 ) : ViewModel() {
     val authEmail: StateFlow<String?> = preferences.preferences.map { it.authEmail }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** F-VID-05: resume rows moved from Home to the profile page. */
+    val continueWatching: StateFlow<List<ContinueEntry>> = observeContinue()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val gamification: StateFlow<AccountGamificationState> = combine(
         observeTotalPoints(), observeStreak(), observePet(), observeShop()

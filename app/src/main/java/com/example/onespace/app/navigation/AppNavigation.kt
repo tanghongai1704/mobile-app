@@ -29,7 +29,8 @@ fun AppNavigation(
     onSection: (Section) -> Unit,
     modifier: Modifier = Modifier,
     startup: StartupViewModel = hiltViewModel(),
-    downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository? = null
+    downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository? = null,
+    videoPlayer: androidx.media3.common.Player? = null
 ) {
     val nav = appState.navController
     fun replaceRoot(route: Any) {
@@ -56,6 +57,9 @@ fun AppNavigation(
                 replaceRoot(AuthRoute.Graph)
             }
             inAuth && current.hasAccess -> replaceRoot(AppRoute.Main)
+            // Settings can replay the first-launch flow: the flag flips
+            // and the root moves back to onboarding (auth session kept).
+            inMain && preferences?.onboarded == false -> replaceRoot(OnboardingRoute.Graph)
             inOnboarding && preferences?.onboarded == true ->
                 replaceRoot(if (current.hasAccess) AppRoute.Main else AuthRoute.Graph)
         }
@@ -94,6 +98,16 @@ fun AppNavigation(
                     session.playMusic(id, title)
                     appState.openMusicPlayer(id)
                 },
+                // Feed posts play in place: the card is the player; leaving
+                // Home is what turns playback into floating/dock (C1/C2 apply).
+                onPlayVideoAtHome = { id, title -> session.playVideo(id, title) },
+                onPlayMusicAtHome = { id, title -> session.playMusic(id, title) },
+                videoPlayer = videoPlayer,
+                onToggleVideo = session::toggleVideo,
+                onToggleMusic = session::toggleMusic,
+                onSeekVideo = session::seekVideoTo,
+                onSeekMusic = session::seekMusicTo,
+                session = session,
                 onOpenArticle = {
                     session.enter(Section.NEWS)
                     appState.openArticle(it)

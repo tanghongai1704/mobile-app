@@ -38,9 +38,11 @@ fun NavGraphBuilder.accountGraph(
                     avm.consumeFeedback()
                 }
             }
+            val continueWatching by avm.continueWatching.collectAsStateWithLifecycle()
             AccountScreen(
                 authEmail = prefs.authEmail,
                 gamification = gamification,
+                continueWatching = continueWatching,
                 onFeedPet = avm::feed,
                 onPurchase = { avm.purchase(it) },
                 onSettings = onOpenSettings,
@@ -49,7 +51,8 @@ fun NavGraphBuilder.accountGraph(
                 onNotifications = { onOpenNotifications() },
                 onPlaylists = { onOpenPlaylists() },
                 onDownloads = { onDownloads() },
-                onBadges = { onBadges() }
+                onBadges = { onBadges() },
+                onOpenVideo = { id, _ -> onOpenVideo(id) }
             )
         }
         composable<AccountRoute.Wrapped> {
@@ -113,7 +116,8 @@ fun NavGraphBuilder.accountGraph(
                 onNotifications = vm::setNotificationsEnabled,
                 onSimulateOffline = vm::setSimulateOffline,
                 onResetConflictRule = vm::resetConflictRule,
-                onSetConflictRule = vm::setConflictRule
+                onSetConflictRule = vm::setConflictRule,
+                onReplayOnboarding = vm::replayOnboarding
             )
         }
     }

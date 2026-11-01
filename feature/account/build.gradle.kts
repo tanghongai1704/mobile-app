@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(project(":domain"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:common"))
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)

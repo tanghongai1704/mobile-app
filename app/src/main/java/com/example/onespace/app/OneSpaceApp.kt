@@ -80,8 +80,10 @@ fun OneSpaceApp() {
     val videoId = videoState.videoId
     val trackId = musicState.trackId
     // F-GAME-08: inside a game the video renders as a split top half, not the floating window.
-    val showFloat = inMain && videoId != null && contextTitle != "Video" && contextTitle != "Games"
-    val showMini = inMain && trackId != null && contextTitle != "Music"
+    // Feed-in-place: on Home the feed card is the player surface, so the
+    // floating window / music dock only take over on the other tabs.
+    val showFloat = inMain && videoId != null && contextTitle != "Video" && contextTitle != "Games" && !onHome
+    val showMini = inMain && trackId != null && contextTitle != "Music" && !onHome
     val showArticleFloat = inMain && ReadingState.articleId != null && contextTitle != "News"
 
     Scaffold(
@@ -185,7 +187,8 @@ fun OneSpaceApp() {
         ) {
             AppNavigation(appState, coordinator, ::select,
                 Modifier.fillMaxSize(),
-                downloadedContent = downloadedContent)
+                downloadedContent = downloadedContent,
+                videoPlayer = media.videoPlayer)
             if (showFloat) FloatingVideo(
                 player = media.videoPlayer,
                 title = videoState.title,

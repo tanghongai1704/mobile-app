@@ -9,7 +9,6 @@ import com.example.onespace.domain.session.usecase.ObserveDailyMissions
 import com.example.onespace.domain.session.usecase.ObserveStreak
 import com.example.onespace.domain.session.usecase.ObserveTotalPoints
 import com.example.onespace.domain.video.usecase.GetVideo
-import com.example.onespace.domain.video.usecase.ObserveContinueWatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
@@ -26,7 +25,6 @@ internal class HomeViewModel @Inject constructor(
     getVideo: GetVideo,
     getMusic: GetMusic,
     getNews: GetNews,
-    observeContinue: ObserveContinueWatching,
     observeTotalPoints: ObserveTotalPoints,
     observeStreak: ObserveStreak,
     observeDailyMissions: ObserveDailyMissions,
@@ -34,14 +32,18 @@ internal class HomeViewModel @Inject constructor(
     preferences: com.example.onespace.domain.session.repository.SessionPreferencesRepository,
     viewingSession: com.example.onespace.domain.video.repository.ViewingSessionRepository
 ) : ViewModel() {
+    /** F-VID-02 flavor on the Home feed: topic picks first when topics exist. */
+    private val topics = preferences.preferences.map { it.selectedTopics }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     val uiState: StateFlow<HomeUiState> = combine(
-        getVideo(), getMusic(), getNews(), observeContinue()
-    ) { videos, tracks, articles, continueWatching ->
+        getVideo(), getMusic(), getNews(), topics
+    ) { videos, tracks, articles, topics ->
         HomeUiState(
-            videos = videos,
+            videos = if (topics.isEmpty()) videos
+            else videos.sortedByDescending { it.topic in topics },
             tracks = tracks,
-            articles = articles,
-            continueWatching = continueWatching
+            articles = articles
         )
     }.catch { emit(HomeUiState()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())

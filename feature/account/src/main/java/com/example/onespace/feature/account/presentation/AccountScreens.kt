@@ -69,6 +69,7 @@ internal fun displayIdentity(identity: String?): String =
 internal fun AccountScreen(
     authEmail: String?,
     gamification: AccountGamificationState = AccountGamificationState(),
+    continueWatching: List<com.example.onespace.domain.video.repository.ContinueEntry> = emptyList(),
     onFeedPet: () -> Unit = {},
     onPurchase: (ShopItem) -> Unit = {},
     onSettings: () -> Unit,
@@ -77,7 +78,8 @@ internal fun AccountScreen(
     onNotifications: () -> Unit = {},
     onPlaylists: () -> Unit = {},
     onDownloads: () -> Unit = {},
-    onBadges: () -> Unit = {}
+    onBadges: () -> Unit = {},
+    onOpenVideo: (id: String, title: String) -> Unit = { _, _ -> }
 ) {
     var showLogout by remember { mutableStateOf(false) }
     var showShop by remember { mutableStateOf(false) }
@@ -171,6 +173,42 @@ internal fun AccountScreen(
                 "Mở game, đồ pet, khung avatar",
                 Icons.Filled.ShoppingBag
             ) { showShop = true }
+        }
+        // F-VID-05: resume rows live on the profile page (moved from Home).
+        if (continueWatching.isNotEmpty()) {
+            item {
+                SectionTitle("Tiếp tục")
+                Column(
+                    Modifier.padding(top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    continueWatching.forEach { entry ->
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    entry.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    "đã xem đến " + com.example.onespace.core.common.formatMsWhole(entry.positionMs),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Filled.PlayCircle, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            modifier = Modifier.clickable { onOpenVideo(entry.videoId, entry.title) }
+                        )
+                    }
+                }
+            }
         }
         item { ContentCard("Đã tải", "Video, nhạc và bài báo đã lưu để xem offline", Icons.Filled.Download, onDownloads) }
         item { ContentCard("Playlist của tôi", "Mọi playlist video và nhạc, quản lý một chỗ", Icons.Filled.LibraryMusic, onPlaylists) }
@@ -351,7 +389,8 @@ internal fun SettingsScreen(
     onNotifications: (Boolean) -> Unit,
     onSimulateOffline: (Boolean) -> Unit,
     onResetConflictRule: () -> Unit,
-    onSetConflictRule: (com.example.onespace.domain.session.MediaConflictRule) -> Unit = {}
+    onSetConflictRule: (com.example.onespace.domain.session.MediaConflictRule) -> Unit = {},
+    onReplayOnboarding: () -> Unit = {}
 ) {
     FeaturePage {
         item {
@@ -468,6 +507,31 @@ internal fun SettingsScreen(
                         }
                     },
                     confirmButton = {}
+                )
+            }
+        }
+        item {
+            // Replay the first-launch flow: the persisted flag flips and the
+            // root navigator returns to the onboarding graph.
+            var showReplayConfirm by remember { mutableStateOf(false) }
+            ListItem(
+                headlineContent = { Text("Làm lại hướng dẫn") },
+                supportingContent = { Text("Xem lại phần giới thiệu và chọn lại chủ đề yêu thích") },
+                modifier = Modifier.clickable { showReplayConfirm = true }
+            )
+            if (showReplayConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showReplayConfirm = false },
+                    title = { Text("Làm lại hướng dẫn?") },
+                    text = { Text("Điểm, nhiệm vụ và dữ liệu đã lưu không đổi; bạn sẽ chọn lại chủ đề ở cuối phần hướng dẫn.") },
+                    confirmButton = {
+                        TextButton(onClick = { onReplayOnboarding(); showReplayConfirm = false }) {
+                            Text("Bắt đầu")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showReplayConfirm = false }) { Text("Để sau") }
+                    }
                 )
             }
         }

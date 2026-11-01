@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:session"))
     implementation(project(":core:common"))
+    implementation(project(":core:media"))
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)

@@ -48,6 +48,11 @@ internal class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferences.setConflictRule(rule) }
     }
 
+    /** Re-run the first-launch flow: flipping the persisted flag makes the
+     *  root navigator move back to the onboarding graph. Points, missions
+     *  and the saved auth session are untouched; only topics get re-picked. */
+    fun replayOnboarding() { viewModelScope.launch { preferences.setOnboarded(false) } }
+
     /** TC08: leave the account and return to the mock login screen. */
     fun exitAccount() {
         viewModelScope.launch {

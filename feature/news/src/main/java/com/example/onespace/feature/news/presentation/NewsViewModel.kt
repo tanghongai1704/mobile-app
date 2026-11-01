@@ -37,7 +37,7 @@ internal class NewsViewModel @Inject constructor(
     private val downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository,
     private val extractedAudio: com.example.onespace.domain.music.repository.ExtractedAudioRepository,
     private val pauseTts: PauseTts,
-    private val stopTts: StopTts,
+    private val stopTtsUseCase: StopTts,
     private val trackMissionAction: TrackMissionAction,
     ttsEngine: TtsEngine
 ) : ViewModel() {
@@ -129,6 +129,6 @@ internal class NewsViewModel @Inject constructor(
     }
 
     fun stopTts() {
-        viewModelScope.launch { stopTts() }
+        viewModelScope.launch { stopTtsUseCase() }
     }
 }
