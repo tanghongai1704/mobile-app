@@ -1,0 +1,100 @@
+# 14 - Cross-navigation (F-NEWS-07 music while reading, F-NEWS-10 floating
+# "Đang đọc" card, F-COM-11 unified search, F-MUS-02 dock on other tabs)
+# All setup is in-flow: start music, open an article, move between tabs.
+appId: com.example.onespace
+name: 14 Cross navigation
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+# Setup: start a song on the Music tab
+- tapOn: "Music"
+- extendedWaitUntil:
+    visible:
+      text: "Nắng sớm"
+    timeout: 20000
+- tapOn: "9:19"   # duration text: tapping the title can hit the overlapping clickable artist text
+- extendedWaitUntil:
+    visible: 'Xem hàng đợi \(.*'
+    timeout: 20000
+# Read an article with music playing (F-NEWS-07): dock stays above the nav bar
+- tapOn: "News"
+- extendedWaitUntil:
+    visible:
+      text: "Thành phố xanh bắt đầu từ ý nhỏ"
+    timeout: 20000
+- tapOn: "Thành phố xanh bắt đầu từ ý nhỏ"
+- extendedWaitUntil:
+    visible:
+      text: "A+"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "Nắng sớm"
+    timeout: 10000
+- takeScreenshot: F-NEWS-07-music-while-reading
+# Leave News: the article shrinks into the floating "Đang đọc" card (F-NEWS-10)
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Đang đọc"
+    timeout: 15000
+- takeScreenshot: F-NEWS-10-reading-card
+# Tap the card to jump back into the article
+- tapOn: "Đang đọc"
+- extendedWaitUntil:
+    visible:
+      text: "A+"
+    timeout: 15000
+# Unified search from Home across all sections (F-COM-11)
+- tapOn: "Home"
+- tapOn: "Tìm trong OneSpace"
+- inputText: "xanh"
+- pressKey: enter
+# The floating "Dang doc" card covers the "Tin tuc" section title at the
+# bottom; "Nhac" (the second result section) is always in view
+- extendedWaitUntil:
+    visible:
+      text: "Nhạc"
+    timeout: 15000
+- takeScreenshot: F-COM-11-cross-search
+# Mini dock visible on the Video tab (F-MUS-02)
+- tapOn: "Xóa tìm kiếm"
+- tapOn: "Video"
+- extendedWaitUntil:
+    visible:
+      text: "Nắng sớm"
+    timeout: 15000
+- takeScreenshot: F-MUS-02-dock-video
+# Music dock while gaming (games own their swipes but keep the dock)
+- tapOn: "Games"
+- extendedWaitUntil:
+    visible:
+      text: "Tập trung chút, số lớn hơn."
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "Nắng sớm"
+    timeout: 15000
+- takeScreenshot: F-MUS-02-dock-games
+# Beat Tiles last (F-GAME-13, case C9: play along with the dock music).
+# Its only exit races the game-over dialog, so this ends the whole suite;
+# leaving the game running afterwards harms no other flow.
+- tapOn: "Beat Tiles"
+- extendedWaitUntil:
+    visible:
+      text: "Nốt nhạc rơi theo nhịp.*"
+    timeout: 15000
+- takeScreenshot: F-GAME-13-beat-tiles
+- takeScreenshot: F-GAME-13-music-dock
+- tapOn: "Bắt đầu"
+- takeScreenshot: F-GAME-13-playing

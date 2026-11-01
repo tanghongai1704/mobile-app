@@ -1,0 +1,41 @@
+# 00 - Onboarding (F-COM-02: chon so thich lan dau)
+# Labels from feature/onboarding/.../OnboardingScreens.kt + OnboardingViewModel.kt
+appId: com.example.onespace
+name: 00 Onboarding
+---
+- launchApp
+# Page 1: value intro
+- extendedWaitUntil:
+    visible:
+      text: "Tất cả trong một app"
+    timeout: 30000
+- takeScreenshot: F-COM-02-onboarding-welcome
+# Page 2: multitask (PIP + music dock) intro
+- tapOn: "Tiếp tục"
+- extendedWaitUntil:
+    visible:
+      text: "Đa nhiệm liền mạch"
+    timeout: 15000
+- takeScreenshot: F-COM-02-onboarding-multitask
+# Page 3: topic chips
+- tapOn: "Tiếp tục"
+- extendedWaitUntil:
+    visible:
+      text: "Chọn sở thích"
+    timeout: 15000
+- takeScreenshot: F-COM-02-onboarding-topics
+# Pick 3 topics (button becomes "Bắt đầu" at >= 3)
+- tapOn: "Thiên nhiên"
+- tapOn: "Công nghệ"
+- tapOn: "Du lịch"
+- extendedWaitUntil:
+    visible:
+      text: "Bắt đầu"
+    timeout: 10000
+- takeScreenshot: F-COM-02-onboarding-selected
+- tapOn: "Bắt đầu"
+# After onboarding the app lands on the login screen
+- extendedWaitUntil:
+    visible:
+      text: "Đăng nhập / Đăng ký"
+    timeout: 20000

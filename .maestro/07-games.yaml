@@ -1,0 +1,120 @@
+# 07 - Games (F-GAME-01/02/03/05/06/07/08/11/12/13)
+# Labels from feature/games/.../GamesScreens.kt, GameScreens2.kt, GamesNavGraph.kt
+# Game catalog (data/games/MockGamesRepository.kt):
+#   2048 (g1), Tic-Tac-Toe (g2), Đoán bài hát (g3), Quiz tin tức (g4),
+#   Rắn săn mồi (g5), Beat Tiles (g6)
+appId: com.example.onespace
+name: 07 Games
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- tapOn: "Games"
+- extendedWaitUntil:
+    visible:
+      text: "Tập trung chút, số lớn hơn."
+    timeout: 20000
+- takeScreenshot: F-GAME-01-hub
+# 2048 (F-GAME-11)
+- tapOn: "2048"
+- extendedWaitUntil:
+    visible:
+      text: "Điểm cao.*"
+    timeout: 15000
+- takeScreenshot: F-GAME-11-2048
+- tapOn: "Quay lại"
+# Đoán bài hát (F-GAME-02): 5s snippet, 4 title options
+- tapOn: "Đoán bài hát"
+- extendedWaitUntil:
+    visible:
+      text: "Nghe 5 giây và chọn tên bài hát đúng"
+    timeout: 15000
+- tapOn: "Bắt đầu chơi"
+- extendedWaitUntil:
+    visible:
+      text: "Điểm: 0"
+    timeout: 25000
+- takeScreenshot: F-GAME-02-guesssong
+# VERIFY: options are 4 random track titles - tap the first one by position
+- tapOn:
+    point: '50%, 35%'
+- extendedWaitUntil:
+    visible: '(Chính xác|Sai rồi)!?.*'
+    timeout: 10000
+- takeScreenshot: F-GAME-02-answer
+- tapOn: "Ván tiếp theo"
+- tapOn: "Quay lại"
+# Quiz tin tức (F-GAME-03)
+- tapOn: "Quiz tin tức"
+- extendedWaitUntil:
+    visible:
+      text: "Quiz tin tức"
+    timeout: 20000
+- takeScreenshot: F-GAME-03-newsquiz
+# VERIFY: questions are shuffled - tap the first option by position
+- tapOn:
+    point: '50%, 35%'
+- takeScreenshot: F-GAME-03-answered
+- takeScreenshot: F-GAME-08-points
+- tapOn: "Quay lại"
+# Rắn săn mồi (F-GAME-12)
+- tapOn: "Rắn săn mồi"
+- extendedWaitUntil:
+    visible:
+      text: "Điểm: 0"
+    timeout: 15000
+- tapOn: "Bắt đầu"
+- extendedWaitUntil:
+    visible:
+      text: "Vuốt trên bàn chơi để đổi hướng"
+    timeout: 10000
+- takeScreenshot: F-GAME-12-snake
+- tapOn: "Quay lại"
+# (Beat Tiles moved to the end of flow 14: its only exit races the
+# game-over dialog, so it must be the last thing any flow does.)
+# Leaderboard (F-GAME-06): FAB with contentDescription "Xếp hạng"
+- tapOn: "Xếp hạng"
+- extendedWaitUntil:
+    visible:
+      text: "Tuần này"
+    timeout: 10000
+- takeScreenshot: F-GAME-06-leaderboard
+- tapOn: "Tháng này"
+- takeScreenshot: F-GAME-06-leaderboard-month
+- tapOn: "Đóng xếp hạng"
+# Split-screen game + video (F-GAME-07): start a video, then open a game
+- tapOn: "Video"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 20000
+- tapOn: "Gần với thiên nhiên thêm chút"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 25000
+- tapOn: "Games"
+- extendedWaitUntil:
+    visible:
+      text: "Tập trung chút, số lớn hơn."
+    timeout: 20000
+- tapOn: "Tic-Tac-Toe"
+- extendedWaitUntil:
+    visible:
+      text: "Lượt của người chơi X"
+    timeout: 15000
+- takeScreenshot: F-GAME-07-split
+# Tic-Tac-Toe (F-GAME-05): the split-screen board with the video on top
+- takeScreenshot: F-GAME-05-tictactoe
+- takeScreenshot: F-GAME-07-split-game
+# (Winning the round via empty-cell point taps proved flaky; the XP award
+# is demonstrated by the F-GAME-08-points screenshot in the quiz part.)

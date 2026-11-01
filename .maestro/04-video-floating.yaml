@@ -1,0 +1,60 @@
+# 04 - Floating video window / PIP / audio-only (F-VID-08, F-VID-09)
+# Labels from app/ui/SessionPlayers.kt (FloatingVideo, MusicMiniPlayer)
+# "Thu nhỏ" (PIP icon) and "Chỉ nghe âm thanh" (headphones) both navigate to News
+# and leave the video running in the floating window.
+appId: com.example.onespace
+name: 04 Video floating
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- tapOn: "Video"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 20000
+- tapOn: "Gần với thiên nhiên thêm chút"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 25000
+# Minimize (F-VID-08): floating window on the News tab
+- tapOn: "Thu nhỏ"
+- extendedWaitUntil:
+    visible:
+      text: ".*cửa sổ nổi.*"
+    timeout: 20000
+- takeScreenshot: F-VID-08-floating
+# Toggle play/pause from the floating window - the icon shows whichever
+# state the restored video is in (fresh: "Tạm dừng", ended: "Phát")
+- tapOn: 'Tạm dừng|Phát'
+- takeScreenshot: F-VID-08-floating-paused
+# Expand back to the full player
+- tapOn: "Mở rộng"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 15000
+# Audio-only mode (F-VID-09): music-style mini player, no video surface
+- tapOn: "Chỉ nghe âm thanh"
+- extendedWaitUntil:
+    visible:
+      text: "Mở rộng"
+    timeout: 15000
+- takeScreenshot: F-VID-09-audio-only
+# Close the floating card -> snackbar, video saved to Watchlist at its position
+- tapOn: "Đóng"
+- extendedWaitUntil:
+    visible:
+      text: "Đã lưu vào Xem sau"
+    timeout: 10000
+- takeScreenshot: F-VID-08-floating-close

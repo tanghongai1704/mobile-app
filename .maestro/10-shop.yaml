@@ -1,0 +1,41 @@
+# 10 - Shop (F-COM-15: cua hang doi qua)
+# Labels from feature/account/.../AccountScreens.kt (ShopSheet)
+# Items (domain/session/model/ShopItem.kt):
+#   Snake 300, Beat Tiles 500, Mũ thú cưng 50, Khăn thú cưng 100,
+#   Khung Đồng 200, Khung Bạc 400, Khung Vàng 800
+appId: com.example.onespace
+name: 10 Shop
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- tapOn: "Tài khoản"
+- scrollUntilVisible:
+    element:
+      text: "Cửa hàng đổi quà"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Cửa hàng đổi quà"
+- extendedWaitUntil:
+    visible: 'Số dư: .*'
+    timeout: 10000
+- takeScreenshot: F-COM-15-shop
+# VERIFY: purchasing needs >= 50 points in the wallet. Points were earned in
+# earlier flows (quiz +20, games +20/+15). If the balance is still too low the
+# button tap does nothing and only the sheet screenshot above covers the FR.
+- scrollUntilVisible:
+    element:
+      text: "Mũ thú cưng"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "50 điểm"
+- takeScreenshot: F-COM-15-purchase

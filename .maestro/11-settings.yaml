@@ -1,0 +1,87 @@
+# 11 - Settings (F-COM-13: sang/toi + ngon ngu + tiet kiem du lieu; F-COM-16 offline sim)
+# Labels from feature/account/.../AccountScreens.kt (SettingsScreen)
+# Route entry: Profile -> "Tùy chỉnh"
+appId: com.example.onespace
+name: 11 Settings
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- tapOn: "Tài khoản"
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- extendedWaitUntil:
+    visible:
+      text: "Tùy chỉnh"
+    timeout: 10000
+- tapOn: "Tùy chỉnh"
+- extendedWaitUntil:
+    visible:
+      text: "Giao diện"
+    timeout: 15000
+- takeScreenshot: F-COM-13-settings
+# Dark theme (F-COM-13)
+- tapOn: "Tối"
+- takeScreenshot: F-COM-13-settings-dark
+# Back to light so later flows screenshot in the default look
+- tapOn: "Sáng"
+# Language segmented row (screenshot only - keep Vietnamese for the other flows)
+- extendedWaitUntil:
+    visible:
+      text: "Ngôn ngữ"
+    timeout: 10000
+- takeScreenshot: F-COM-13-settings-language
+# Data saver (F-COM-13)
+- tapOn: "Tiết kiệm dữ liệu"
+- takeScreenshot: F-COM-13-datasaver
+- tapOn: "Tiết kiệm dữ liệu"
+# Offline simulation switch (F-COM-16) - toggled again in flow 13 for captures
+- scrollUntilVisible:
+    element:
+      text: "Mô phỏng mất mạng (demo)"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: F-COM-16-offline-sim
+# Replay onboarding dialog (does not wipe data) - open then dismiss
+- scrollUntilVisible:
+    element:
+      text: "Làm lại hướng dẫn"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Làm lại hướng dẫn"
+- extendedWaitUntil:
+    visible:
+      text: "Làm lại hướng dẫn?"
+    timeout: 10000
+- takeScreenshot: F-COM-02-replay-onboarding
+- tapOn: "Để sau"
+# Audio conflict rule picker (F-COM-14 settings section)
+- scrollUntilVisible:
+    element:
+      text: "Xung đột âm thanh"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Xung đột âm thanh"
+# The picker dialog always lists "Luôn hỏi" first; when a rule is remembered
+# (flow 08 ticks "Không hỏi lại") the row's trailing button says "Mặc định"
+# instead, so the dialog radio row is the only exact match.
+- extendedWaitUntil:
+    visible:
+      text: "Luôn hỏi"
+    timeout: 10000
+- takeScreenshot: F-COM-14-settings-rule
+- tapOn: "Luôn hỏi"
+- takeScreenshot: F-COM-13-settings-end

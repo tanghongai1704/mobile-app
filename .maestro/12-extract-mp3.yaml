@@ -1,0 +1,62 @@
+# 12 - MP3 extraction from video (F-VID-10, F-MUS-07)
+# Long-press the video surface -> "Trích xuất MP3?" -> confirm -> the track
+# appears in the Music tab under "Từ video của bạn".
+# Labels from feature/video/.../VideoNavGraph.kt + MusicScreens.kt
+appId: com.example.onespace
+name: 12 Extract MP3
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- tapOn: "Video"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 20000
+- tapOn: "Gần với thiên nhiên thêm chút"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 25000
+# Long-press the video box -> confirm dialog
+- longPressOn:
+    point: '50%, 16%'
+- extendedWaitUntil:
+    visible:
+      text: "Trích xuất MP3?"
+    timeout: 10000
+- takeScreenshot: F-VID-10-extract-dialog
+- tapOn: "Trích xuất"
+- takeScreenshot: F-VID-10-extract-confirm
+# The extracted audio lands in the Music tab behind the "Từ video" chip
+- tapOn: "Music"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm bài hát hoặc nghệ sĩ"
+    timeout: 20000
+- tapOn: "Từ video"
+- extendedWaitUntil:
+    visible:
+      text: "Từ video của bạn"
+    timeout: 15000
+- takeScreenshot: F-MUS-07-extracted
+- takeScreenshot: F-VID-10-extracted-list
+# Play the extracted MP3 through the normal music engine. Tap its SUBTITLE:
+# the floating video window shows the same title and would steal the tap.
+# (No queue-button assert: the floating video window covers the lower part
+# of the Now Playing screen.)
+- tapOn: "OneSpace Studio · 1:00"
+- extendedWaitUntil:
+    visible:
+      text: "OneSpace Studio"
+    timeout: 20000
+- takeScreenshot: F-VID-10-playing-extracted

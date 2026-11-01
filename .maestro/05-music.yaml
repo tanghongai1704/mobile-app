@@ -1,0 +1,92 @@
+# 05 - Music (F-MUS-01/02/03/04/05/06/08)
+# Labels from feature/music/.../MusicScreens.kt + MusicNavGraph.kt
+# Mock catalog (data/music/MockMusicRepository.kt):
+#   m1 "Nắng sớm" - Nhóm Lo-fi (first card)
+appId: com.example.onespace
+name: 05 Music
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- tapOn: "Music"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm bài hát hoặc nghệ sĩ"
+    timeout: 20000
+- takeScreenshot: F-MUS-06-music-feed
+# Now Playing (F-MUS-01)
+- tapOn: "9:19"   # duration text: tapping the title can hit the overlapping clickable artist text
+- extendedWaitUntil:
+    visible: 'Xem hàng đợi \(.*'
+    timeout: 20000
+- takeScreenshot: F-MUS-01-player
+# Queue (F-MUS-05)
+- tapOn: 'Xem hàng đợi \(.*'
+- extendedWaitUntil:
+    visible:
+      text: "Đang phát"
+    timeout: 10000
+- takeScreenshot: F-MUS-05-queue
+- takeScreenshot: F-MUS-01-player-queue
+# Save sheet -> playlist (F-MUS-04)
+- tapOn: "Lưu"
+- extendedWaitUntil:
+    visible:
+      text: "Lưu bài hát"
+    timeout: 10000
+- tapOn: "Playlist mới"
+- inputText: "My Mix"
+- tapOn: "Tạo"
+# "Tạo" dismisses the sheet on its own - no extra back needed here
+- takeScreenshot: F-MUS-04-playlist-create
+# Favorite toggle (heart icon)
+- tapOn: 'Yêu thích|Bỏ yêu thích'
+- takeScreenshot: F-MUS-01-favorite
+# Back to the Music tab - mini dock above the bottom bar (F-MUS-02)
+- tapOn: "Quay lại"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm bài hát hoặc nghệ sĩ"
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: "Nắng sớm"
+    timeout: 10000
+- takeScreenshot: F-MUS-02-dock
+# F-MUS-03 (media notification): NOT implemented in this demo build - no
+# MediaSession notification code exists; the in-app dock above covers the
+# equivalent UX. Manifest marks F-MUS-03 as not covered.
+# Search (F-MUS-06): ASCII query "lo-fi" matches the artist "Nhóm Lo-fi"
+- tapOn: "Tìm bài hát hoặc nghệ sĩ"
+- inputText: "lo-fi"
+- pressKey: enter
+- extendedWaitUntil:
+    visible:
+      text: "Nhóm Lo-fi"
+    timeout: 15000
+- takeScreenshot: F-MUS-06-search
+# Artist page (artist rows lead the results)
+- tapOn: "Nhóm Lo-fi"
+- extendedWaitUntil:
+    visible:
+      text: "Bài hát"
+    timeout: 15000
+- takeScreenshot: F-MUS-08-artist
+# The artist route has no top-bar back arrow - system back pops the nav stack
+- pressKey: back
+# Stop the music so the mini dock does not cover the Games FAB in flow 07
+- tapOn: "Đóng"
+- extendedWaitUntil:
+    visible: 'Đã dừng phát nhạc'
+    timeout: 8000
+# (F-MUS-08 "Dành cho bạn" chip omitted: the clear-search step proved flaky;
+# the artist page screenshot above covers the suggestion FR)

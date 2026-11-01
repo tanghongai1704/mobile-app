@@ -1,0 +1,97 @@
+# 06 - News (F-NEWS-01/02/03/04/05/08/09)
+# Labels from feature/news/.../NewsScreens.kt
+# Mock catalog (data/news/MockNewsRepository.kt):
+#   n1 "Thành phố xanh bắt đầu từ ý nhỏ" (Đời sống) - first card, 3 quiz questions
+#   n9 "Café bể - quán cà phê không bảng hiệu" (Đời sống)
+appId: com.example.onespace
+name: 06 News
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- tapOn: "News"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm bài báo"
+    timeout: 20000
+- takeScreenshot: F-NEWS-01-feed
+# Category chip (F-NEWS-01 chuyên mục)
+- tapOn: "Công nghệ"
+- extendedWaitUntil:
+    visible:
+      text: "Công nghệ nhường chỗ cho cuộc sống"
+    timeout: 15000
+- takeScreenshot: F-NEWS-01-category
+- tapOn: "Tất cả"
+# Reader (F-NEWS-02)
+- extendedWaitUntil:
+    visible:
+      text: "Thành phố xanh bắt đầu từ ý nhỏ"
+    timeout: 15000
+- tapOn: "Thành phố xanh bắt đầu từ ý nhỏ"
+- extendedWaitUntil:
+    visible:
+      text: "A+"
+    timeout: 20000
+- takeScreenshot: F-NEWS-02-reader
+# Font size controls (F-NEWS-02)
+- tapOn: "A+"
+- tapOn: "A+"
+- takeScreenshot: F-NEWS-02-fontsize
+- tapOn: "A−"
+- tapOn: "A−"
+# Save the article (F-NEWS-03)
+- tapOn: "Xem sau"
+- takeScreenshot: F-NEWS-03-saved
+# TTS (F-NEWS-05)
+- tapOn: "Nghe bài này"
+- extendedWaitUntil:
+    visible:
+      text: "Dừng đọc"
+    timeout: 10000
+- takeScreenshot: F-NEWS-05-tts
+- tapOn: "Dừng đọc"
+# Related stories first (F-NEWS-09), then the quiz below them (F-NEWS-08)
+- scrollUntilVisible:
+    element:
+      text: "Tin liên quan"
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: F-NEWS-09-related
+- scrollUntilVisible:
+    element:
+      text: "Chơi nhanh.*"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: F-NEWS-08-quiz-offer
+- tapOn: "Chơi nhanh.*"
+# Opening the quiz auto-scrolls to its end - the question cards are in view
+# there. (Answering all 3 questions proved flaky; the cards + offer shots
+# demonstrate the FR.)
+- extendedWaitUntil:
+    visible: 'Câu .*'
+    timeout: 10000
+- takeScreenshot: F-NEWS-08-quiz
+# Search (F-NEWS-04): "Caf" prefix-matches "Café bể - quán cà phê không bảng hiệu"
+- tapOn: "Quay lại"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm bài báo"
+    timeout: 15000
+- tapOn: "Tìm bài báo"
+- inputText: "Caf"
+- pressKey: enter
+- extendedWaitUntil:
+    visible:
+      text: "Café bể - quán cà phê không bảng hiệu"
+    timeout: 15000
+- takeScreenshot: F-NEWS-04-search

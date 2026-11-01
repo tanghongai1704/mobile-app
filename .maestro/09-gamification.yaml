@@ -1,0 +1,109 @@
+# 09 - Gamification (F-COM-03/04/06/07/08/09/10/12, F-COM-16 downloads)
+# Labels from feature/account/.../AccountScreens.kt
+# Pet stages (domain/session/model/Pet.kt): Trứng / Bé cưng / Thiếu niên / Trưởng thành
+appId: com.example.onespace
+name: 09 Gamification
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+# Profile is reachable from Home only (top-bar account icon)
+- tapOn: "Tài khoản"
+- extendedWaitUntil:
+    visible:
+      text: "Huy hiệu"
+    timeout: 15000
+- takeScreenshot: F-COM-03-profile
+# Stats: Điểm / Chuỗi ngày / Thú cưng (F-COM-04, F-COM-06)
+- takeScreenshot: F-COM-04-stats
+- takeScreenshot: F-COM-06-streak
+# Pet card (F-COM-07)
+- extendedWaitUntil:
+    visible:
+      text: "Hoàn thành nhiệm vụ để trứng nở"
+    timeout: 10000
+- takeScreenshot: F-COM-07-pet
+# Badge grid (F-COM-08)
+- tapOn: "Huy hiệu"
+- extendedWaitUntil:
+    visible:
+      text: "Người mới"
+    timeout: 15000
+- takeScreenshot: F-COM-08-badges
+- tapOn: "Quay lại"
+# Avatar editor + frames (F-COM-09)
+- tapOn: "Đổi avatar"
+- extendedWaitUntil:
+    visible:
+      text: "Hình đại diện"
+    timeout: 10000
+- takeScreenshot: F-COM-09-avatar-frames
+- tapOn: "Xong"
+# Wrapped monthly recap (F-COM-10)
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- extendedWaitUntil:
+    visible:
+      text: "Tổng kết tháng"
+    timeout: 10000
+- tapOn: "Tổng kết tháng"
+- extendedWaitUntil:
+    visible:
+      text: "OneSpace của bạn tháng này"
+    timeout: 15000
+- takeScreenshot: F-COM-10-wrapped
+- scrollUntilVisible:
+    element:
+      text: "Khoảnh khắc đáng nhớ"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: F-COM-10-wrapped-moments
+- tapOn: "Quay lại"
+# Reminder hub (F-COM-12)
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- extendedWaitUntil:
+    visible:
+      text: "Nhắc nhở"
+    timeout: 10000
+- tapOn: "Nhắc nhở"
+- extendedWaitUntil:
+    visible:
+      text: "Nhắc nhiệm vụ hằng ngày"
+    timeout: 15000
+- takeScreenshot: F-COM-12-reminders
+- tapOn: "Quay lại"
+# Downloads hub (F-COM-16): one video downloaded in flow 03
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- extendedWaitUntil:
+    visible:
+      text: "Đã tải"
+    timeout: 10000
+- tapOn: "Đã tải"
+- extendedWaitUntil:
+    visible: 'Video \(.*\)'
+    timeout: 15000
+- takeScreenshot: F-COM-16-downloads
+- tapOn: "Quay lại"

@@ -1,0 +1,65 @@
+# 01 - Login (F-COM-01: tai khoan dang nhap; F-COM-18: che do khach)
+# Labels from feature/auth/.../AuthScreens.kt + DemoAuthRepository.kt
+# Demo facts: any password >= 6 chars signs in; demo OTP code is 123456;
+# the OTP request needs a valid 9-11 digit phone number first.
+appId: com.example.onespace
+name: 01 Login
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: "Đăng nhập / Đăng ký"
+    timeout: 30000
+- takeScreenshot: F-COM-01-login
+# Google entry point (demo build only explains it)
+- tapOn: "Tiếp tục với Google"
+- extendedWaitUntil:
+    visible:
+      text: "Đăng nhập bằng Google"
+    timeout: 10000
+- takeScreenshot: F-COM-01-login-google
+- tapOn: "Đã hiểu"
+# Guest entry point (F-COM-18) - open the sheet, then dismiss WITHOUT continuing
+- tapOn: "Dùng thử không cần tài khoản"
+- extendedWaitUntil:
+    visible:
+      text: "Tiếp tục dùng thử"
+    timeout: 10000
+- takeScreenshot: F-COM-18-guest-sheet
+- pressKey: back
+# Email tab of the segmented login
+- tapOn: "Email"
+- extendedWaitUntil:
+    visible:
+      text: "Một tài khoản. Bốn cách tận hưởng mỗi ngày."
+    timeout: 10000
+- takeScreenshot: F-COM-01-login-email
+- tapOn: "Số điện thoại"
+# Fill the phone number first (label matches the segment too -> index 1 = the field)
+- tapOn:
+    text: "Số điện thoại"
+    index: 1
+- inputText: "987654321"
+# Close the phone keyboard (ENTER is a no-op on Phone-type fields) -
+# it covers the "Dung ma OTP" toggle below the card
+- pressKey: back
+# OTP alternative - request a code, land on the verify screen, then come back
+- tapOn: "Dùng mã OTP"
+- tapOn: "Gửi mã OTP"
+- extendedWaitUntil:
+    visible:
+      text: "Kiểm tra mã xác thực"
+    timeout: 20000
+- takeScreenshot: F-COM-01-otp-verify
+- tapOn: "Quay lại"
+- tapOn: "Dùng mật khẩu"
+# Password sign-in
+- tapOn: "Mật khẩu"
+- inputText: "demo123"
+- pressKey: back
+- tapOn: "Đăng nhập"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 30000
+- takeScreenshot: F-COM-01-loggedin-home

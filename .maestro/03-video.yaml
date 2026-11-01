@@ -1,0 +1,187 @@
+# 03 - Video tab (F-VID-01/02/03/04/05/06/11/12/13/14/15, F-COM-16 download)
+# Labels from feature/video/.../VideoScreens.kt + VideoNavGraph.kt
+# Mock catalog (data/video/MockVideoRepository.kt):
+#   v1 "Gần với thiên nhiên thêm chút" (OneSpace Studio, 1:00) - first card
+#   v7 "Nắng xuyên tán lá sớm" (Góc xanh, 0:10) - for the end-of-video quiz
+appId: com.example.onespace
+name: 03 Video
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- tapOn: "Video"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm video hoặc kênh"
+    timeout: 20000
+- takeScreenshot: F-VID-02-video-feed
+# "Dành cho bạn" keeps the onboarding topics first
+- tapOn: "Dành cho bạn"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 15000
+- takeScreenshot: F-VID-02-video-foryou
+- tapOn: "Tất cả"
+# Search: channel matches first, then videos (F-VID-03)
+- tapOn: "Tìm video hoặc kênh"
+- inputText: "onespace"
+- pressKey: enter
+- extendedWaitUntil:
+    visible:
+      text: "OneSpace Studio"
+    timeout: 15000
+- takeScreenshot: F-VID-03-search
+- takeScreenshot: F-VID-12-channel-card
+# Open the channel page (F-VID-12) - the channel card leads the results, so
+# its title is the first "OneSpace Studio" match
+- tapOn:
+    text: "OneSpace Studio"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      text: "Video của kênh"
+    timeout: 15000
+- takeScreenshot: F-VID-12-channel
+- tapOn: "Quay lại"
+- tapOn: "Xóa tìm kiếm"
+# Open the first video (F-VID-01)
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 15000
+- tapOn: "Gần với thiên nhiên thêm chút"
+# The creator row only renders like this on the detail screen
+- extendedWaitUntil:
+    visible:
+      text: "OneSpace Studio · 1:00"
+    timeout: 25000
+- takeScreenshot: F-VID-01-player
+# Save sheet (F-VID-04): watch later row + create a playlist (F-VID-13)
+- tapOn: "Lưu"
+- extendedWaitUntil:
+    visible:
+      text: "Lưu video"
+    timeout: 10000
+- takeScreenshot: F-VID-04-save-sheet
+- tapOn: "Xem sau"
+- takeScreenshot: F-VID-04-watchlater-added
+- tapOn: "Playlist mới"
+- inputText: "Demo Chill"
+- tapOn: "Tạo"
+- takeScreenshot: F-VID-13-playlist-create
+# Swipe the sheet down to close it - a BACK press would only close the
+# keyboard (the "Playlist mới" field keeps focus after "Tạo")
+- swipe:
+    start: '50%,45%'
+    end: '50%,95%'
+- extendedWaitUntil:
+    visible:
+      text: "Cài đặt phát"
+    timeout: 10000
+- takeScreenshot: F-VID-04-save-sheet-closed
+# Playback settings sheet (F-VID-06 quality, F-VID-14 speed)
+- tapOn: "Cài đặt phát"
+- extendedWaitUntil:
+    visible:
+      text: "Tốc độ phát"
+    timeout: 10000
+- takeScreenshot: F-VID-14-speed-sheet
+- takeScreenshot: F-VID-06-quality-sheet
+- tapOn: "720p"
+# Share (F-VID-11): Android share sheet shows the app's share text
+- tapOn: "Chia sẻ"
+- extendedWaitUntil:
+    visible: 'Xem "Gần với thiên nhiên thêm chút" trên OneSpace'
+    timeout: 10000
+- takeScreenshot: F-VID-11-share
+- pressKey: back
+# Download for offline (F-COM-16)
+- tapOn: 'Tải xuống|Bỏ tải'
+- takeScreenshot: F-COM-16-download-toast
+# Seek ±10s transport buttons (F-VID-14)
+- tapOn: "Lùi 10 giây"
+- tapOn: "Tới 10 giây"
+- takeScreenshot: F-VID-14-seek
+# (F-VID-10 MP3 extraction is demonstrated in flow 12-extract-mp3)
+# History (F-VID-05): grouped under "Hôm nay"
+- tapOn: "Quay lại"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm video hoặc kênh"
+    timeout: 15000
+- tapOn: "Đã xem"
+- extendedWaitUntil:
+    visible:
+      text: "Hôm nay"
+    timeout: 15000
+- takeScreenshot: F-VID-05-history
+# Playlist screen (F-VID-13): Profile -> "Playlist của tôi" -> the one just created
+- tapOn: "Home"
+- tapOn: "Tài khoản"
+# The video from the detail screen keeps playing and its floating window
+# covers the middle of the profile - close it first
+- tapOn: "Đóng"
+# Manual swipes: scrollUntilVisible's visibility check proved flaky here
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- extendedWaitUntil:
+    visible:
+      text: "Playlist của tôi"
+    timeout: 10000
+- tapOn: "Playlist của tôi"
+- extendedWaitUntil:
+    visible:
+      text: "Demo Chill"
+    timeout: 15000
+- tapOn: "Demo Chill"
+- extendedWaitUntil:
+    visible:
+      text: "1 video.*"
+    timeout: 15000
+- takeScreenshot: F-VID-13-playlist
+# One back from the playlist returns to the Video feed (nav stack shortcut)
+- tapOn: "Quay lại"
+# End-of-video quiz (F-VID-15): play a 10s video and wait for the offer
+- tapOn: "Video"
+- tapOn: "Tìm video hoặc kênh"
+- inputText: "xanh"
+- pressKey: enter
+- tapOn: "Nắng xuyên tán lá sớm"
+- extendedWaitUntil:
+    visible:
+      text: "Nắng xuyên tán lá sớm"
+    timeout: 25000
+# 10s clip + network buffering: allow up to 45s for the offer to appear
+- extendedWaitUntil:
+    visible:
+      text: "Chơi nhanh.*"
+    timeout: 45000
+- takeScreenshot: F-VID-15-quiz-offer
+- tapOn: "Chơi nhanh.*"
+- extendedWaitUntil:
+    visible:
+      text: "Bạn đã xem xong!"
+    timeout: 15000
+- takeScreenshot: F-VID-15-quiz
+- tapOn: "Thiên nhiên"
+# The result line renders below the four options - scroll to reveal it
+- scrollUntilVisible:
+    element:
+      text: 'Chính xác! \+20 điểm'
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: F-VID-15-quiz-correct

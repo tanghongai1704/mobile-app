@@ -1,0 +1,66 @@
+# 02 - Home feed (F-VID-02, F-VID-04, F-COM-04/05/06/11)
+# Labels from feature/home/.../HomeScreen.kt
+# Bottom nav labels are ENGLISH in this app: Home / Video / Music / News / Games.
+# NOTE: only ever tap a bottom tab that differs from the current screen title,
+# otherwise the top-bar title and the nav item share the same text.
+appId: com.example.onespace
+name: 02 Home
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+- takeScreenshot: F-VID-02-home-feed
+# Gamification banner: XP + streak chip + daily missions
+- extendedWaitUntil:
+    visible:
+      text: "Nghe 1 bài nhạc"
+    timeout: 20000
+- takeScreenshot: F-COM-04-points-banner
+- takeScreenshot: F-COM-05-missions
+- takeScreenshot: F-COM-06-streak
+# Watchlist sheet (empty on first run)
+- tapOn: "Xem sau"
+- extendedWaitUntil:
+    visible:
+      text: "Chưa lưu video nào.*"
+    timeout: 10000
+- takeScreenshot: F-VID-04-watchlist-empty
+- pressKey: back
+# Wait for the sheet dismissal animation to finish before typing
+- extendedWaitUntil:
+    visible:
+      text: "Đề xuất cho bạn"
+    timeout: 15000
+# Cross-content search (F-COM-11): "xanh" matches videos (Góc xanh) + articles
+- tapOn: "Tìm trong OneSpace"
+- inputText: "xanh"
+- pressKey: enter
+- extendedWaitUntil:
+    visible:
+      text: "Tin tức"
+    timeout: 15000
+- takeScreenshot: F-COM-11-search
+- tapOn: "Xóa tìm kiếm"
+- extendedWaitUntil:
+    visible:
+      text: "Đề xuất cho bạn"
+    timeout: 15000
+- takeScreenshot: F-VID-02-home-recommend
+# Inline playback on the feed card (the card IS the player on Home)
+- tapOn: "Phát Gần với thiên nhiên thêm chút"
+- extendedWaitUntil:
+    visible:
+      text: "Tạm dừng"
+    timeout: 25000
+- takeScreenshot: F-VID-02-home-inline-player
+# Pause again so nothing keeps playing into the next flow
+- tapOn: "Tạm dừng"

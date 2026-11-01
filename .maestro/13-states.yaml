@@ -1,0 +1,111 @@
+# 13 - Edge & empty states (F-COM-16 offline, F-VID-04 watchlist, F-COM-11 no-results)
+# Offline via the Settings demo switch "Mô phỏng mất mạng (demo)":
+#   Home shows "Mất kết nối mạng — đang hiển thị nội dung đã lưu."
+#   Feeds render the "Không có kết nối" error state with retry.
+appId: com.example.onespace
+name: 13 States
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+# Search with no results (empty state)
+- tapOn: "Tìm trong OneSpace"
+- inputText: "zzzzzz"
+- pressKey: enter
+- extendedWaitUntil:
+    visible:
+      text: "Không có kết quả.*"
+    timeout: 15000
+- takeScreenshot: F-COM-11-no-results
+- tapOn: "Xóa tìm kiếm"
+# Watchlist now has entries from flows 03/04 - open it again
+- extendedWaitUntil:
+    visible: 'Xem sau \(.*\)'
+    timeout: 15000
+- tapOn:
+    text: 'Xem sau \(.*'
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 10000
+- takeScreenshot: F-VID-04-watchlist
+- pressKey: back
+# ---- Offline simulation ----
+# Route to Settings and switch it on
+- tapOn: "Tài khoản"
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- extendedWaitUntil:
+    visible:
+      text: "Tùy chỉnh"
+    timeout: 10000
+- tapOn: "Tùy chỉnh"
+- scrollUntilVisible:
+    element:
+      text: "Mô phỏng mất mạng (demo)"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Mô phỏng mất mạng (demo)"
+# Home shows the offline banner over the cached feed
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Mất kết nối mạng.*"
+    timeout: 20000
+- takeScreenshot: F-COM-16-offline-banner
+# Feeds render the retry error state
+- tapOn: "Video"
+- extendedWaitUntil:
+    visible:
+      text: "Không có kết nối"
+    timeout: 20000
+- takeScreenshot: F-COM-16-offline-feed
+- tapOn: "Music"
+- extendedWaitUntil:
+    visible:
+      text: "Không có kết nối"
+    timeout: 20000
+- takeScreenshot: F-COM-16-offline-music
+# (The News tab keeps showing its already-loaded feed in offline mode, so
+# there is no offline screenshot for it.)
+# Restore connectivity
+- tapOn: "Home"
+- tapOn: "Tài khoản"
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- swipe:
+    start: '50%,75%'
+    end: '50%,35%'
+- extendedWaitUntil:
+    visible:
+      text: "Tùy chỉnh"
+    timeout: 10000
+- tapOn: "Tùy chỉnh"
+- scrollUntilVisible:
+    element:
+      text: "Mô phỏng mất mạng (demo)"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Mô phỏng mất mạng (demo)"
+# VERIFY: F-COM-17 (bao noi dung / report content). No report UI was found in
+# the app source (article reader actions are bookmark / download / TTS / MP3).
+# If a report entry point is added later, insert its steps here, e.g.:
+# - tapOn:
+#     text: "Báo nội dung"
+# - takeScreenshot: F-COM-17-report
+- tapOn: "Quay lại"
+- tapOn: "Quay lại"

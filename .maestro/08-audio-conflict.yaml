@@ -1,0 +1,80 @@
+# 08 - Audio conflict popup (F-COM-14, F-MUS-10)
+# Labels from app/OneSpaceApp.kt:
+#   C1 (video playing -> start music):
+#     title 'Phát "<track>"?', "Video đang phát",
+#     tick "Không hỏi lại", choices "Tắt tiếng video" / "Dừng video"
+#   C2 (music playing -> open video):
+#     title 'Mở "<title>"?', "Nhạc đang phát",
+#     choices "Tắt tiếng video, nhạc vẫn phát" / "Tắt tiếng nhạc, video có tiếng"
+# KEY FACT: most mock video FILES only run ~10s despite their listed
+# durations, so they end before the music can start. v9 "Bão biển qua ống
+# kính nhỏ" (oceans.mp4) genuinely runs 46s and keeps playing in the
+# floating window across tab switches - that gives the C1 dialog time to
+# appear. C2 uses its own preference, so no Settings reset is needed.
+appId: com.example.onespace
+name: 08 Audio conflict
+---
+- launchApp
+# The app restores the last active section on cold start (SessionCoordinator);
+# wait for the bottom bar, then normalise to Home before doing anything else.
+- extendedWaitUntil:
+    visible:
+      text: "Games"
+    timeout: 30000
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm trong OneSpace"
+    timeout: 15000
+# C1 setup: open the 46s video (search by its creator, ASCII query)
+- tapOn: "Video"
+- extendedWaitUntil:
+    visible:
+      text: "Tìm video hoặc kênh"
+    timeout: 20000
+- tapOn: "Tìm video hoặc kênh"
+- inputText: "onespace"
+- pressKey: enter
+- scrollUntilVisible:
+    element:
+      text: "Bão biển qua ống kính nhỏ"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Bão biển qua ống kính nhỏ"
+- extendedWaitUntil:
+    visible:
+      text: "Bão biển qua ống kính nhỏ"
+    timeout: 25000
+# Trigger C1: switch to Music and start a track while the video plays
+- tapOn: "Music"
+- extendedWaitUntil:
+    visible:
+      text: "Nắng sớm"
+    timeout: 20000
+- tapOn: "9:19"   # duration text: tapping the title can hit the overlapping clickable artist text
+- extendedWaitUntil:
+    visible:
+      text: "Video đang phát"
+    timeout: 15000
+- takeScreenshot: F-COM-14-conflict-popup
+# F-MUS-10 (audio focus xung đột) is this same dialog from the music side
+- takeScreenshot: F-MUS-10-audio-focus
+# Tick "Không hỏi lại" combined with the choice
+- tapOn: "Không hỏi lại"
+- takeScreenshot: F-COM-14-conflict-tick
+- tapOn: "Dừng video"
+# Trigger C2: open a video while music is playing. Home's first feed card is
+# always v1 - tapping it opens the video and raises the C2 dialog. (Home
+# also hides the music dock, so nothing covers the card.)
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible:
+      text: "Gần với thiên nhiên thêm chút"
+    timeout: 15000
+- tapOn: "Gần với thiên nhiên thêm chút"
+- extendedWaitUntil:
+    visible:
+      text: "Nhạc đang phát"
+    timeout: 15000
+- takeScreenshot: F-COM-14-conflict-c2
+- tapOn: "Tắt tiếng nhạc, video có tiếng"
