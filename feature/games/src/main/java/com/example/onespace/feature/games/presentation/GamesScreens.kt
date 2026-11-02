@@ -7,10 +7,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -42,10 +47,12 @@ internal fun GuessSongScreen(
     state: com.example.onespace.domain.games.model.GuessSongState,
     onStart: () -> Unit,
     onAnswer: (String) -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onStartPlaylist: (AppPlaylist) -> Unit = {}
 ) {
+    var choosing by remember { mutableStateOf(false) }
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -66,8 +73,32 @@ internal fun GuessSongScreen(
         when {
             state.question == null -> {
                 // Start screen
-                Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { choosing = false; onStart() }, modifier = Modifier.fillMaxWidth()) {
                     Text(tr("Bắt đầu chơi", "Start playing"))
+                }
+                OutlinedButton(onClick = { choosing = !choosing }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.LibraryMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(tr("Chơi từ Playlist của bạn", "Play from your playlists"))
+                }
+                if (choosing) {
+                    // Playlists that mix in videos are left out: only pure music playlists can play.
+                    val usable = AppPlaylistStore.playlists.values.filter { it.videoIds.isEmpty() && it.trackIds.isNotEmpty() }
+                    if (usable.isEmpty()) {
+                        Text(
+                            tr("Chưa có playlist nhạc nào. Lưu bài hát vào một playlist trước nhé.",
+                                "No music playlists yet. Save songs to a playlist first."),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else usable.forEach { pl ->
+                        ContentCard(
+                            pl.name,
+                            tr("${pl.trackIds.size} bài hát", "${pl.trackIds.size} songs"),
+                            Icons.Filled.LibraryMusic,
+                            { choosing = false; onStartPlaylist(pl) }
+                        )
+                    }
                 }
             }
             !state.hasAnswered -> {

@@ -111,8 +111,8 @@ class OneSpaceAppState(val navController: NavHostController) {
         openSmart(TopLevelDestination.NEWS, NewsRoute.Graph, NewsRoute.Article(id))
     }
 
-    fun openGame(id: String) {
-        openSmart(TopLevelDestination.GAMES, GamesRoute.Graph, GamesRoute.Game(id))
+    fun openGame(id: String, track: String? = null) {
+        openSmart(TopLevelDestination.GAMES, GamesRoute.Graph, GamesRoute.Game(id, track))
     }
 
 

@@ -147,7 +147,8 @@ fun AppNavigation(
                 session = session,
                 getGraphEntry = { appState.graphEntry(MusicRoute.Graph) },
                 onOpenPlayer = appState::openMusicPlayer,
-                onOpenArtist = appState::openMusicArtist
+                onOpenArtist = appState::openMusicArtist,
+                onOpenGuessSong = { appState.openGame("g3") }
             )
             newsGraph(
                 getGraphEntry = { appState.graphEntry(NewsRoute.Graph) },

@@ -35,7 +35,7 @@ object DailyChallenges {
         ChallengeTemplate("g1", "2048", "Đạt 300 điểm trong một ván 2048", 300, ProgressMode.BEST),
         ChallengeTemplate("g2", "Tic-Tac-Toe", "Thắng máy 2 ván Tic-Tac-Toe", 2, ProgressMode.TOTAL),
         ChallengeTemplate("g3", "Đoán bài hát", "Đoán đúng 3 bài hát", 3, ProgressMode.TOTAL),
-        ChallengeTemplate("g4", "Quiz tin tức", "Trả lời đúng 3 câu hỏi tin tức", 3, ProgressMode.TOTAL),
+        ChallengeTemplate("g4", "Quiz kiến thức", "Trả lời đúng 3 câu hỏi kiến thức", 3, ProgressMode.TOTAL),
         ChallengeTemplate("g5", "Rắn săn mồi", "Ăn 6 mồi trong một ván Rắn", 6, ProgressMode.BEST),
         ChallengeTemplate("g6", "Beat Tiles", "Đạt 10 điểm trong một ván Beat Tiles", 10, ProgressMode.BEST)
     )

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -69,7 +70,8 @@ internal fun MusicScreen(
     onOpenArtist: (String) -> Unit = {},
     playingTrackId: String? = null,
     onAddToQueue: (Track) -> Unit = {},
-    onAddToPlaylist: (String) -> Unit = {}
+    onAddToPlaylist: (String) -> Unit = {},
+    onOpenGuessSong: () -> Unit = {}
 ) {
     var saveTarget by remember { mutableStateOf<Track?>(null) }
     val row = TrackRowActions(
@@ -111,6 +113,14 @@ internal fun MusicScreen(
     }
     FeaturePage {
         if (searchQuery.isBlank()) {
+            // Shortcut to the Guess the Song game, which lives in the Games tab.
+            item {
+                FilledTonalButton(onClick = onOpenGuessSong, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.SportsEsports, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(tr("Chơi Đoán bài hát", "Play Guess the Song"))
+                }
+            }
             item {
                 LazyRow(
                     modifier = Modifier.fadingEdgeEnd(),

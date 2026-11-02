@@ -1,7 +1,7 @@
 # 07 - Games (F-GAME-01/02/03/05/06/07/08/11/12/13)
 # Labels from feature/games/.../GamesScreens.kt, GameScreens2.kt, GamesNavGraph.kt
 # Game catalog (data/games/MockGamesRepository.kt):
-#   2048 (g1), Tic-Tac-Toe (g2), Đoán bài hát (g3), Quiz tin tức (g4),
+#   2048 (g1), Tic-Tac-Toe (g2), Đoán bài hát (g3), Quiz kiến thức (g4),
 #   Rắn săn mồi (g5), Beat Tiles (g6)
 appId: com.example.onespace
 name: 07 Games
@@ -53,11 +53,11 @@ name: 07 Games
 - takeScreenshot: F-GAME-02-answer
 - tapOn: "Ván tiếp theo"
 - tapOn: "Quay lại"
-# Quiz tin tức (F-GAME-03)
-- tapOn: "Quiz tin tức"
+# Quiz kiến thức (F-GAME-03)
+- tapOn: "Quiz kiến thức"
 - extendedWaitUntil:
     visible:
-      text: "Quiz tin tức"
+      text: "Quiz kiến thức"
     timeout: 20000
 - takeScreenshot: F-GAME-03-newsquiz
 # VERIFY: questions are shuffled - tap the first option by position

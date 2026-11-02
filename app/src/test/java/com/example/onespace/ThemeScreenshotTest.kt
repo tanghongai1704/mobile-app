@@ -326,3 +326,83 @@ abstract class FloatingShots(mode: String) : ScreenshotBase(mode) {
         shot("f03-floating-other-tab")
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w392dp-h800dp-xxhdpi")
+class FeedbackScreenshotTest : FeedbackShots("light")
+
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w392dp-h800dp-night-xxhdpi")
+class FeedbackScreenshotDarkTest : FeedbackShots("dark")
+
+/** Karaoke popup, song actions, search drop-down, quiz, playlists for Guess the Song, Beat Tiles menu, split. */
+abstract class FeedbackShots(mode: String) : ScreenshotBase(mode) {
+    private fun open(text: String) {
+        compose.onAllNodesWithText(text).onFirst().performSemanticsAction(SemanticsActions.OnClick); settle()
+    }
+
+    private fun openScrolling(text: String) {
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(text)); settle()
+        compose.onAllNodesWithText(text).onFirst().performSemanticsAction(SemanticsActions.OnClick); settle()
+    }
+
+    @Test
+    fun feedback() {
+        firstRunToHome()
+        optional("search") {
+            compose.onNode(hasContentDescription("Tìm kiếm").and(hasClickAction())).performSemanticsAction(SemanticsActions.OnClick)
+            settle(); shot("k01-home-search-open")
+            compose.onNode(hasContentDescription("Tìm kiếm").and(hasClickAction())).performSemanticsAction(SemanticsActions.OnClick)
+            settle()
+        }
+        tab("Nhạc"); settle()
+        optional("music-menu") {
+            compose.onAllNodes(hasContentDescription("Thêm tùy chọn").and(hasClickAction())).onFirst().performSemanticsAction(SemanticsActions.OnClick)
+            settle(); shot("k02-music-row-menu")
+            back()
+        }
+        optional("music-detail") {
+            open("Nắng sớm"); shot("k03-music-detail")
+            compose.onNode(hasContentDescription("Ghi âm / Karaoke").and(hasClickAction())).performSemanticsAction(SemanticsActions.OnClick)
+            settle(); shot("k04-record-mode")
+            compose.onNodeWithText("Hủy").performClick(); settle()
+            compose.onNodeWithText("Xem hàng đợi").performClick(); settle(); shot("k05-queue")
+            back()
+        }
+        tab("Video"); settle()
+        optional("video-detail") {
+            open("Gần với thiên nhiên thêm chút"); shot("k06-video-detail")
+            compose.onNode(hasContentDescription("Ghi âm / Karaoke").and(hasClickAction())).performSemanticsAction(SemanticsActions.OnClick)
+            settle(); shot("k07-record-mode-video")
+            compose.onNodeWithText("Ghi cùng video").performClick(); settle(); shot("k08-record-mic-intro")
+            compose.onNodeWithText("Để sau").performClick(); settle()
+        }
+        tab("Trò chơi"); settle()
+        optional("split") {
+            open("2048"); shot("k09-split-2048")
+            back()
+        }
+        optional("split-snake") {
+            openScrolling("Rắn săn mồi"); shot("k10-split-snake-notice")
+            compose.onNodeWithText("Chơi toàn màn hình").performClick(); settle(); shot("k11-snake-full")
+            back()
+        }
+        optional("quiz") {
+            openScrolling("Quiz kiến thức"); shot("k12-knowledge-quiz")
+            back()
+        }
+        optional("guess") {
+            open("Đoán bài hát")
+            compose.onNodeWithText("Chơi từ Playlist của bạn").performClick(); settle(); shot("k13-guess-playlist")
+            back()
+        }
+        optional("beat") {
+            openScrolling("Beat Tiles")
+            shot("k14-beat-menu")
+            compose.onNodeWithText("Chọn bài hát của bạn").performClick(); settle(); shot("k15-beat-songs")
+            back()
+        }
+    }
+}

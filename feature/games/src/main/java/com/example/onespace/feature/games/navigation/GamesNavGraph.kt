@@ -6,6 +6,7 @@ import com.example.onespace.core.designsystem.fadingEdgeEnd
 import androidx.compose.runtime.*
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -21,6 +22,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.pointer.pointerInput
+import com.example.onespace.core.designsystem.oneSpaceColors
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -144,7 +151,8 @@ fun NavGraphBuilder.gamesGraph(
             } // Box
         }
         composable<GamesRoute.Game> { entry ->
-            val id = entry.toRoute<GamesRoute.Game>().id
+            val route = entry.toRoute<GamesRoute.Game>()
+            val id = route.id
             // F-GAME-08: while a video is playing it stays on top and the
             // game runs in the bottom half of the screen.
             val playback by session.video.collectAsStateWithLifecycle()
@@ -168,23 +176,29 @@ fun NavGraphBuilder.gamesGraph(
             }
             Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
-                if (videoActive) {
-                    // F-GAME-07: a real split — the video owns roughly the top
-                    // two-fifths with its own controls, the game the rest.
-                    Column(Modifier.fillMaxWidth().weight(0.38f)) {
-                        com.example.onespace.core.media.VideoSurface(
-                            awardVm.player,
-                            Modifier.fillMaxWidth().weight(1f),
-                            { session.seekVideoBy(10_000) }
-                        )
-                        VideoSplitControls(
-                            player = awardVm.player,
-                            onToggle = session::toggleVideo,
-                            onSeek = session::seekVideoTo
-                        )
-                    }
+                // Games that need the whole screen cannot share it with a video: say so first.
+                val needsFullScreen = id in FULL_SCREEN_GAMES
+                var fullScreenAccepted by remember(id) { mutableStateOf(false) }
+                val split = videoActive && !(needsFullScreen && fullScreenAccepted)
+                if (videoActive && needsFullScreen && !fullScreenAccepted) {
+                    FullScreenNotice(
+                        onPlayFullScreen = {
+                            if (playback.playRequested) session.toggleVideo()
+                            fullScreenAccepted = true
+                        }
+                    )
+                } else if (split) {
+                    // F-GAME-07: a real split. The video owns the top third with the same tap-to-show
+                    // controls as the player; the board below keeps its full size and is never covered.
+                    SplitVideo(
+                        player = awardVm.player,
+                        onToggle = session::toggleVideo,
+                        onSeekBy = session::seekVideoBy,
+                        onSeekTo = session::seekVideoTo,
+                        modifier = Modifier.fillMaxWidth().weight(0.34f)
+                    )
                 }
-                Box(Modifier.weight(if (videoActive) 0.62f else 1f)) {
+                if (!(videoActive && needsFullScreen && !fullScreenAccepted)) Box(Modifier.weight(if (split) 0.66f else 1f)) {
                     when (id) {
                         "g1" -> {
                             val vm: Game2048ViewModel = hiltViewModel()
@@ -221,17 +235,13 @@ fun NavGraphBuilder.gamesGraph(
                                 state = state,
                                 onStart = vm::startNewRound,
                                 onAnswer = vm::answer,
-                                onNext = vm::nextRound
+                                onNext = vm::nextRound,
+                                onStartPlaylist = { vm.startFromPlaylist(it.trackIds) }
                             )
                         }
                         "g4" -> {
-                            val vm: NewsQuizViewModel = hiltViewModel()
-                            LaunchedEffect(Unit) { vm.load() }
-                            val questions by vm.questions.collectAsStateWithLifecycle()
-                            NewsQuizScreen(
-                                questions = questions,
-                                onAnswer = { if (it) vm.award() }
-                            )
+                            val vm: KnowledgeQuizViewModel = hiltViewModel()
+                            KnowledgeQuizScreen(onFinish = vm::finish)
                         }
                         "g5" -> {
                             SnakeScreen(onGameOver = { score ->
@@ -240,10 +250,39 @@ fun NavGraphBuilder.gamesGraph(
                             })
                         }
                         "g6" -> {
-                            BeatTilesScreen(onGameOver = { score ->
-                                if (score > 0) awardVm.awardGame("beat_tiles", score / 2)
-                                awardVm.recordScore("g6", score)
-                            })
+                            val vm: BeatTilesViewModel = hiltViewModel()
+                            val songs by vm.songs.collectAsStateWithLifecycle()
+                            // Null = menu; a pick of "random" or of one song starts the game.
+                            var pick by remember(route.track) {
+                                mutableStateOf<BeatTilesPick?>(null)
+                            }
+                            LaunchedEffect(route.track, songs) {
+                                val wanted = route.track?.let { id -> songs.find { it.id == id } }
+                                if (wanted != null && pick == null) {
+                                    session.playMusic(wanted.id, wanted.title)
+                                    pick = BeatTilesPick.Song(wanted)
+                                }
+                            }
+                            val chosen = pick
+                            if (chosen == null) {
+                                BeatTilesMenu(
+                                    songs = songs,
+                                    onRandom = { pick = BeatTilesPick.Random },
+                                    onSong = {
+                                        session.playMusic(it.id, it.title)
+                                        pick = BeatTilesPick.Song(it)
+                                    }
+                                )
+                            } else {
+                                BeatTilesScreen(
+                                    bpm = (chosen as? BeatTilesPick.Song)?.track?.bpm,
+                                    songTitle = (chosen as? BeatTilesPick.Song)?.track?.title,
+                                    onGameOver = { score ->
+                                        if (score > 0) awardVm.awardGame("beat_tiles", score / 2)
+                                        awardVm.recordScore("g6", score)
+                                    }
+                                )
+                            }
                         }
                         else -> Text(tr("Không tìm thấy game", "Game not found"))
                     }
@@ -258,21 +297,52 @@ fun NavGraphBuilder.gamesGraph(
     }
 }
 
+/** Games that need the whole screen (tall lanes, swipe-driven boards) and so cannot be split. */
+private val FULL_SCREEN_GAMES = setOf("g5", "g6")
+
+/** Shown instead of the board when a full-screen game is opened while a video is playing. */
+@Composable
+private fun FullScreenNotice(onPlayFullScreen: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(Icons.Filled.SportsEsports, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp))
+        Text(tr("Trò chơi này cần toàn màn hình", "This game needs the full screen"),
+            style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            tr("Không thể vừa xem video vừa chơi. Video sẽ được tạm dừng khi bạn chơi toàn màn hình.",
+                "You cannot watch the video while playing. The video is paused while you play full screen."),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        androidx.compose.material3.Button(onClick = onPlayFullScreen, modifier = Modifier.fillMaxWidth()) {
+            Text(tr("Chơi toàn màn hình", "Play full screen"))
+        }
+    }
+}
+
 /**
- * Compact control row under the split video: pause, scrub, time. The
- * position polls the shared player directly — the session flow only
- * updates on player events, not continuously.
+ * Video on top of a game: tap shows back-10 / play-pause / forward-10 and the progress line, which fade
+ * after 2 seconds, so the picture stays clean while you play. The position polls the shared player
+ * directly; the session flow only updates on player events.
  */
 @Composable
-private fun VideoSplitControls(
+private fun SplitVideo(
     player: androidx.media3.common.Player?,
     onToggle: () -> Unit,
-    onSeek: (Long) -> Unit
+    onSeekBy: (Long) -> Unit,
+    onSeekTo: (Long) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var pos by remember { mutableLongStateOf(0L) }
     var dur by remember { mutableLongStateOf(0L) }
     var playing by remember { mutableStateOf(false) }
-    var scrub by remember { mutableStateOf<Float?>(null) }
+    var controls by remember { mutableStateOf(true) }
+    var touches by remember { mutableIntStateOf(0) }
     LaunchedEffect(player) {
         while (true) {
             if (player != null) {
@@ -283,32 +353,51 @@ private fun VideoSplitControls(
             kotlinx.coroutines.delay(500)
         }
     }
-    val shown = scrub ?: if (dur > 0) pos.toFloat() / dur.toFloat() else 0f
-    Row(
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-    ) {
-        androidx.compose.material3.IconButton(onClick = onToggle) {
-            androidx.compose.material3.Icon(
-                if (playing) androidx.compose.material.icons.Icons.Filled.Pause
-                else androidx.compose.material.icons.Icons.Filled.PlayArrow,
-                contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play")
+    LaunchedEffect(controls, touches, playing) {
+        if (controls && playing) { kotlinx.coroutines.delay(2000); controls = false }
+    }
+    val alpha by androidx.compose.animation.core.animateFloatAsState(
+        if (controls) 1f else 0f, androidx.compose.animation.core.tween(300), label = "split-controls"
+    )
+    val onMedia = MaterialTheme.oneSpaceColors.onMedia
+    Box(modifier) {
+        com.example.onespace.core.media.VideoSurface(
+            player, Modifier.fillMaxSize().background(MaterialTheme.oneSpaceColors.mediaBackdrop), { onSeekBy(10_000) }
+        )
+        Box(Modifier.matchParentSize().pointerInput(Unit) {
+            detectTapGestures(onTap = { controls = !controls; touches++ })
+        })
+        if (alpha > 0.01f) Box(Modifier.matchParentSize().alpha(alpha)) {
+            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.IconButton(onClick = { touches++; onSeekBy(-10_000) }) {
+                    Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"), tint = onMedia)
+                }
+                androidx.compose.material3.IconButton(onClick = { touches++; onToggle() }, modifier = Modifier.size(52.dp)) {
+                    Icon(
+                        if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"),
+                        tint = onMedia, modifier = Modifier.size(34.dp)
+                    )
+                }
+                androidx.compose.material3.IconButton(onClick = { touches++; onSeekBy(10_000) }) {
+                    Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"), tint = onMedia)
+                }
+            }
+            Text(
+                com.example.onespace.core.common.formatMsWhole(pos) + " / " + com.example.onespace.core.common.formatMsWhole(dur),
+                style = MaterialTheme.typography.labelSmall, color = onMedia,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 16.dp)
             )
         }
-        androidx.compose.material3.Slider(
-            value = shown.coerceIn(0f, 1f),
-            onValueChange = { scrub = it },
-            onValueChangeFinished = {
-                scrub?.let { onSeek((it * dur).toLong()) }
-                scrub = null
-            },
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            com.example.onespace.core.common.formatMsWhole(pos) + " / " +
-                com.example.onespace.core.common.formatMsWhole(dur),
-            style = androidx.compose.material3.MaterialTheme.typography.labelSmall
+        // The line lives on the bottom edge of the frame; draggable while the controls are up.
+        com.example.onespace.core.designsystem.ScrubBar(
+            pos, dur,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            onSeek = { touches++; onSeekTo(it) },
+            interactive = alpha > 0.5f,
+            trackHeight = if (alpha > 0.5f) 3.dp else 2.dp,
+            knobRadius = 6.dp,
+            trackColor = onMedia.copy(alpha = 0.3f)
         )
     }
 }

@@ -8,10 +8,15 @@ import kotlin.random.Random
 class StartGuessSong(
     private val pointRepository: PointRepository
 ) {
-    /** Generate a new question from the music catalog: pick 1 correct + 3 wrong titles. */
-    suspend fun generate(tracks: List<Track>): GuessSongQuestion? {
+    /**
+     * Generate a new question from the music catalog: pick 1 correct + 3 wrong titles. With
+     * [pool] (the songs of one playlist) the answer always comes from the pool while the wrong
+     * titles still come from the whole catalog, so a short playlist stays playable.
+     */
+    suspend fun generate(tracks: List<Track>, pool: List<Track>? = null): GuessSongQuestion? {
         if (tracks.size < 4) return null
-        val correct = tracks[Random.nextInt(tracks.size)]
+        val source = pool?.takeIf { it.isNotEmpty() } ?: tracks
+        val correct = source[Random.nextInt(source.size)]
         val wrongOptions = tracks.filter { it.id != correct.id }
             .shuffled()
             .take(3)

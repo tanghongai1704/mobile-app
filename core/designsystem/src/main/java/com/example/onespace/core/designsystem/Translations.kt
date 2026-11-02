@@ -19,13 +19,13 @@ object Translations {
         "Vuốt để gộp ô, chạm mốc 2048." to "Swipe to merge tiles and reach 2048.",
         "Đấu với máy ở 3 mức độ hoặc chơi cùng bạn." to "Play the computer on 3 levels or a friend.",
         "Đoán bài hát" to "Guess the Song", "Nghe 5 giây, chọn tên bài đúng." to "Listen for 5 seconds, pick the right title.",
-        "Quiz tin tức" to "News Quiz", "Trả lời câu hỏi từ các bài báo đã đọc." to "Answer questions from articles you read.",
+        "Quiz kiến thức" to "Knowledge Quiz", "Câu hỏi kiến thức tổng quát từ dễ đến khó, kiểu Ai là triệu phú." to "General-knowledge questions from easy to hard, Millionaire style.",
         "Rắn săn mồi" to "Snake", "Vuốt để điều khiển, ăn thật nhiều điểm." to "Swipe to steer and score big.",
         "Nốt nhạc rơi theo bài đang phát, chạm đúng nhịp." to "Notes fall with the playing song; tap on the beat.",
         "Không tải được danh sách game." to "Couldn't load the games.",
         // Daily challenges
         "Đạt 300 điểm trong một ván 2048" to "Score 300 in one 2048 game", "Thắng máy 2 ván Tic-Tac-Toe" to "Beat the computer twice at Tic-Tac-Toe",
-        "Đoán đúng 3 bài hát" to "Guess 3 songs correctly", "Trả lời đúng 3 câu hỏi tin tức" to "Answer 3 news questions correctly",
+        "Đoán đúng 3 bài hát" to "Guess 3 songs correctly", "Trả lời đúng 3 câu hỏi kiến thức" to "Answer 3 knowledge questions correctly",
         "Ăn 6 mồi trong một ván Rắn" to "Eat 6 treats in one Snake game", "Đạt 10 điểm trong một ván Beat Tiles" to "Score 10 in one Beat Tiles game",
         // Game badges
         "Rắn tham ăn" to "Hungry snake", "Ăn 15 mồi trong một ván Rắn" to "Eat 15 treats in one Snake game",

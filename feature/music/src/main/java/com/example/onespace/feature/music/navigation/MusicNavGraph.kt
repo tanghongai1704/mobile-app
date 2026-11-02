@@ -18,7 +18,8 @@ fun NavGraphBuilder.musicGraph(
     session: SessionCoordinator,
     getGraphEntry: () -> NavBackStackEntry,
     onOpenPlayer: (String) -> Unit,
-    onOpenArtist: (String) -> Unit = {}
+    onOpenArtist: (String) -> Unit = {},
+    onOpenGuessSong: () -> Unit = {}
 ) {
     navigation<MusicRoute.Graph>(startDestination = MusicRoute.Feed) {
         composable<MusicRoute.Feed> { entry ->
@@ -62,6 +63,7 @@ fun NavGraphBuilder.musicGraph(
                     onToggleFavorite = vm::toggleFavorite,
                     onToggleDownload = { id, title, subtitle -> vm.toggleDownload(id, title, subtitle) },
                     playingTrackId = nowPlaying.trackId,
+                    onOpenGuessSong = onOpenGuessSong,
                     onAddToQueue = session::addToQueue,
                     onAddToPlaylist = { tid ->
                         val store = com.example.onespace.core.designsystem.AppPlaylistStore

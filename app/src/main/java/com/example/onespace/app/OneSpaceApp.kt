@@ -8,6 +8,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.SportsEsports
+import com.example.onespace.app.ui.RecordFlow
+import com.example.onespace.app.ui.RecordSource
 import androidx.compose.material3.*
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
@@ -64,6 +68,7 @@ fun OneSpaceApp() {
     val msgSavedWatchLater = tr("Đã lưu vào Xem sau", "Saved to Watch later")
     // One search per top-level section; the field drops down under the top bar.
     val musicSpeed by coordinator.musicSpeed.collectAsStateWithLifecycle()
+    var recordSource by remember { mutableStateOf<RecordSource?>(null) }
     val searches = remember { Section.entries.associateWith { com.example.onespace.core.designsystem.SearchState() } }
     val activeSearch = selected?.let { searches[it.section] }
     fun select(section: Section) {
@@ -114,6 +119,24 @@ fun OneSpaceApp() {
                     }
                 },
                 actions = {
+                    // Karaoke / Record on the player screens, next to the back arrow's row.
+                    if (screen == ContextScreen.VIDEO && videoId != null) IconButton(onClick = {
+                        recordSource = RecordSource(videoState.title.ifBlank { "Video" }, isVideo = true)
+                    }) {
+                        Icon(Icons.Filled.Mic, contentDescription = tr("Ghi âm / Karaoke", "Record / Karaoke"))
+                    }
+                    if (screen == ContextScreen.MUSIC && trackId != null) {
+                        IconButton(onClick = {
+                            recordSource = RecordSource(musicState.title.ifBlank { "Nhạc" }, isVideo = false)
+                        }) {
+                            Icon(Icons.Filled.Mic, contentDescription = tr("Ghi âm / Karaoke", "Record / Karaoke"))
+                        }
+                        // Beat Tiles with this song; off when the song has no beat data.
+                        val beat = musicState.queue.firstOrNull { it.id == trackId }?.bpm
+                        IconButton(enabled = beat != null, onClick = { appState.openGame("g6", trackId) }) {
+                            Icon(Icons.Filled.SportsEsports, contentDescription = tr("Chơi Beat Tiles với bài này", "Play Beat Tiles with this song"))
+                        }
+                    }
                     // Search is a magnifier on the section roots; the field opens under the bar.
                     if (screen == null && activeSearch != null) IconButton(onClick = activeSearch::toggle) {
                         Icon(
@@ -244,6 +267,16 @@ fun OneSpaceApp() {
                 }
             )
         }
+    }
+
+    recordSource?.takeIf { inMain }?.let { source ->
+        RecordFlow(
+            source = source,
+            player = media.videoPlayer,
+            isPlaying = { if (source.isVideo) videoState.playRequested else musicState.playRequested },
+            onPlayPauseSource = { if (source.isVideo) coordinator.toggleVideo() else coordinator.toggleMusic() },
+            onDismiss = { recordSource = null }
+        )
     }
 
     // Case C1: while music collides with a playing video, one of three

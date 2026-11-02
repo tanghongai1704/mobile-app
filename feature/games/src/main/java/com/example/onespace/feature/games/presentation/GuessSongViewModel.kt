@@ -25,10 +25,14 @@ internal class GuessSongViewModel @Inject constructor(
     private val _state = MutableStateFlow(GuessSongState())
     val state = _state.asStateFlow()
 
+    /** Names of the playlists whose songs feed the questions; null = the whole library. */
+    private var playlistTrackIds: Set<String>? = null
+
     fun startNewRound() {
         viewModelScope.launch {
             val tracks = musicRepository.observeCatalog().first()
-            val question = startGuessSong.generate(tracks)
+            val pool = playlistTrackIds?.let { ids -> tracks.filter { it.id in ids } }
+            val question = startGuessSong.generate(tracks, pool)
             _state.value = GuessSongState(
                 question = question,
                 isPlaying = true,
@@ -37,6 +41,16 @@ internal class GuessSongViewModel @Inject constructor(
             )
         }
     }
+
+    /** Starts a game whose questions come only from the songs of one of the user's playlists. */
+    fun startFromPlaylist(trackIds: List<String>) {
+        playlistTrackIds = trackIds.toSet()
+        _state.value = GuessSongState()
+        startNewRound()
+    }
+
+    /** Back to questions from the whole library. */
+    fun useWholeLibrary() { playlistTrackIds = null }
 
     fun answer(selected: String) {
         val question = _state.value.question ?: return

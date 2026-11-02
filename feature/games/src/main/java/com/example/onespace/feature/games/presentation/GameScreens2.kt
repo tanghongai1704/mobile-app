@@ -6,6 +6,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -109,60 +113,138 @@ internal fun SnakeScreen(onGameOver: (Int) -> Unit = {}) {
 
 private fun abs(v: Float) = if (v < 0) -v else v
 
-/** F-GAME-03: the news quiz as a game — questions come from the article catalog. */
+/**
+ * Knowledge quiz in the "Who wants to be a millionaire" style: ten general-knowledge questions
+ * from easy to hard, a growing reward, a safe checkpoint after question five and the option to
+ * walk away with what has been earned.
+ */
 @Composable
-internal fun NewsQuizScreen(
-    questions: List<com.example.onespace.domain.news.model.QuizQuestion>,
-    onAnswer: (Boolean) -> Unit = {},
-    onRestart: () -> Unit = {}
-) {
-    var index by remember { mutableIntStateOf(0) }
-    var score by remember { mutableIntStateOf(0) }
+internal fun KnowledgeQuizScreen(onFinish: (earned: Int, correct: Int) -> Unit = { _, _ -> }) {
+    var run by remember { mutableStateOf(com.example.onespace.domain.games.engine.KnowledgeQuizRun.start()) }
+    var version by remember { mutableIntStateOf(0) }
     var picked by remember { mutableStateOf<Int?>(null) }
+    var correct by remember { mutableIntStateOf(0) }
+    var reported by remember { mutableStateOf(false) }
+    @Suppress("UNUSED_EXPRESSION") version
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(tr("Quiz tin tức", "News quiz"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        if (questions.isEmpty()) {
-            Text(tr("Chưa có câu hỏi nào.", "No questions yet."), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            return@Column
+        Text(tr("Quiz kiến thức", "Knowledge quiz"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        val q = run.current
+        if (q == null || (picked != null && run.over)) {
+            // Result card (also shown after the last answer is revealed).
         }
-        if (index >= questions.size) {
-            Text(tr("Hoàn thành!", "Done!"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-            Text(tr("Đúng $score/${questions.size} câu", "$score/${questions.size} correct"),
-                style = MaterialTheme.typography.titleMedium)
-            Button(onClick = { index = 0; score = 0; picked = null; onRestart() }) {
-                Text(tr("Chơi lại", "Play again"))
+        val showing = run.current
+        if (showing != null) {
+            // Ladder: question number and what it is worth.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(tr("Câu ${run.index + 1}/${run.questions.size}", "Question ${run.index + 1}/${run.questions.size}"),
+                    style = MaterialTheme.typography.titleMedium)
+                Text(tr("Giá trị ${run.worth} điểm", "Worth ${run.worth} points"),
+                    style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             }
-            return@Column
+            LinearProgressIndicator(progress = { run.index / run.questions.size.toFloat() }, modifier = Modifier.fillMaxWidth())
+            Text(tr("Đã tích lũy: ${run.earned} điểm", "Earned so far: ${run.earned} points"),
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Text(showing.question, style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(16.dp))
+            }
+            val letters = listOf("A", "B", "C", "D")
+            showing.options.forEachIndexed { oi, option ->
+                val reveal = picked != null
+                val isRight = oi == showing.correctIndex
+                OutlinedButton(
+                    onClick = {
+                        if (picked == null) {
+                            picked = oi
+                            if (oi == showing.correctIndex) correct += 1
+                        }
+                    },
+                    colors = when {
+                        reveal && isRight -> ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.oneSpaceColors.feedback.container)
+                        reveal && picked == oi -> ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                        else -> ButtonDefaults.outlinedButtonColors()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(letters[oi] + ".  " + option, modifier = Modifier.fillMaxWidth())
+                }
+            }
+            if (picked != null) {
+                val wasRight = picked == showing.correctIndex
+                Text(
+                    if (wasRight) tr("Chính xác! +${run.worth} điểm", "Correct! +${run.worth} points")
+                    else tr("Rất tiếc, đáp án đúng là ${letters[showing.correctIndex]}.", "Sorry, the answer was ${letters[showing.correctIndex]}."),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (wasRight) MaterialTheme.oneSpaceColors.feedback.success else MaterialTheme.colorScheme.error
+                )
+                Button(onClick = {
+                    run.answer(picked!!)
+                    picked = null
+                    version++
+                    if (run.over && !reported) { reported = true; onFinish(run.earned, correct) }
+                }, modifier = Modifier.fillMaxWidth()) {
+                    Text(tr("Tiếp tục", "Continue"))
+                }
+            } else if (run.index > 0) {
+                // Walking away is only offered between questions, after at least one right answer.
+                TextButton(onClick = {
+                    run.walkAway(); version++
+                    if (!reported) { reported = true; onFinish(run.earned, correct) }
+                }) { Text(tr("Dừng cuộc chơi, giữ ${run.earned} điểm", "Stop here and keep ${run.earned} points")) }
+            }
+        } else {
+            val won = run.won
+            Text(
+                if (won) tr("Chúc mừng, bạn đã vượt qua tất cả!", "Congratulations, you cleared them all!")
+                else tr("Kết thúc ván chơi", "Round over"),
+                style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary
+            )
+            Text(tr("Trả lời đúng $correct/${run.questions.size} câu", "$correct/${run.questions.size} correct"),
+                style = MaterialTheme.typography.titleMedium)
+            Text(tr("Nhận ${run.earned} điểm", "You earn ${run.earned} points"),
+                style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Button(onClick = {
+                run = com.example.onespace.domain.games.engine.KnowledgeQuizRun.start()
+                picked = null; correct = 0; reported = false; version++
+            }) { Text(tr("Chơi lại", "Play again")) }
         }
-        Text(tr("Câu ${index + 1}/${questions.size} · Điểm $score", "Question ${index + 1}/${questions.size} · Score $score"),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val q = questions[index]
-        Text(q.question, style = MaterialTheme.typography.titleMedium)
-        q.options.forEachIndexed { oi, option ->
-            val chosen = picked == oi
-            val isCorrect = picked != null && oi == q.correctIndex
-            OutlinedButton(
-                onClick = {
-                    if (picked == null) {
-                        picked = oi
-                        val ok = oi == q.correctIndex
-                        if (ok) { score += 1; onAnswer(true) }
-                    }
-                },
-                colors = if (picked != null && isCorrect) ButtonDefaults.outlinedButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ) else ButtonDefaults.outlinedButtonColors(),
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(option) }
+    }
+}
+
+/** Beat Tiles entry: a random round, or pick one of your songs that has beat data. */
+@Composable
+internal fun BeatTilesMenu(
+    songs: List<com.example.onespace.domain.music.model.Track>,
+    onRandom: () -> Unit,
+    onSong: (com.example.onespace.domain.music.model.Track) -> Unit
+) {
+    var choosing by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text("Beat Tiles", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(
+            tr("Chạm đúng ô khi nốt nhạc rơi tới vạch sáng.", "Tap the lane when a note reaches the glowing line."),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Button(onClick = onRandom, modifier = Modifier.fillMaxWidth()) { Text(tr("Chơi ngẫu nhiên", "Play random")) }
+        OutlinedButton(onClick = { choosing = !choosing }, modifier = Modifier.fillMaxWidth()) {
+            Text(tr("Chọn bài hát của bạn", "Choose one of your songs"))
         }
-        if (picked != null) {
-            Button(onClick = { index += 1; picked = null }, modifier = Modifier.fillMaxWidth()) {
-                Text(tr("Câu tiếp theo", "Next question"))
+        if (choosing) {
+            if (songs.isEmpty()) {
+                Text(tr("Chưa có bài hát nào hỗ trợ Beat Tiles.", "No songs support Beat Tiles yet."),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else songs.forEach { t ->
+                com.example.onespace.core.designsystem.ContentCard(
+                    t.title, t.artist + " · " + t.bpm + " BPM",
+                    Icons.Filled.MusicNote, { onSong(t) }
+                )
             }
         }
     }
@@ -219,7 +301,7 @@ private data class TileNote(val lane: Int, val y: Float, val id: Int)
  * the rhythm visually so the game is playable with or without a song.
  */
 @Composable
-internal fun BeatTilesScreen(onGameOver: (Int) -> Unit = {}) {
+internal fun BeatTilesScreen(bpm: Int? = null, songTitle: String? = null, onGameOver: (Int) -> Unit = {}) {
     var notes by remember { mutableStateOf(listOf<TileNote>()) }
     var running by remember { mutableStateOf(false) }
     var score by remember { mutableIntStateOf(0) }
@@ -240,7 +322,9 @@ internal fun BeatTilesScreen(onGameOver: (Int) -> Unit = {}) {
         while (running) {
             delay(33)
             tick += 1
-            val interval = maxOf(9, 18 - tick / 400)
+            // With a song the tiles follow its tempo (one tile per beat); otherwise a gentle
+            // speed-up. 33 ms per tick.
+            val interval = if (bpm != null) maxOf(6, (60_000f / bpm / 33f).toInt()) else maxOf(9, 18 - tick / 400)
             if (tick % interval == 0) {
                 val lane = (tick * 7 + nextId * 3) % 4
                 notes = notes + TileNote(lane, 0f, nextId)
@@ -286,6 +370,8 @@ internal fun BeatTilesScreen(onGameOver: (Int) -> Unit = {}) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(tr("Điểm: $score", "Score: $score"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (songTitle != null) Text(songTitle, style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
             Text(if (combo > 0) "Combo x$combo" else tr("Trượt $misses/3", "Miss $misses/3"),
                 style = MaterialTheme.typography.titleSmall,
                 color = if (combo > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)

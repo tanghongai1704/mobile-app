@@ -2,8 +2,6 @@ package com.example.onespace.feature.games.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.onespace.domain.news.model.QuizQuestion
-import com.example.onespace.domain.news.repository.NewsRepository
 import com.example.onespace.domain.session.model.MissionType
 import com.example.onespace.domain.session.repository.PointRepository
 import com.example.onespace.domain.session.usecase.TrackMissionAction
@@ -13,31 +11,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** F-GAME-03 / F-GAME-09: the news quiz game with per-answer XP. */
+/** Knowledge quiz: the points of a finished run go into the shared wallet. */
 @HiltViewModel
-internal class NewsQuizViewModel @Inject constructor(
-    private val newsRepository: NewsRepository,
+internal class KnowledgeQuizViewModel @Inject constructor(
     private val points: PointRepository,
+    private val trackMissionAction: TrackMissionAction,
     private val challenge: ChallengeReporter
 ) : ViewModel() {
-    private val _questions = MutableStateFlow<List<QuizQuestion>>(emptyList())
-    val questions = _questions.asStateFlow()
-
-    fun load() {
+    /** Called once when a run ends: [earned] points, [correct] right answers. */
+    fun finish(earned: Int, correct: Int) {
         viewModelScope.launch {
-            val articles = newsRepository.observeCatalog().first()
-            _questions.value = articles.flatMap { it.quiz }.shuffled()
-        }
-    }
-
-    /** F-GAME-09: a correct answer pays into the shared point wallet. */
-    fun award() {
-        viewModelScope.launch {
-            points.add("quiz_tin_tuc", 15)
-            challenge.report("g4", 1)
+            if (earned > 0) points.add("quiz_kien_thuc", earned)
+            if (correct > 0) {
+                challenge.report("g4", correct)
+                trackMissionAction(MissionType.PLAY)
+            }
         }
     }
 }
@@ -90,4 +82,20 @@ internal class PlayAwardViewModel @Inject constructor(
             trackMissionAction(MissionType.PLAY)
         }
     }
+}
+
+/** Songs of the library that carry beat data, offered by the Beat Tiles menu. */
+@HiltViewModel
+internal class BeatTilesViewModel @Inject constructor(
+    music: com.example.onespace.domain.music.repository.MusicRepository
+) : ViewModel() {
+    val songs = music.observeCatalog()
+        .map { list -> list.filter { it.bpm != null } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+}
+
+/** How a Beat Tiles round was started. */
+internal sealed interface BeatTilesPick {
+    data object Random : BeatTilesPick
+    data class Song(val track: com.example.onespace.domain.music.model.Track) : BeatTilesPick
 }

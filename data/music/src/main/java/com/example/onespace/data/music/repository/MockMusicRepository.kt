@@ -19,7 +19,7 @@ internal class MockMusicRepository : MusicRepository {
 
     private fun sh(n: Int) = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-$n.mp3"
 
-    private val catalog = listOf(
+    private val rawCatalog = listOf(
         Track("m1", "Nắng sớm", "Nhóm Lo-fi", "9:19", sh(1), true, lyrics = listOf("Nắng sớm lướt qua khung cửa", "Cà phê còn ấm trên tay", "Một ngày mới vừa thức giấc", "Nhẹ như tiếng gió đầu ngày")),
         Track("m2", "Nơi nào yên tĩnh", "Đài Chủ nhật", "10:38", sh(2), lyrics = listOf("Nơi nào yên tĩnh cho ta", "Nghe tim mình chậm lại", "Thành phố ngoài kia vẫn chạy", "Còn ta ngồi lại với đêm")),
         Track("m3", "Suy nghĩ đêm muộn", "Trạm Chill", "8:36", sh(3), true, lyrics = listOf("Suy nghĩ đêm muộn tràn về", "Ngọn đèn nhỏ bên bàn học", "Ngày mai rồi sẽ ổn thôi", "Cứ thở và bước tiếp đi")),
@@ -71,4 +71,8 @@ internal class MockMusicRepository : MusicRepository {
         Track("m49", "Bài ca cho người ấy", "Kẹo Dừa", "9:19", sh(1), true),
         Track("m50", "Mình hát cho nhau", "Mùa Gạo Mới", "10:38", sh(2))
     )
+
+    /** Beat data for the first twenty songs: Beat Tiles is only offered for songs that have it. */
+    private val tempos = listOf(92, 100, 108, 116, 124, 132)
+    private val catalog = rawCatalog.mapIndexed { i, t -> if (i < 20) t.copy(bpm = tempos[i % tempos.size]) else t }
 }

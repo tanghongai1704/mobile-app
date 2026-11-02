@@ -14,7 +14,7 @@ internal class MockGamesRepository : GamesRepository {
         Game("g1", "2048", "Vuốt để gộp ô, chạm mốc 2048.", 0),
         Game("g2", "Tic-Tac-Toe", "Đấu với máy ở 3 mức độ hoặc chơi cùng bạn.", 0),
         Game("g3", "Đoán bài hát", "Nghe 5 giây, chọn tên bài đúng.", 0),
-        Game("g4", "Quiz tin tức", "Trả lời câu hỏi từ các bài báo đã đọc.", 0),
+        Game("g4", "Quiz kiến thức", "Câu hỏi kiến thức tổng quát từ dễ đến khó, kiểu Ai là triệu phú.", 0),
         Game("g5", "Rắn săn mồi", "Vuốt để điều khiển, ăn thật nhiều điểm.", 0),
         Game("g6", "Beat Tiles", "Nốt nhạc rơi theo bài đang phát, chạm đúng nhịp.", 0)
         ))
