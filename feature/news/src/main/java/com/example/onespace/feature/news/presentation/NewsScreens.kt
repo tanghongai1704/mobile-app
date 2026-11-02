@@ -60,37 +60,23 @@ internal fun NewsScreen(
     topics: Set<String> = emptySet(),
     onOpen: (String) -> Unit
 ) {
-    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchState = com.example.onespace.core.designsystem.LocalSearchState.current
+    val searchQuery = searchState.query
     var filter by rememberSaveable { mutableStateOf("all") }
     val q = searchQuery.trim()
     val base = if (q.isEmpty()) articles
         else articles.filter { it.title.contains(q, true) || it.category.contains(q, true) }
     val topicChips = articles.map { it.category }.filter { it.isNotBlank() }.distinct()
     val visible = when {
-        filter == "foryou" -> base.filter { it.category in topics }
+        filter == "foryou" -> if (topics.isEmpty()) base else base.filter { it.category in topics }
+        // No publish date in the catalog: later entries are newer; featured = longest reads.
+        filter == "latest" -> base.asReversed()
+        filter == "featured" -> base.sortedByDescending { it.readMinutes() }.take(4)
         filter == "saved" -> base.filter { it.id in saved }
         filter != "all" -> base.filter { it.category == filter }
         else -> base
     }
     FeaturePage {
-        item {
-            OutlinedTextField(
-                shape = androidx.compose.foundation.shape.CircleShape, colors = com.example.onespace.core.designsystem.AppFieldDefaults.colors(),
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(tr("Tìm bài báo", "Search articles")) },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = tr("Xóa tìm kiếm", "Clear search"))
-                        }
-                    }
-                },
-                singleLine = true
-            )
-        }
         if (q.isEmpty()) {
             item {
                 LazyRow(
@@ -98,9 +84,9 @@ internal fun NewsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item { FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text(tr("Tất cả", "All")) }) }
-                    if (topics.isNotEmpty()) {
-                        item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text(tr("Dành cho bạn", "For you")) }) }
-                    }
+                    item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text(tr("Đề xuất", "Recommended")) }) }
+                    item { FilterChip(selected = filter == "latest", onClick = { filter = "latest" }, label = { Text(tr("Mới nhất", "Latest")) }) }
+                    item { FilterChip(selected = filter == "featured", onClick = { filter = "featured" }, label = { Text(tr("Nổi bật", "Featured")) }) }
                     items(topicChips, key = { it }) { cat ->
                         FilterChip(selected = filter == cat, onClick = { filter = cat }, label = { Text(cat.t()) })
                     }
@@ -418,3 +404,7 @@ private fun QuizQuestionCard(
         }
     }
 }
+
+/** Minutes in strings like "5 phút đọc"; 0 when the article has no reading time. */
+private fun com.example.onespace.domain.news.model.Article.readMinutes(): Int =
+    Regex("\\d+").find(readTime)?.value?.toIntOrNull() ?: 0

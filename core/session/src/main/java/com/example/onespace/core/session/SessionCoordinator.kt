@@ -237,6 +237,21 @@ class SessionCoordinator @Inject constructor(
     fun toggleRepeat() { _musicRepeat.value = !_musicRepeat.value }
 
     fun removeFromQueue(trackId: String) = port.removeTrackFromQueue(trackId)
+    fun addToQueue(track: Track) = port.addTrackToQueue(track)
+
+    /** Music playback speed for this session: x1 -> x1.5 -> x2 -> x0.5 -> x1 ... */
+    private val _musicSpeed = MutableStateFlow(1f)
+    val musicSpeed: StateFlow<Float> = _musicSpeed.asStateFlow()
+
+    fun cycleMusicSpeed() {
+        _musicSpeed.value = when (_musicSpeed.value) {
+            1f -> 1.5f
+            1.5f -> 2f
+            2f -> 0.5f
+            else -> 1f
+        }
+        port.setMusicSpeed(_musicSpeed.value)
+    }
     fun moveQueueItem(fromIndex: Int, toIndex: Int) = port.moveTrackInQueue(fromIndex, toIndex)
 
     fun nextTrack() {

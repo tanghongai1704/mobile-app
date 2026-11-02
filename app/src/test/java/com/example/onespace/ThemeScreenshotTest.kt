@@ -98,7 +98,7 @@ abstract class ScreenshotBase(private val mode: String) {
         waitText("Dùng thử không cần tài khoản")
         compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
         compose.onNodeWithText("Tiếp tục dùng thử").performClick()
-        waitText("Tìm trong OneSpace")
+        waitText("Playlist của tôi")
         settle()
     }
 
@@ -123,7 +123,7 @@ abstract class ScreenshotBase(private val mode: String) {
         shot("02-login")
         compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
         compose.onNodeWithText("Tiếp tục dùng thử").performClick()
-        waitText("Tìm trong OneSpace")
+        waitText("Playlist của tôi")
         settle()
         shot("03-home")
         optional("home-feed") {

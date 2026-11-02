@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -19,8 +20,14 @@ import com.example.onespace.domain.games.model.Game
 
 @Composable
 internal fun GamesScreen(games: List<Game>, onOpen: (String) -> Unit) {
+    val q = LocalSearchState.current.query.trim()
+    val shown = if (q.isEmpty()) games
+        else games.filter { it.title.t().contains(q, true) || it.description.t().contains(q, true) }
     FeaturePage {
-        items(games, key = { it.id }) { game ->
+        if (q.isNotEmpty() && shown.isEmpty()) item {
+            EmptyHint(Icons.Filled.Search, tr("Không có trò chơi nào khớp", "No games match"))
+        }
+        items(shown, key = { it.id }) { game ->
             val record = if (game.bestScore > 0) tr(" · Kỷ lục ", " · Record ") + game.bestScore else ""
             ContentCard(game.title.t(), game.description.t() + record,
                 if (game.id == "g1") Icons.Filled.GridView else Icons.Filled.SelectAll,

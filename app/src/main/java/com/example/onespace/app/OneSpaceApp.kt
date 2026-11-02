@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
@@ -60,7 +62,12 @@ fun OneSpaceApp() {
     val msgMusicStopped = tr("Đã dừng phát nhạc", "Music stopped")
     val msgUndo = tr("Hoàn tác", "Undo")
     val msgSavedWatchLater = tr("Đã lưu vào Xem sau", "Saved to Watch later")
+    // One search per top-level section; the field drops down under the top bar.
+    val musicSpeed by coordinator.musicSpeed.collectAsStateWithLifecycle()
+    val searches = remember { Section.entries.associateWith { com.example.onespace.core.designsystem.SearchState() } }
+    val activeSearch = selected?.let { searches[it.section] }
     fun select(section: Section) {
+        searches.values.forEach { it.close() }
         haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick)
         coordinator.enter(section)
         appState.navigateToSection(section)
@@ -99,7 +106,7 @@ fun OneSpaceApp() {
             SnackbarHost(snackbarHostState)
         },
         topBar = {
-            if (inMain) TopAppBar(
+            if (inMain) Column { TopAppBar(
                 title = { Text(screen?.title() ?: selected?.label() ?: "") },
                 navigationIcon = {
                     if (screen != null) IconButton(onClick = appState::navigateBack) {
@@ -107,6 +114,13 @@ fun OneSpaceApp() {
                     }
                 },
                 actions = {
+                    // Search is a magnifier on the section roots; the field opens under the bar.
+                    if (screen == null && activeSearch != null) IconButton(onClick = activeSearch::toggle) {
+                        Icon(
+                            if (activeSearch.open) Icons.Filled.Close else Icons.Filled.Search,
+                            contentDescription = tr("Tìm kiếm", "Search")
+                        )
+                    }
                     // Profile is secondary: reachable from Home only, not every screen.
                     if (onHome) IconButton(onClick = {
                         coordinator.cancelPendingRestore()
@@ -116,6 +130,17 @@ fun OneSpaceApp() {
                     }
                 }
             )
+                if (screen == null && activeSearch?.open == true) {
+                    val hint = when (selected?.section) {
+                        Section.HOME -> tr("Tìm trong OneSpace", "Search OneSpace")
+                        Section.VIDEO -> tr("Tìm video hoặc kênh", "Search videos or channels")
+                        Section.MUSIC -> tr("Tìm bài hát hoặc nghệ sĩ", "Search songs or artists")
+                        Section.NEWS -> tr("Tìm bài báo", "Search articles")
+                        else -> tr("Tìm trò chơi", "Search games")
+                    }
+                    com.example.onespace.core.designsystem.AppSearchField(activeSearch, hint)
+                }
+            }
         },
         bottomBar = {
             if (inMain) Column {
@@ -125,6 +150,8 @@ fun OneSpaceApp() {
                     playback = musicState,
                     onExpand = { trackId?.let { appState.openMusicPlayer(it) } },
                     onToggle = coordinator::toggleMusic,
+                    speed = musicSpeed,
+                    onCycleSpeed = coordinator::cycleMusicSpeed,
                     onClose = {
                         // Undo pattern: the user can bring the music back within 4 seconds.
                         val lastId = trackId
@@ -194,10 +221,14 @@ fun OneSpaceApp() {
                     }
                 }
         ) {
-            AppNavigation(appState, coordinator, ::select,
-                Modifier.fillMaxSize(),
-                downloadedContent = downloadedContent,
-                videoPlayer = media.videoPlayer)
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.example.onespace.core.designsystem.LocalSearchState provides (activeSearch ?: com.example.onespace.core.designsystem.SearchState())
+            ) {
+                AppNavigation(appState, coordinator, ::select,
+                    Modifier.fillMaxSize(),
+                    downloadedContent = downloadedContent,
+                    videoPlayer = media.videoPlayer)
+            }
             if (showFloat) FloatingVideo(
                 player = media.videoPlayer,
                 title = videoState.title,

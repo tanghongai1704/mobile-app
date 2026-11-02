@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -64,10 +66,26 @@ internal fun MusicScreen(
     onOpenExtracted: (com.example.onespace.domain.music.repository.ExtractedAudio) -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onToggleDownload: (String, String, String) -> Unit = { _, _, _ -> },
-    onOpenArtist: (String) -> Unit = {}
+    onOpenArtist: (String) -> Unit = {},
+    playingTrackId: String? = null,
+    onAddToQueue: (Track) -> Unit = {},
+    onAddToPlaylist: (String) -> Unit = {}
 ) {
+    var saveTarget by remember { mutableStateOf<Track?>(null) }
+    val row = TrackRowActions(
+        favorites = favorites,
+        downloaded = downloaded,
+        playingTrackId = playingTrackId,
+        onOpen = onOpen,
+        onToggleFavorite = onToggleFavorite,
+        onToggleDownload = onToggleDownload,
+        onOpenArtist = onOpenArtist,
+        onSave = { saveTarget = it },
+        onAddToQueue = onAddToQueue
+    )
     // F-MUS-06: search over title and artist.
-    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchState = com.example.onespace.core.designsystem.LocalSearchState.current
+    val searchQuery = searchState.query
     var filter by rememberSaveable { mutableStateOf("all") }
     val q = searchQuery.trim()
     val base = if (q.isEmpty()) tracks
@@ -80,7 +98,7 @@ internal fun MusicScreen(
             q.lowercase().split(' ').any { w -> w.length > 1 &&
                 (t.title.lowercase().contains(w) || t.artist.lowercase().contains(w)) }
         }
-    // F-MUS-08: "Dành cho bạn" = suggestions from favorites, merged into the chip.
+    // F-MUS-08: "Đề xuất" = suggestions from favorites, merged into the chip.
     val loved = base.filter { it.id in favorites }
     val suggestedIds = suggestedOf(tracks, favorites).map { it.id }.toSet()
     val genreChips = listOf("Pop", "US-UK", "Việt", "Lo-fi", "Acoustic", "Chill")
@@ -92,24 +110,6 @@ internal fun MusicScreen(
         else -> base
     }
     FeaturePage {
-        item {
-            OutlinedTextField(
-                shape = androidx.compose.foundation.shape.CircleShape, colors = com.example.onespace.core.designsystem.AppFieldDefaults.colors(),
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(tr("Tìm bài hát hoặc nghệ sĩ", "Search songs or artists")) },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = tr("Xóa tìm kiếm", "Clear search"))
-                        }
-                    }
-                },
-                singleLine = true
-            )
-        }
         if (searchQuery.isBlank()) {
             item {
                 LazyRow(
@@ -117,7 +117,7 @@ internal fun MusicScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item { FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text(tr("Tất cả", "All")) }) }
-                    item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text(tr("Dành cho bạn", "For you")) }) }
+                    item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text(tr("Đề xuất", "Recommended")) }) }
                     item { FilterChip(selected = filter == "loved", onClick = { filter = "loved" }, label = { Text(tr("Yêu thích", "Favourites")) }) }
                     item { FilterChip(selected = filter == "extracted", onClick = { filter = "extracted" }, label = { Text(tr("Từ video", "From videos")) }) }
                     items(genreChips, key = { it }) { g ->
@@ -126,13 +126,7 @@ internal fun MusicScreen(
                 }
             }
             items(visible, key = { it.id }) { track ->
-                TrackCard(
-                    track,
-                    favorite = track.id in favorites,
-                    downloaded = track.id in downloaded,
-                    onOpen, onToggleFavorite, onToggleDownload,
-                    onOpenArtist
-                )
+                TrackCard(track, row)
             }
             // "Từ video" is a filter chip, not a bottom section.
             if (filter == "extracted" && extracted.isNotEmpty()) {
@@ -196,8 +190,7 @@ internal fun MusicScreen(
             }
             if (base.isNotEmpty()) {
                 items(base, key = { it.id }) { track ->
-                    TrackCard(track, track.id in favorites, track.id in downloaded,
-                        onOpen, onToggleFavorite, onToggleDownload, onOpenArtist)
+                    TrackCard(track, row)
                 }
             } else {
                 item {
@@ -209,12 +202,14 @@ internal fun MusicScreen(
                 if (relatedTracks.isNotEmpty()) {
                     item { SectionTitle(tr("Liên quan", "Related")) }
                     items(relatedTracks, key = { "rel-" + it.id }) { track ->
-                        TrackCard(track, track.id in favorites, track.id in downloaded,
-                            onOpen, onToggleFavorite, onToggleDownload, onOpenArtist)
+                        TrackCard(track, row)
                     }
                 }
             }
         }
+    }
+    saveTarget?.let { t ->
+        MusicSaveSheet(track = t, onDismiss = { saveTarget = null }, onAddToPlaylist = onAddToPlaylist)
     }
 }
 
@@ -225,21 +220,29 @@ private fun suggestedOf(tracks: List<Track>, favorites: Set<String>): List<Track
     return tracks.filter { it.artist in artists && it.id !in favorites }.take(5)
 }
 
+/** Everything a song row needs to act on; shared by all rows of a list. */
+private class TrackRowActions(
+    val favorites: Set<String>,
+    val downloaded: Set<String>,
+    val playingTrackId: String?,
+    val onOpen: (String) -> Unit,
+    val onToggleFavorite: (String) -> Unit,
+    val onToggleDownload: (String, String, String) -> Unit,
+    val onOpenArtist: (String) -> Unit,
+    val onSave: (Track) -> Unit,
+    val onAddToQueue: (Track) -> Unit
+)
+
 @Composable
-private fun TrackCard(
-    track: Track,
-    favorite: Boolean,
-    downloaded: Boolean,
-    onOpen: (String) -> Unit,
-    onToggleFavorite: (String) -> Unit,
-    onToggleDownload: (String, String, String) -> Unit = { _, _, _ -> },
-    onOpenArtist: (String) -> Unit = {}
-) {
+private fun TrackCard(track: Track, actions: TrackRowActions) {
+    val favorite = track.id in actions.favorites
+    val downloaded = track.id in actions.downloaded
+    var menuOpen by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onOpen(track.id) }
+            .clickable { actions.onOpen(track.id) }
             .padding(vertical = 8.dp)
     ) {
         // Artist avatar: gradient tile with the artist's initial so
@@ -269,7 +272,7 @@ private fun TrackCard(
                     track.artist,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onOpenArtist(track.artist) }
+                    modifier = Modifier.clickable { actions.onOpenArtist(track.artist) }
                 )
                 Box(Modifier.size(3.dp).background(
                     MaterialTheme.colorScheme.outline,
@@ -279,24 +282,48 @@ private fun TrackCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
-        // F-MUS-07: the badges are direct toggles.
-        if (favorite) {
-            IconButton(onClick = { onToggleFavorite(track.id) }) {
-                Icon(Icons.Filled.Favorite, contentDescription = tr("Bỏ yêu thích", "Remove from favourites"),
-                    tint = MaterialTheme.colorScheme.error)
-            }
-        }
-        if (downloaded) {
-            Text(
-                tr("Đã tải", "Downloaded"),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clickable {
-                    onToggleDownload(track.id, track.title, track.artist + " · " + track.duration)
+                if (downloaded) {
+                    Icon(Icons.Filled.DownloadDone, contentDescription = tr("Đã tải", "Downloaded"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                 }
+            }
+        }
+        // F-MUS-07: the heart is a direct toggle, same as on the player.
+        IconButton(onClick = { actions.onToggleFavorite(track.id) }) {
+            Icon(
+                if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                contentDescription = if (favorite) tr("Bỏ yêu thích", "Remove from favourites") else tr("Yêu thích", "Favourites"),
+                tint = if (favorite) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        // "⋮": download, save to a playlist, and queue it when another song is playing.
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = tr("Thêm tùy chọn", "More options"),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(if (downloaded) tr("Bỏ tải", "Remove download") else tr("Tải về", "Download")) },
+                    leadingIcon = { Icon(if (downloaded) Icons.Filled.DownloadDone else Icons.Filled.Download, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        actions.onToggleDownload(track.id, track.title, track.artist + " · " + track.duration)
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(tr("Lưu", "Save")) },
+                    leadingIcon = { Icon(Icons.Filled.BookmarkBorder, contentDescription = null) },
+                    onClick = { menuOpen = false; actions.onSave(track) }
+                )
+                if (actions.playingTrackId != null && actions.playingTrackId != track.id) {
+                    DropdownMenuItem(
+                        text = { Text(tr("Thêm vào hàng đợi", "Add to queue")) },
+                        leadingIcon = { Icon(Icons.Filled.QueueMusic, contentDescription = null) },
+                        onClick = { menuOpen = false; actions.onAddToQueue(track) }
+                    )
+                }
+            }
         }
     }
 }
@@ -355,7 +382,7 @@ internal fun NowPlayingScreen(
                         Icon(
                             if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = if (favorite) tr("Bỏ yêu thích", "Remove from favourites") else tr("Yêu thích", "Favourites"),
-                            tint = if (favorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (favorite) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = onToggleDownload) {
@@ -369,13 +396,17 @@ internal fun NowPlayingScreen(
             }
 
             Spacer(Modifier.height(8.dp))
+            // Lyrics above the player controls; a quiet note when the song has none.
+            LyricsPanel(track.lyrics)
+            Spacer(Modifier.height(8.dp))
             PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
-            Slider(
-                value = playback.positionMs.toFloat().coerceIn(0f, playback.totalMs.toFloat().coerceAtLeast(1f)),
-                onValueChange = { onSeekTo(it.toLong()) },
-                enabled = playback.totalMs > 0,
-                valueRange = 0f..playback.totalMs.toFloat().coerceAtLeast(1f),
-                modifier = Modifier.fillMaxWidth()
+            // Slim line with a short knob: music has no picture, so the bar stays small.
+            ScrubBar(
+                positionMs = playback.positionMs,
+                totalMs = playback.totalMs,
+                onSeek = onSeekTo,
+                trackHeight = 2.dp,
+                knobRadius = 5.dp
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(formatMsWhole(playback.positionMs), style = MaterialTheme.typography.labelMedium)
@@ -417,7 +448,19 @@ internal fun NowPlayingScreen(
             Spacer(Modifier.height(8.dp))
             // F-MUS-05: the queue behind the player.
             TextButton(onClick = { showQueue = !showQueue }) {
-                Text(if (showQueue) tr("Ẩn hàng đợi", "Hide queue") else tr("Xem hàng đợi (", "View queue (") + playback.queue.size + tr(" bài)", " songs)"))
+                Text(if (showQueue) tr("Ẩn hàng đợi", "Hide queue") else tr("Xem hàng đợi", "View queue"))
+                if (!showQueue) {
+                    Spacer(Modifier.width(8.dp))
+                    // The count is a badge of its own, not part of the label.
+                    Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                        Text(
+                            playback.queue.size.toString() + tr(" bài", " songs"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
             if (showQueue) {
                 // F-MUS-05: one-time queue, not a playlist — flows top to
@@ -535,6 +578,32 @@ internal fun NowPlayingScreen(
     }
 }
 
+/** Lyric lines in a soft card, or a short "no lyrics yet" note. */
+@Composable
+private fun LyricsPanel(lines: List<String>) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            Modifier.fillMaxWidth().heightIn(max = 160.dp).verticalScroll(rememberScrollState()).padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (lines.isEmpty()) {
+                Text(
+                    tr("Chưa có lời bài hát", "No lyrics yet"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else lines.forEach {
+                Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }
+    }
+}
+
 /** F-MUS-04: the tracks saved in one music playlist. */
 @Composable
 internal fun MusicPlaylistScreen(
@@ -634,7 +703,11 @@ internal fun MusicArtistScreen(
         }
         item { SectionTitle(tr("Bài hát", "Songs")) }
         items(own, key = { it.id }) { track ->
-            TrackCard(track, favorite = false, downloaded = false, onOpen = onOpen, onToggleFavorite = {}, onToggleDownload = { _, _, _ -> })
+            TrackCard(track, TrackRowActions(
+                favorites = emptySet(), downloaded = emptySet(), playingTrackId = null,
+                onOpen = onOpen, onToggleFavorite = {}, onToggleDownload = { _, _, _ -> },
+                onOpenArtist = {}, onSave = {}, onAddToQueue = {}
+            ))
         }
     }
 }

@@ -35,6 +35,7 @@ fun NavGraphBuilder.musicGraph(
                 empty = EmptySpec(Icons.Filled.MusicNote, tr("Kho nhạc trống", "The music library is empty"), tr("Làm mới", "Refresh"), vm::retry)
             ) { tracks ->
                 val extracted by vm.extracted.collectAsStateWithLifecycle()
+                val nowPlaying by session.music.collectAsStateWithLifecycle()
                 MusicScreen(
                     tracks,
                     favorites,
@@ -60,6 +61,14 @@ fun NavGraphBuilder.musicGraph(
                     },
                     onToggleFavorite = vm::toggleFavorite,
                     onToggleDownload = { id, title, subtitle -> vm.toggleDownload(id, title, subtitle) },
+                    playingTrackId = nowPlaying.trackId,
+                    onAddToQueue = session::addToQueue,
+                    onAddToPlaylist = { tid ->
+                        val store = com.example.onespace.core.designsystem.AppPlaylistStore
+                        val existing = store.playlists.keys.firstOrNull()
+                        if (existing != null) store.addTrack(existing, tid)
+                        else store.create("Nhạc của tôi", trackIds = listOf(tid))
+                    }
                 )
             }
         }

@@ -122,6 +122,7 @@ fun AppNavigation(
                     session.enter(Section.NEWS)
                     appState.openArticle(it)
                 },
+                onOpenPlaylists = appState::openPlaylists,
                 onMissionClick = { id ->
                     // F-COM-05: a mission deep-links to the tab where it can be done.
                     onSection(

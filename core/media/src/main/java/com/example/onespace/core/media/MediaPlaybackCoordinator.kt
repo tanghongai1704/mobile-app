@@ -167,6 +167,17 @@ class MediaPlaybackCoordinator @Inject constructor(
         syncMusicState()
     }
 
+    override fun addTrackToQueue(track: Track) {
+        if (queue.any { it.id == track.id }) return
+        queue = queue + track
+        musicPlayer.addMediaItem(mediaItem(track))
+        _music.value = _music.value.copy(queue = queue)
+    }
+
+    override fun setMusicSpeed(speed: Float) {
+        musicPlayer.playbackParameters = androidx.media3.common.PlaybackParameters(speed)
+    }
+
     override fun removeTrackFromQueue(trackId: String) {
         val old = _music.value.queue
         val newQueue = old.filterNot { it.id == trackId }

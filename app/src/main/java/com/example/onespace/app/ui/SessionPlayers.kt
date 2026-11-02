@@ -48,7 +48,10 @@ import com.example.onespace.domain.session.port.PlaybackStatus
 
 /** Mini player dock: rounded top edge, tinted note tile, whole row expands; actions are 40dp buttons. */
 @Composable
-fun MusicMiniPlayer(title: String, playback: MusicPlayback, onExpand: () -> Unit, onToggle: () -> Unit, onClose: () -> Unit) {
+fun MusicMiniPlayer(
+    title: String, playback: MusicPlayback, onExpand: () -> Unit, onToggle: () -> Unit, onClose: () -> Unit,
+    speed: Float = 1f, onCycleSpeed: () -> Unit = {}
+) {
     val playing = playback.playRequested && playback.error == null
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -76,6 +79,11 @@ fun MusicMiniPlayer(title: String, playback: MusicPlayback, onExpand: () -> Unit
             Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
                 Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
                 PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
+            }
+            // Speed: x1 -> x1.5 -> x2 -> x0.5 -> x1 ..., one tap each.
+            TextButton(onClick = onCycleSpeed, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)) {
+                Text("x" + (if (speed % 1f == 0f) speed.toInt().toString() else speed.toString()),
+                    style = MaterialTheme.typography.labelLarge)
             }
             IconButton(onClick = onToggle) {
                 Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,

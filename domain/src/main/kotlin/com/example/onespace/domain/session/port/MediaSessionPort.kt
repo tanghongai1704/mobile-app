@@ -58,6 +58,10 @@ interface MediaSessionPort {
     fun seekMusicTo(positionMs: Long)
     fun removeTrackFromQueue(trackId: String)
     fun moveTrackInQueue(fromIndex: Int, toIndex: Int)
+    /** Appends a song behind the current queue without interrupting playback. */
+    fun addTrackToQueue(track: Track) {}
+    /** Playback speed of the music engine (1 = normal). */
+    fun setMusicSpeed(speed: Float) {}
 
     fun openVideo(video: Video, startPositionMs: Long, plan: com.example.onespace.domain.session.VideoStartPlan.Play)
     fun resumeVideo(plan: com.example.onespace.domain.session.VideoStartPlan.Play)

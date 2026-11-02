@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.PlayArrow
@@ -75,6 +76,7 @@ internal fun HomeScreen(
     offline: Boolean = false,
     watchLater: Set<String> = emptySet(),
     onMissionClick: (String) -> Unit = {},
+    onOpenPlaylists: () -> Unit = {},
     onOpenVideo: (id: String, title: String) -> Unit,
     onPlayTrack: (id: String, title: String) -> Unit,
     onOpenArticle: (id: String) -> Unit,
@@ -91,51 +93,44 @@ internal fun HomeScreen(
     onSeekMusic: (positionMs: Long) -> Unit = {}
 ) {
     // F-COM-11: one search field across all four sections.
-    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchState = com.example.onespace.core.designsystem.LocalSearchState.current
+    val searchQuery = searchState.query
     var showWatchlist by remember { mutableStateOf(false) }
     // System back clears an active search before leaving the app.
     androidx.activity.compose.BackHandler(enabled = searchQuery.isNotEmpty()) {
-        searchQuery = ""
+        searchState.close()
     }
     val q = searchQuery.trim()
     val videos = if (q.isEmpty()) state.videos else state.videos.filter { it.title.contains(q, true) || it.creator.contains(q, true) }
     val tracks = if (q.isEmpty()) state.tracks else state.tracks.filter { it.title.contains(q, true) || it.artist.contains(q, true) }
     val articles = if (q.isEmpty()) state.articles else state.articles.filter { it.title.contains(q, true) || it.category.contains(q, true) }
     FeaturePage {
-        item {
-            androidx.compose.material3.OutlinedTextField(
-                shape = androidx.compose.foundation.shape.CircleShape, colors = com.example.onespace.core.designsystem.AppFieldDefaults.colors(),
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { androidx.compose.material3.Text(tr("Tìm trong OneSpace", "Search OneSpace")) },
-                leadingIcon = { androidx.compose.material3.Icon(Icons.Filled.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        androidx.compose.material3.IconButton(onClick = { searchQuery = "" }) {
-                            androidx.compose.material3.Icon(
-                                androidx.compose.material.icons.Icons.Filled.Close,
-                                contentDescription = tr("Xóa tìm kiếm", "Clear search")
-                            )
-                        }
-                    }
-                },
-                singleLine = true
-            )
-        }
         if (q.isEmpty()) {
             item {
-                // F-VID-04: the watchlist lives on Home.
-                androidx.compose.material3.FilledTonalButton(onClick = { showWatchlist = true }) {
-                    androidx.compose.material3.Icon(
-                        androidx.compose.material.icons.Icons.Filled.Schedule,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    androidx.compose.material3.Text(
-                        if (watchLater.isEmpty()) tr("Xem sau", "Watch later") else tr("Xem sau (", "Watch later (") + watchLater.size + ")"
-                    )
+                // F-VID-04: the watchlist lives on Home; "My playlists" is a shortcut to the
+                // same list that stays in the account.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.FilledTonalButton(onClick = { showWatchlist = true }, modifier = Modifier.weight(1f)) {
+                        androidx.compose.material3.Icon(
+                            androidx.compose.material.icons.Icons.Filled.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        androidx.compose.material3.Text(
+                            if (watchLater.isEmpty()) tr("Xem sau", "Watch later") else tr("Xem sau (", "Watch later (") + watchLater.size + ")",
+                            maxLines = 1
+                        )
+                    }
+                    androidx.compose.material3.FilledTonalButton(onClick = onOpenPlaylists, modifier = Modifier.weight(1f)) {
+                        androidx.compose.material3.Icon(
+                            androidx.compose.material.icons.Icons.Filled.LibraryMusic,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        androidx.compose.material3.Text(tr("Playlist của tôi", "My playlists"), maxLines = 1)
+                    }
                 }
             }
         }
@@ -501,9 +496,6 @@ private fun VideoPostCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (isCurrent) {
-                FeedSeekbar(positionMs, totalMs, onSeekTo)
-            }
         }
     }
 }
@@ -544,8 +536,9 @@ private fun MusicPostCard(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
+                // While it plays the seek bar already shows the length: no duplicate here.
                 Text(
-                    track.artist + " · " + track.duration,
+                    if (isCurrent) track.artist else track.artist + " · " + track.duration,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -602,14 +595,19 @@ private fun ArticlePostCard(article: Article, onOpen: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 3, overflow = TextOverflow.Ellipsis
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            // Reading time and "Read more" share one line (no empty gap under the text).
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    article.readTime,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 TextButton(onClick = onOpen) { Text(tr("Xem thêm", "Read more")) }
             }
-            Text(
-                article.readTime,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -626,29 +624,20 @@ private fun FeedSeekbar(
     onSeekTo: (positionMs: Long) -> Unit
 ) {
     if (totalMs <= 0) return  // nothing to seek yet
-    var dragging by remember { mutableStateOf(false) }
-    var dragValue by remember { mutableFloatStateOf(0f) }
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        Slider(
-            value = if (dragging) dragValue
-            else positionMs.toFloat().coerceIn(0f, totalMs.toFloat()),
-            onValueChange = {
-                dragging = true
-                dragValue = it
-            },
-            onValueChangeFinished = {
-                onSeekTo(dragValue.toLong())
-                dragging = false
-            },
-            valueRange = 0f..totalMs.toFloat(),
-            modifier = Modifier.fillMaxWidth()
+        // Slim line with a small knob; the card itself keeps the room.
+        ScrubBar(
+            positionMs, totalMs,
+            onSeek = onSeekTo,
+            trackHeight = 2.dp,
+            knobRadius = 5.dp
         )
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                formatMsWhole(if (dragging) dragValue.toLong() else positionMs),
+                formatMsWhole(positionMs),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

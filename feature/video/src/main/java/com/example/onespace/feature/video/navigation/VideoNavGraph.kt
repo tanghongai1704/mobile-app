@@ -42,13 +42,66 @@ fun NavGraphBuilder.videoGraph(
                 onRetry = vm::retry,
                 empty = EmptySpec(Icons.Filled.PlayCircle, tr("Chưa có video nào", "No videos yet"), tr("Làm mới", "Refresh"), vm::retry)
             ) { videos ->
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val downloads by vm.downloads.collectAsStateWithLifecycle()
+                val watchLater by vm.watchLaterIds.collectAsStateWithLifecycle()
+                val volume by session.videoVolume.collectAsStateWithLifecycle()
+                var lastVolume by remember { mutableStateOf(1f) }
+                var saveTarget by remember { mutableStateOf<com.example.onespace.domain.video.model.Video?>(null) }
+                val systemVolume = rememberSystemVolume()
+                val shareTemplate = tr("Xem \"%s\" trên OneSpace", "Watch \"%s\" on OneSpace")
+                val msgShare = tr("Chia sẻ", "Share")
+                val msgDownloadAdded = tr("Đã thêm vào Đã tải (Hồ sơ)", "Added to Downloaded (Profile)")
+                val msgDownloadRemoved = tr("Đã bỏ khỏi Đã tải", "Removed from Downloaded")
+                val msgWatchLaterRemoved = tr("Đã bỏ khỏi Xem sau", "Removed from Watch later")
+                val msgWatchLaterAdded = tr("Đã thêm vào Xem sau", "Added to Watch later")
+                val actions = remember(downloads, shareTemplate, msgShare, msgDownloadAdded, msgDownloadRemoved) {
+                    VideoCardActions(
+                        downloaded = { it.id in downloads },
+                        onShare = { v ->
+                            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT, shareTemplate.format(v.title))
+                            }
+                            context.startActivity(android.content.Intent.createChooser(send, msgShare))
+                        },
+                        onToggleDownload = { v ->
+                            vm.toggleDownload(v.id, v.title, v.creator + " · " + v.duration)
+                            android.widget.Toast.makeText(
+                                context,
+                                if (v.id !in downloads) msgDownloadAdded else msgDownloadRemoved,
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        onAddToPlaylist = { saveTarget = it }
+                    )
+                }
                 VideoScreen(
                     videos, topics, history,
                     onOpen = { id ->
                         videos.find { it.id == id }?.let { session.playVideo(it.id, it.title) }
                         onOpenVideo(id)
                     },
-                    onOpenChannel = onOpenArtist
+                    onOpenChannel = onOpenArtist,
+                    cardActions = actions,
+                    volume = volume,
+                    onToggleMute = {
+                        if (volume > 0f) { lastVolume = volume; session.setVideoVolume(0f) }
+                        else session.setVideoVolume(lastVolume.coerceAtLeast(0.2f))
+                    },
+                    systemVolume = systemVolume,
+                    savedVideo = saveTarget,
+                    watchLaterIds = watchLater,
+                    onToggleWatchLater = { v ->
+                        val wasSaved = v.id in watchLater
+                        vm.toggleWatchLater(v.id, v.title)
+                        android.widget.Toast.makeText(
+                            context,
+                            if (wasSaved) msgWatchLaterRemoved else msgWatchLaterAdded,
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    onDismissSave = { saveTarget = null }
                 )
             }
         }
@@ -300,3 +353,34 @@ fun NavGraphBuilder.videoGraph(
     }
 }
 
+
+
+/**
+ * The phone's media volume as 0..1, emitted only after it changes (null until then), so the
+ * Video list can flash a level bar next to its speaker when the hardware keys are used.
+ */
+@androidx.compose.runtime.Composable
+private fun rememberSystemVolume(): Float? {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var level by remember { mutableStateOf<Float?>(null) }
+    androidx.compose.runtime.DisposableEffect(context) {
+        val audio = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context?, intent: android.content.Intent?) {
+                val max = audio?.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC) ?: return
+                val now = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                if (max > 0) level = now.toFloat() / max
+            }
+        }
+        // VOLUME_CHANGED_ACTION is the long-standing broadcast for hardware key changes.
+        val filter = android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    return level
+}

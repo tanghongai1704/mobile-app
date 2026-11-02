@@ -292,7 +292,7 @@ class NavigationSmokeTest {
         compose.onNodeWithContentDescription("Bài trước").performClick()
         awaitText("Nắng sớm")
         compose.onNodeWithContentDescription("Quay lại").performClick()
-        compose.onNodeWithText("Dành cho bạn").assertIsDisplayed()
+        compose.onNodeWithText("Đề xuất").assertIsDisplayed()
     }
 
     @Test fun realMediaStreamsAdvanceBeyondTheInitialPosition() {
