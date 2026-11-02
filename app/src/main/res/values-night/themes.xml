@@ -2,10 +2,10 @@
 <resources>
     <style name="Theme.OneSpace" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowBackground">#0F1512</item>
+        <item name="android:windowBackground">@color/window_background</item>
     </style>
     <style name="Theme.OneSpace.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#0F1512</item>
+        <item name="windowSplashScreenBackground">@color/window_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
         <item name="postSplashScreenTheme">@style/Theme.OneSpace</item>
     </style>

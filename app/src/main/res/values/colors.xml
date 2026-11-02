@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Mirrors core/designsystem Color.kt (Coral Spark); XML cannot read Compose colours. -->
+    <color name="window_background">#FBF5F4</color>
+    <color name="brand_primary">#AF242E</color>
+    <color name="brand_secondary">#9E3653</color>
+    <color name="brand_tertiary">#7243A9</color>
+    <!-- Launcher icon is identical in light and dark: no night overrides. -->
+    <color name="launcher_background">#AF242E</color>
+    <color name="launcher_dot_primary">#FFF4F4</color>
+    <color name="launcher_dot_secondary">#FFC2CC</color>
+    <color name="launcher_dot_tertiary">#CA9CFF</color>
 </resources>

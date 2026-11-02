@@ -1,5 +1,6 @@
 package com.example.onespace.feature.news.navigation
 
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.runtime.*
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,7 +28,7 @@ fun NavGraphBuilder.newsGraph(
             CatalogContent(
                 state,
                 onRetry = vm::retry,
-                empty = EmptySpec(Icons.Filled.Newspaper, "Chưa có tin tức", "Làm mới", vm::retry)
+                empty = EmptySpec(Icons.Filled.Newspaper, tr("Chưa có tin tức", "No news yet"), tr("Làm mới", "Refresh"), vm::retry)
             ) { articles ->
                 NewsScreen(articles, savedIds, topics, onOpenArticle)
             }

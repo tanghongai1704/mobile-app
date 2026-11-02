@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -59,7 +58,8 @@ data class MissionUi(
     val target: Int = 1,
     val completed: Boolean = false
 ) {
-    val progressText: String get() = if (completed) "Hoàn thành" else "$progress/$target"
+    val progressText: String
+        @androidx.compose.runtime.Composable get() = if (completed) tr("Hoàn thành", "Done") else "$progress/$target"
 }
 
 /**
@@ -104,17 +104,18 @@ internal fun HomeScreen(
     FeaturePage {
         item {
             androidx.compose.material3.OutlinedTextField(
+                shape = androidx.compose.foundation.shape.CircleShape, colors = com.example.onespace.core.designsystem.AppFieldDefaults.colors(),
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { androidx.compose.material3.Text("Tìm trong OneSpace") },
+                placeholder = { androidx.compose.material3.Text(tr("Tìm trong OneSpace", "Search OneSpace")) },
                 leadingIcon = { androidx.compose.material3.Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         androidx.compose.material3.IconButton(onClick = { searchQuery = "" }) {
                             androidx.compose.material3.Icon(
                                 androidx.compose.material.icons.Icons.Filled.Close,
-                                contentDescription = "Xóa tìm kiếm"
+                                contentDescription = tr("Xóa tìm kiếm", "Clear search")
                             )
                         }
                     }
@@ -133,7 +134,7 @@ internal fun HomeScreen(
                     )
                     Spacer(Modifier.width(6.dp))
                     androidx.compose.material3.Text(
-                        if (watchLater.isEmpty()) "Xem sau" else "Xem sau (" + watchLater.size + ")"
+                        if (watchLater.isEmpty()) tr("Xem sau", "Watch later") else tr("Xem sau (", "Watch later (") + watchLater.size + ")"
                     )
                 }
             }
@@ -142,7 +143,7 @@ internal fun HomeScreen(
             if (videos.isEmpty() && tracks.isEmpty() && articles.isEmpty()) {
                 item {
                     androidx.compose.material3.Text(
-                        "Không có kết quả cho \"" + q + "\"",
+                        tr("Không có kết quả cho \"", "No results for \"") + q + "\"",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -165,7 +166,7 @@ internal fun HomeScreen(
             if (articles.isNotEmpty()) {
                 item { SectionTitle("Tin tức") }
                 items(articles.take(5), key = { "gs-n-" + it.id }) { article ->
-                    ContentCard(article.title, article.category + " · " + article.readTime,
+                    ContentCard(article.title, article.category.t() + " · " + article.readTime,
                         Icons.Filled.Newspaper, { onOpenArticle(article.id) })
                 }
             }
@@ -185,7 +186,7 @@ internal fun HomeScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     androidx.compose.material3.Text(
-                        "Mất kết nối mạng — đang hiển thị nội dung đã lưu.",
+                        tr("Mất kết nối mạng — đang hiển thị nội dung đã lưu.", "You are offline. Showing saved content."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.padding(12.dp)
@@ -196,7 +197,7 @@ internal fun HomeScreen(
         // Feed: content shows directly, interleaved and continuous —
         // the user scrolls through actual picks, not section links.
         if (q.isEmpty()) {
-            item(key = "feed-title") { SectionTitle("Đề xuất cho bạn") }
+            item(key = "feed-title") { SectionTitle(tr("Đề xuất cho bạn", "Recommended for you")) }
             items(interleaveFeed(videos, tracks, articles), key = { it.key }) { post ->
                 FeedPost(
                     post = post,
@@ -224,11 +225,11 @@ internal fun HomeScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp).fillMaxHeight(0.75f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                item { SectionTitle("Xem sau") }
+                item { SectionTitle(tr("Xem sau", "Watch later")) }
                 if (watchLater.isEmpty()) {
                     item {
                         androidx.compose.material3.Text(
-                            "Chưa lưu video nào. Mở một video, bấm Lưu và chọn Xem sau.",
+                            tr("Chưa lưu video nào. Mở một video, bấm Lưu và chọn Xem sau.", "No videos saved yet. Open a video, tap Save and choose Watch later."),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 24.dp)
@@ -256,7 +257,7 @@ internal fun HomeScreen(
 @Composable
 private fun GamificationBanner(state: GamificationUiState, onMissionClick: (String) -> Unit = {}) {    // Neutral card with small tonal accents so the banner blends into the
     // feed instead of shouting over it.
-    ElevatedCard(shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    AppCard(shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
         Column(
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -273,13 +274,13 @@ private fun GamificationBanner(state: GamificationUiState, onMissionClick: (Stri
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        "${state.totalPoints} điểm",
+                        tr("${state.totalPoints} điểm", "${state.totalPoints} points"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 if (state.streak > 0) {
-                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                    Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer) {
                         Row(
                             Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -291,7 +292,7 @@ private fun GamificationBanner(state: GamificationUiState, onMissionClick: (Stri
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                "${state.streak} ngày",
+                                tr("${state.streak} ngày", "${state.streak} ${if (state.streak == 1) "day" else "days"}"),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
@@ -307,7 +308,7 @@ private fun GamificationBanner(state: GamificationUiState, onMissionClick: (Stri
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .clickable { onMissionClick(mission.id) }
                         .background(
                             if (done) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
@@ -324,7 +325,7 @@ private fun GamificationBanner(state: GamificationUiState, onMissionClick: (Stri
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        mission.title,
+                        mission.title.t(),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f)
                     )
@@ -373,17 +374,8 @@ private fun interleaveFeed(
 }
 
 /** Stable gradient per id so the same video always gets the same cover. */
-private val feedPalette = listOf(
-    listOf(Color(0xFF00695C), Color(0xFF4DB6AC)),
-    listOf(Color(0xFF4527A0), Color(0xFF9575CD)),
-    listOf(Color(0xFF1565C0), Color(0xFF64B5F6)),
-    listOf(Color(0xFF005045), Color(0xFF82D5C3)),
-    listOf(Color(0xFF66587B), Color(0xFFD1BFE7)),
-    listOf(Color(0xFFAD1457), Color(0xFFF06292))
-)
-
-private fun idGradient(id: String) =
-    feedPalette[Math.floorMod(id.hashCode(), feedPalette.size)]
+private fun idGradient(id: String, topics: TopicGradients): GradientPair =
+    topics.all[Math.floorMod(id.hashCode(), topics.all.size)]
 
 @Composable
 private fun FeedPost(
@@ -446,13 +438,13 @@ private fun VideoPostCard(
     onSeekTo: (positionMs: Long) -> Unit,
     onOpenDetail: () -> Unit
 ) {
-    Card(
+    AppCard(
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenDetail)
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                .background(Brush.linearGradient(idGradient(video.id)))
+                .background(idGradient(video.id, MaterialTheme.oneSpaceColors.topics).brush())
         ) {
             if (isCurrent && player != null) {
                 // Inline playback on the card — the same shared player instance
@@ -467,28 +459,28 @@ private fun VideoPostCard(
             Surface(
                 onClick = { if (isCurrent) onToggle() else onPlayAtHome() },
                 shape = CircleShape,
-                color = Color.White.copy(alpha = 0.92f),
+                color = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.92f),
                 shadowElevation = 4.dp,
                 modifier = Modifier.align(Alignment.Center).size(52.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         if (isCurrent && isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isCurrent) "Tạm dừng" else "Phát " + video.title,
+                        contentDescription = if (isCurrent) tr("Tạm dừng", "Pause") else tr("Phát ", "Play ") + video.title,
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
             if (!isCurrent) {
                 Surface(
-                    color = Color.Black.copy(alpha = 0.55f),
+                    color = MaterialTheme.oneSpaceColors.mediaScrim,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp)
                 ) {
                     Text(
                         video.duration,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
+                        color = MaterialTheme.oneSpaceColors.onMedia,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
@@ -528,7 +520,7 @@ private fun MusicPostCard(
     onSeekTo: (positionMs: Long) -> Unit,
     onOpenDetail: () -> Unit
 ) {
-    Card(
+    AppCard(
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenDetail)
     ) {
@@ -538,12 +530,12 @@ private fun MusicPostCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
-                Modifier.size(84.dp).clip(RoundedCornerShape(12.dp))
-                    .background(Brush.linearGradient(idGradient(track.id))),
+                Modifier.size(84.dp).clip(MaterialTheme.shapes.small)
+                    .background(idGradient(track.id, MaterialTheme.oneSpaceColors.topics).brush()),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Filled.MusicNote, contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.95f), modifier = Modifier.size(32.dp))
+                    tint = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.95f), modifier = Modifier.size(32.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
@@ -565,12 +557,12 @@ private fun MusicPostCard(
                 FilledIconButton(onClick = onToggle) {
                     Icon(
                         if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Tạm dừng" else "Phát tiếp"
+                        contentDescription = if (isPlaying) tr("Tạm dừng", "Pause") else tr("Phát tiếp", "Resume")
                     )
                 }
             } else {
                 FilledIconButton(onClick = onPlayAtHome) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Phát " + track.title)
+                    Icon(Icons.Filled.PlayArrow, contentDescription = tr("Phát ", "Play ") + track.title)
                 }
             }
         }
@@ -579,7 +571,7 @@ private fun MusicPostCard(
 
 @Composable
 private fun ArticlePostCard(article: Article, onOpen: () -> Unit) {
-    Card(
+    AppCard(
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)
     ) {
@@ -611,7 +603,7 @@ private fun ArticlePostCard(article: Article, onOpen: () -> Unit) {
                 maxLines = 3, overflow = TextOverflow.Ellipsis
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onOpen) { Text("Xem thêm") }
+                TextButton(onClick = onOpen) { Text(tr("Xem thêm", "Read more")) }
             }
             Text(
                 article.readTime,

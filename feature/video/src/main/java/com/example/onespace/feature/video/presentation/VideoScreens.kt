@@ -1,5 +1,6 @@
 package com.example.onespace.feature.video.presentation
 
+import com.example.onespace.core.designsystem.fadingEdgeEnd
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,9 +13,9 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.LocationCity
@@ -50,6 +51,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.dp
 import com.example.onespace.core.common.formatMsWhole
 import com.example.onespace.core.designsystem.*
+import com.example.onespace.domain.video.quiz.VideoQuizGenerator
 import com.example.onespace.domain.video.model.Video
 import com.example.onespace.domain.video.model.VideoQuality
 import com.example.onespace.domain.video.repository.ContinueEntry
@@ -96,19 +98,21 @@ internal fun VideoScreen(
     // F-VID-05: videoId -> last watch position, for the card progress bars.
     val progressMap = history.associate { it.videoId to it.positionMs }
 
+    val english = LocalEnglish.current
     FeaturePage {
         item {
             OutlinedTextField(
+                shape = androidx.compose.foundation.shape.CircleShape, colors = com.example.onespace.core.designsystem.AppFieldDefaults.colors(),
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Tìm video hoặc kênh") },
+                placeholder = { Text(tr("Tìm video hoặc kênh", "Search videos or channels")) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     // One tap clears the whole query.
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Xóa tìm kiếm")
+                            Icon(Icons.Filled.Close, contentDescription = tr("Xóa tìm kiếm", "Clear search"))
                         }
                     }
                 },
@@ -117,16 +121,19 @@ internal fun VideoScreen(
         }
         if (q.isEmpty()) {
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    modifier = Modifier.fadingEdgeEnd(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     item {
-                        FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text("Tất cả") })
+                        FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text(tr("Tất cả", "All")) })
                     }
                     if (topics.isNotEmpty()) {
                         item {
                             FilterChip(
                                 selected = filter == "foryou",
                                 onClick = { filter = "foryou" },
-                                label = { Text("Dành cho bạn") }
+                                label = { Text(tr("Dành cho bạn", "For you")) }
                             )
                         }
                     }
@@ -135,14 +142,14 @@ internal fun VideoScreen(
                         FilterChip(
                             selected = filter == "watched",
                             onClick = { filter = "watched" },
-                            label = { Text("Đã xem") }
+                            label = { Text(tr("Đã xem", "Watched")) }
                         )
                     }
                     items(topicChips, key = { it }) { topic ->
                         FilterChip(
                             selected = filter == topic,
                             onClick = { filter = topic },
-                            label = { Text(topic) }
+                            label = { Text(topic.t()) }
                         )
                     }
                 }
@@ -151,11 +158,11 @@ internal fun VideoScreen(
                 // F-VID-05: grouped by Hôm nay / Hôm qua / weekday / dd.MM.
                 val groups = history
                     .sortedByDescending { it.updatedAt }
-                    .groupBy { timeGroupLabel(it.updatedAt) }
+                    .groupBy { timeGroupLabel(it.updatedAt, english) }
                 if (groups.isEmpty()) {
                     item {
                         Text(
-                            "Chưa xem video nào.",
+                            tr("Chưa xem video nào.", "No videos watched yet."),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 24.dp)
@@ -185,7 +192,7 @@ internal fun VideoScreen(
             if (channels.isNotEmpty()) {
                 // Channel cards lead the results; the avatar tile makes them self-evident, no section header needed.
                 items(channels, key = { "ch-" + it }) { creator ->
-                    Card(onClick = { onOpenChannel(creator) }, modifier = Modifier.fillMaxWidth()) {
+                    AppCard(onClick = { onOpenChannel(creator) }, modifier = Modifier.fillMaxWidth()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -223,14 +230,14 @@ internal fun VideoScreen(
             } else {
                 item {
                     Text(
-                        "Không có video phù hợp",
+                        tr("Không có video phù hợp", "No matching videos"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 12.dp)
                     )
                 }
                 if (related.isNotEmpty()) {
-                    item { SectionTitle("Liên quan") }
+                    item { SectionTitle(tr("Liên quan", "Related")) }
                     items(related, key = { "rel-" + it.id }) { video ->
                         FeedCard(video, onOpen, watchedAt = progressMap[video.id])
                     }
@@ -282,7 +289,7 @@ private fun FeedCard(
     watchedAt: Long? = null,
     showWatchedText: Boolean = false
 ) {
-    Card(onClick = { onOpen(video.id) }, modifier = Modifier.fillMaxWidth()) {
+    AppCard(onClick = { onOpen(video.id) }, modifier = Modifier.fillMaxWidth()) {
         Column {
             VideoThumb(video, watchedAt)
             Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
@@ -318,7 +325,7 @@ private fun FeedCard(
                 }
                 if (showWatchedText && watchedAt != null && watchedAt > 0) {
                     Text(
-                        "Đã xem đến " + formatMsWhole(watchedAt),
+                        tr("Đã xem đến ", "Watched up to ") + formatMsWhole(watchedAt),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary
                     )
@@ -331,23 +338,23 @@ private fun FeedCard(
 /** Topic-tinted tile: one look per topic, duration badge like YouTube. */
 @Composable
 private fun VideoThumb(video: Video, watchedAt: Long? = null) {
-    val (icon, colors) = topicLook(video.topic)
+    val (icon, colors) = topicLook(video.topic, MaterialTheme.oneSpaceColors.topics)
     Box(
         Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
-            .background(Brush.linearGradient(colors))
+            .background(colors.brush())
     ) {
         Icon(
             icon,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.9f),
+            tint = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.9f),
             modifier = Modifier
                 .align(Alignment.Center)
                 .size(56.dp)
         )
         Surface(
-            color = Color.Black.copy(alpha = 0.6f),
+            color = MaterialTheme.oneSpaceColors.mediaScrim,
             shape = MaterialTheme.shapes.small,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -356,7 +363,7 @@ private fun VideoThumb(video: Video, watchedAt: Long? = null) {
             Text(
                 video.duration,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
+                color = MaterialTheme.oneSpaceColors.onMedia,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
@@ -389,30 +396,30 @@ private fun durationMsOf(duration: String): Long {
 }
 
 /** F-VID-05: Hôm nay / Hôm qua / weekday within this week / dd.MM for older. */
-private fun timeGroupLabel(updatedAt: Long): String {
-    if (updatedAt <= 0) return "Trước đây"
+private fun timeGroupLabel(updatedAt: Long, english: Boolean): String {
+    if (updatedAt <= 0) return if (english) "Earlier" else "Trước đây"
     val date = java.time.Instant.ofEpochMilli(updatedAt)
         .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
     val today = java.time.LocalDate.now()
     return when {
-        date == today -> "Hôm nay"
-        date == today.minusDays(1) -> "Hôm qua"
+        date == today -> if (english) "Today" else "Hôm nay"
+        date == today.minusDays(1) -> if (english) "Yesterday" else "Hôm qua"
         date >= today.with(java.time.DayOfWeek.MONDAY) ->
             date.dayOfWeek.getDisplayName(
-                java.time.format.TextStyle.FULL, java.util.Locale("vi")
+                java.time.format.TextStyle.FULL, java.util.Locale(if (english) "en" else "vi")
             ).replaceFirstChar { it.uppercase() }
         else -> date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM"))
     }
 }
 
-private fun topicLook(topic: String): Pair<androidx.compose.ui.graphics.vector.ImageVector, List<androidx.compose.ui.graphics.Color>> = when (topic) {
-    "Thiên nhiên" -> Icons.Filled.Park to listOf(Color(0xFF2E7D32), Color(0xFF81C784))
-    "Đời sống" -> Icons.Filled.LocationCity to listOf(Color(0xFF37474F), Color(0xFF78909C))
-    "Nhẹ nhàng" -> Icons.Filled.Spa to listOf(Color(0xFF6A1B9A), Color(0xFFBA68C8))
-    "Du lịch" -> Icons.Filled.Flight to listOf(Color(0xFFE65100), Color(0xFFFFB74D))
-    "Ẩm thực" -> Icons.Filled.Restaurant to listOf(Color(0xFF8D6E63), Color(0xFFFFCC80))
-    "Thể thao" -> Icons.Filled.DirectionsRun to listOf(Color(0xFF00695C), Color(0xFF4DB6AC))
-    else -> Icons.Filled.PlayCircle to listOf(Color(0xFF283593), Color(0xFF7986CB))
+private fun topicLook(topic: String, topics: TopicGradients): Pair<androidx.compose.ui.graphics.vector.ImageVector, GradientPair> = when (topic) {
+    "Thiên nhiên" -> Icons.Filled.Park to topics.nature
+    "Đời sống" -> Icons.Filled.LocationCity to topics.life
+    "Nhẹ nhàng" -> Icons.Filled.Spa to topics.calm
+    "Du lịch" -> Icons.Filled.Flight to topics.travel
+    "Ẩm thực" -> Icons.Filled.Restaurant to topics.food
+    "Thể thao" -> Icons.Filled.DirectionsRun to topics.sport
+    else -> Icons.Filled.PlayCircle to topics.tech
 }
 
 /**
@@ -451,8 +458,10 @@ internal fun VideoDetailScreen(
     onToggleDownload: () -> Unit = {},
     onExtractMp3: () -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
-    onQuizCorrect: () -> Unit = {},
-    relatedTitle: String = "Liên quan",
+    quizCombo: Int = 0,
+    quizRound: Int = 0,
+    onQuizAnswered: (Boolean) -> Int = { 0 },
+    relatedTitle: String = tr("Liên quan", "Related"),
     inPlaylist: Boolean = false,
     playlistOrder: String = "sequential",
     playlistRepeat: Boolean = false,
@@ -465,7 +474,7 @@ internal fun VideoDetailScreen(
     onNextVideo: () -> Unit = {},
     onMinimize: () -> Unit
 ) {
-    if (video == null) { Text("Chưa có video này"); return }
+    if (video == null) { Text(tr("Chưa có video này", "This video is not available")); return }
     var showGear by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
     val inAnyPlaylist = AppPlaylistStore.playlists.values.any { video.id in it.videoIds }
@@ -487,12 +496,12 @@ internal fun VideoDetailScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = if (playing) "Đang phát" else "Đã tạm dừng",
+                                contentDescription = if (playing) tr("Đang phát", "Now playing") else tr("Đã tạm dừng", "Paused"),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(48.dp)
                             )
                             Text(
-                                if (playing) "Đang phát âm thanh" else "Đã tạm dừng",
+                                if (playing) tr("Đang phát âm thanh", "Playing audio") else tr("Đã tạm dừng", "Paused"),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -515,8 +524,8 @@ internal fun VideoDetailScreen(
                 // sheet — volume, speed and quality in three clean sections.
                 Box(Modifier.align(Alignment.TopEnd)) {
                     IconButton(onClick = { showGear = true }) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Cài đặt phát",
-                            tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(Icons.Filled.Settings, contentDescription = tr("Cài đặt phát", "Playback settings"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia)
                     }
                 }
                 // F-VID-17: speed badge on the video while not default.
@@ -542,12 +551,12 @@ internal fun VideoDetailScreen(
                     // F-VID-09: sound only — the floating window becomes a
                     // music-style mini player.
                     IconButton(onClick = { onSoundOnly() }) {
-                        Icon(Icons.Filled.Headphones, contentDescription = "Chỉ nghe âm thanh",
-                            tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(Icons.Filled.Headphones, contentDescription = tr("Chỉ nghe âm thanh", "Audio only"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia)
                     }
                     IconButton(onClick = onMinimize) {
-                        Icon(Icons.Filled.PictureInPictureAlt, contentDescription = "Thu nhỏ",
-                            tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(Icons.Filled.PictureInPictureAlt, contentDescription = tr("Thu nhỏ", "Minimise"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia)
                     }
                 }
                 if (muted) {
@@ -557,7 +566,7 @@ internal fun VideoDetailScreen(
                         modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)
                     ) {
                         Text(
-                            "Tắt tiếng",
+                            tr("Tắt tiếng", "Muted"),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -592,26 +601,26 @@ internal fun VideoDetailScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 IconButton(onClick = onPrevVideo) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Video trước",
+                    Icon(Icons.Filled.SkipPrevious, contentDescription = tr("Video trước", "Previous video"),
                         modifier = Modifier.size(32.dp))
                 }
                 IconButton(onClick = { onSeekBy(-10_000) }) {
-                    Icon(Icons.Filled.Replay10, contentDescription = "Lùi 10 giây",
+                    Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"),
                         modifier = Modifier.size(28.dp))
                 }
                 FilledIconButton(onClick = onToggle, modifier = Modifier.size(56.dp)) {
                     Icon(
                         if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playing) "Tạm dừng" else "Phát",
+                        contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"),
                         modifier = Modifier.size(28.dp)
                     )
                 }
                 IconButton(onClick = { onSeekBy(10_000) }) {
-                    Icon(Icons.Filled.Forward10, contentDescription = "Tới 10 giây",
+                    Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"),
                         modifier = Modifier.size(28.dp))
                 }
                 IconButton(onClick = onNextVideo) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Video tiếp",
+                    Icon(Icons.Filled.SkipNext, contentDescription = tr("Video tiếp", "Next video"),
                         modifier = Modifier.size(32.dp))
                 }
             }
@@ -625,14 +634,14 @@ internal fun VideoDetailScreen(
                         selected = playlistOrder == "shuffle",
                         onClick = onTogglePlaylistOrder,
                         label = {
-                            Text(if (playlistOrder == "shuffle") "Ngẫu nhiên" else "Tuần tự")
+                            Text(if (playlistOrder == "shuffle") tr("Ngẫu nhiên", "Shuffle") else tr("Tuần tự", "In order"))
                         },
                         leadingIcon = { Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp)) }
                     )
                     FilterChip(
                         selected = playlistRepeat,
                         onClick = onTogglePlaylistRepeat,
-                        label = { Text("Lặp lại") },
+                        label = { Text(tr("Lặp lại", "Repeat")) },
                         leadingIcon = { Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(16.dp)) }
                     )
                 }
@@ -668,14 +677,14 @@ internal fun VideoDetailScreen(
                     // Icon-only actions, larger and balanced with the title.
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         IconButton(onClick = onShare) {
-                            Icon(Icons.Filled.Share, contentDescription = "Chia sẻ",
+                            Icon(Icons.Filled.Share, contentDescription = tr("Chia sẻ", "Share"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(26.dp))
                         }
                         IconButton(onClick = onToggleDownload) {
                             Icon(
                                 if (downloaded) Icons.Filled.DownloadDone else Icons.Filled.Download,
-                                contentDescription = if (downloaded) "Bỏ tải" else "Tải xuống",
+                                contentDescription = if (downloaded) tr("Bỏ tải", "Remove download") else tr("Tải xuống", "Download"),
                                 tint = if (downloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(26.dp)
                             )
@@ -683,7 +692,7 @@ internal fun VideoDetailScreen(
                         IconButton(onClick = { showSave = true }) {
                             Icon(
                                 if (watchLaterActive || inAnyPlaylist) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                contentDescription = "Lưu",
+                                contentDescription = tr("Lưu", "Save"),
                                 tint = if (watchLaterActive || inAnyPlaylist) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(26.dp)
                             )
@@ -703,12 +712,12 @@ internal fun VideoDetailScreen(
                     Icon(Icons.Filled.SportsEsports, contentDescription = null,
                         modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Chơi nhanh — câu đố về video này, nhận 20 điểm")
+                    Text(tr("Chơi nhanh: câu đố về video này, từ 20 điểm, đúng liên tiếp được thêm", "Quick play: a quiz about this video, from 20 points, more for streaks"))
                 }
             }
         }
         if (showQuiz) {
-            item { EndOfVideoQuiz(video = video, others = related, onCorrect = onQuizCorrect) }
+            item { EndOfVideoQuiz(video = video, pool = related, startRound = quizRound, combo = quizCombo, onAnswered = onQuizAnswered) }
         }
         if (related.any { it.id != video.id }) {
             item { SectionTitle(relatedTitle) }
@@ -720,7 +729,7 @@ internal fun VideoDetailScreen(
         }
         item {
             PrototypeNote(
-                "Chạm video để phát/dừng, chạm hai lần để tua 10 giây, giữ để trích MP3."
+                tr("Chạm video để phát/dừng, chạm hai lần để tua 10 giây, giữ để trích MP3.", "Tap the video to play or pause, double-tap to skip 10 seconds, hold to extract the MP3.")
             )
         }
     }
@@ -767,14 +776,14 @@ private fun PlaybackSettingsSheet(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SheetSectionLabel("Âm lượng")
+            SheetSectionLabel(tr("Âm lượng", "Volume"))
             // 0 = mute, 1 = full volume; session state, never persisted.
             Slider(value = volume, onValueChange = onVolume, valueRange = 0f..1f)
             HorizontalDivider()
-            SheetSectionLabel("Tốc độ phát")
+            SheetSectionLabel(tr("Tốc độ phát", "Playback speed"))
             SpeedPicker(speed, onSpeed)
             HorizontalDivider()
-            SheetSectionLabel("Chất lượng")
+            SheetSectionLabel(tr("Chất lượng", "Quality"))
             QualityPicker(quality, onQuality)
         }
     }
@@ -906,7 +915,7 @@ private fun SaveSheet(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SectionTitle("Lưu video")
+            SectionTitle(tr("Lưu video", "Save video"))
             // F-VID-04: one row, no explanations.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -921,7 +930,7 @@ private fun SaveSheet(
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.width(12.dp))
-                Text("Xem sau", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Text(tr("Xem sau", "Watch later"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                 if (watchLaterActive) {
                     Icon(
                         Icons.Filled.CheckCircle, contentDescription = null,
@@ -966,7 +975,7 @@ private fun SaveSheet(
             OutlinedTextField(
                 value = newName,
                 onValueChange = { newName = it },
-                label = { Text("Playlist mới") },
+                label = { Text(tr("Playlist mới", "New playlist")) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -977,52 +986,129 @@ private fun SaveSheet(
                 },
                 enabled = newName.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Tạo") }
+            ) { Text(tr("Tạo", "Create")) }
             Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 /**
- * F-VID-18: one small question after the video ends; a correct answer
- * earns 20 XP through the shared point repository.
+ * F-VID-18: a short question after the video. The type rotates (who posted it, how long,
+ * same topic, true/false) and correct answers in a row raise the reward (combo).
  */
 @Composable
-private fun EndOfVideoQuiz(video: Video, others: List<Video>, onCorrect: () -> Unit = {}) {
-    var picked by remember(video.id) { mutableStateOf<String?>(null) }
-    val correct = video.topic.ifBlank { "Giải trí" }
-    val options = (listOf(correct) + others.map { it.topic }.filter { it.isNotBlank() && it != correct })
-        .distinct()
-        .take(4)
-        .let { if (correct in it) it else it + correct }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Bạn đã xem xong!", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Video này thuộc chủ đề nào?",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            options.forEach { option ->
-                val isRight = option == correct
+internal fun EndOfVideoQuiz(
+    video: Video,
+    pool: List<Video>,
+    startRound: Int,
+    combo: Int,
+    onAnswered: (Boolean) -> Int,
+    random: kotlin.random.Random = kotlin.random.Random.Default
+) {
+    val firstRound = remember(video.id) { startRound }
+    var asked by remember(video.id) { mutableIntStateOf(0) }
+    val english = LocalEnglish.current
+    val quiz = remember(video.id, asked, english) {
+        VideoQuizGenerator.generate(
+            video, pool, firstRound + asked, random,
+            english = english, localize = { Translations.english(it) }
+        )
+    }
+    var picked by remember(quiz) { mutableStateOf<Int?>(null) }
+    var reward by remember(quiz) { mutableIntStateOf(0) }
+    val comboBefore = remember(quiz) { combo }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val answered = picked
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    quiz.kind.label.t(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (combo > 0) {
+                    Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer) {
+                        Row(
+                            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.LocalFireDepartment, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Combo x$combo",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+            Text(quiz.prompt, style = MaterialTheme.typography.titleMedium)
+            quiz.options.forEachIndexed { index, option ->
+                val isRight = index == quiz.correctIndex
+                val feedback = MaterialTheme.oneSpaceColors.feedback
+                val showRight = answered != null && isRight
+                val showWrong = answered != null && !isRight && index == answered
+                val container = when {
+                    showRight -> feedback.container
+                    showWrong -> MaterialTheme.colorScheme.errorContainer
+                    else -> Color.Transparent
+                }
+                val content = when {
+                    showRight -> feedback.onContainer
+                    showWrong -> MaterialTheme.colorScheme.onErrorContainer
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
                 OutlinedButton(
                     onClick = {
                         if (picked == null) {
-                            picked = option
-                            if (isRight) onCorrect()
+                            picked = index
+                            haptic.performHapticFeedback(
+                                if (isRight) androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm
+                                else androidx.compose.ui.hapticfeedback.HapticFeedbackType.Reject
+                            )
+                            reward = onAnswered(isRight)
                         }
                     },
-                    colors = if (picked != null && isRight) {
-                        ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                    } else ButtonDefaults.outlinedButtonColors()
-                ) { Text(option) }
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = container, contentColor = content
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (showRight || showWrong) {
+                        Icon(
+                            if (showRight) Icons.Filled.CheckCircle else Icons.Filled.Close,
+                            contentDescription = if (showRight) tr("Đáp án đúng", "Correct answer") else tr("Bạn chọn sai", "You picked the wrong one"),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(option)
+                }
             }
-            if (picked != null) {
+            if (answered != null) {
+                val correct = answered == quiz.correctIndex
                 Text(
-                    if (picked == correct) "Chính xác! +20 điểm" else "Tiếc quá, đúng là: " + correct,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (picked == correct) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    if (correct) {
+                        tr("Chính xác! +$reward điểm", "Correct! +$reward points") + if (comboBefore + 1 >= 2) " (combo x${comboBefore + 1})" else ""
+                    } else {
+                        quiz.explanation + if (comboBefore > 0) tr(" Combo x$comboBefore bị ngắt.", " Combo x$comboBefore ended.") else ""
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (correct) MaterialTheme.oneSpaceColors.feedback.success else MaterialTheme.colorScheme.error
                 )
+                Button(onClick = { asked += 1 }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (correct) tr("Câu tiếp theo (thêm điểm combo)", "Next question (more combo points)") else tr("Thử câu khác", "Try another"))
+                }
             }
         }
     }
@@ -1064,7 +1150,7 @@ internal fun ArtistProfileScreen(
                 }
             }
         }
-        item { SectionTitle("Video của kênh") }
+        item { SectionTitle(tr("Video của kênh", "Video from the channel")) }
         items(own, key = { it.id }) { video ->
             FeedCard(video, onOpen, watchedAt = watchProgress[video.id])
         }
@@ -1083,14 +1169,14 @@ internal fun VideoPlaylistScreen(
     val items = videos.filter { it.id in (AppPlaylistStore.playlists[name]?.videoIds ?: emptyList()) }
     // Order and repeat stay visible and toggleable, before and during playback.
     val settings = AppPlaylistStore.settingsOf(name)
-    val orderLabel = if (settings.order == "shuffle") "Ngẫu nhiên" else "Tuần tự"
+    val orderLabel = if (settings.order == "shuffle") tr("Ngẫu nhiên", "Shuffle") else tr("Tuần tự", "In order")
     FeaturePage {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     if (items.isEmpty()) "0 video"
                     else items.size.toString() + " video · " + orderLabel +
-                        if (settings.repeat) " · Lặp lại" else "",
+                        if (settings.repeat) tr(" · Lặp lại", " · Repeat") else "",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1099,15 +1185,15 @@ internal fun VideoPlaylistScreen(
                         Button(onClick = { onPlay(items) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.PlayCircle, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Phát")
+                            Text(tr("Phát", "Play"))
                         }
                         IconButton(onClick = { AppPlaylistStore.toggleOrder(name) }) {
-                            Icon(Icons.Filled.Shuffle, contentDescription = "Phát ngẫu nhiên",
+                            Icon(Icons.Filled.Shuffle, contentDescription = tr("Phát ngẫu nhiên", "Shuffle play"),
                                 tint = if (settings.order == "shuffle") MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = { AppPlaylistStore.toggleRepeat(name) }) {
-                            Icon(Icons.Filled.Repeat, contentDescription = "Lặp lại",
+                            Icon(Icons.Filled.Repeat, contentDescription = tr("Lặp lại", "Repeat"),
                                 tint = if (settings.repeat) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
                         }

@@ -18,6 +18,11 @@ class FeedPet(
 ) {
     /** Feed the pet: costs 30 points, once per day. */
     suspend operator fun invoke(): FeedResult {
+        // A challenge treat is a free feed and does not count against the daily limit.
+        if (petRepository.consumeTreat()) {
+            petRepository.recordFeed()
+            return FeedResult.SUCCESS_WITH_TREAT
+        }
         if (!petRepository.canFeedToday()) return FeedResult.LIMIT_REACHED
         val spent = pointRepository.spend(FEED_COST, "feed_pet")
         if (!spent) return FeedResult.NOT_ENOUGH_POINTS
@@ -28,4 +33,4 @@ class FeedPet(
     companion object { const val FEED_COST = 30 }
 }
 
-enum class FeedResult { SUCCESS, NOT_ENOUGH_POINTS, LIMIT_REACHED }
+enum class FeedResult { SUCCESS, SUCCESS_WITH_TREAT, NOT_ENOUGH_POINTS, LIMIT_REACHED }

@@ -111,6 +111,9 @@ class SessionCoordinatorTest {
         override suspend fun setConflictRule(rule: MediaConflictRule?) {
             state.value = state.value.copy(conflictRule = rule)
         }
+        override suspend fun setVideoConflictChoice(pauseMusic: Boolean?) = Unit
+        override suspend fun setAvatar(emoji: String?) = Unit
+        override suspend fun setAvatarFrame(frameId: String) = Unit
         override suspend fun setDataSaver(enabled: Boolean) = Unit
         override suspend fun setThemeMode(mode: ThemeMode) = Unit
         override suspend fun setOnboarded(done: Boolean) = Unit
@@ -146,6 +149,8 @@ class SessionCoordinatorTest {
         override suspend fun onMissionsCompleted(count: Int) = Unit
         override suspend fun canFeedToday() = false
         override suspend fun recordFeed() = Unit
+        override suspend fun grantTreat() = Unit
+        override suspend fun consumeTreat() = false
     }
 
     private class FakeStreak : StreakRepository {

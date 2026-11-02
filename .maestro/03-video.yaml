@@ -11,9 +11,9 @@ name: 03 Video
 # wait for the bottom bar, then normalise to Home before doing anything else.
 - extendedWaitUntil:
     visible:
-      text: "Games"
+      text: "Trò chơi"
     timeout: 30000
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Tìm trong OneSpace"
@@ -126,7 +126,7 @@ name: 03 Video
     timeout: 15000
 - takeScreenshot: F-VID-05-history
 # Playlist screen (F-VID-13): Profile -> "Playlist của tôi" -> the one just created
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - tapOn: "Tài khoản"
 # The video from the detail screen keeps playing and its floating window
 # covers the middle of the profile - close it first

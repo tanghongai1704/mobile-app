@@ -58,10 +58,10 @@ AuthRepository có demo implementation ở data:auth; request/verify/guest/sign-
 - DataStore lưu settings, interests, last section/track ID và phiên demo.
 - C1 có ba lựa chọn, nhớ global trên thiết bị, reset ở Settings.
 - Native splash, themed shell, auth/onboarding và graph navigation có baseline.
-- News bookmark còn trong RAM; chưa phải durable/offline-first.
-- Game mới board preview; chưa có gameplay/snapshot.
+- News bookmark, playlist, avatar và khung avatar được lưu bền (DataStore) và còn sau khi khởi động lại; ReadingState và vị trí cuộn vẫn là trạng thái tạm của phiên. Catalog vẫn là dữ liệu mock nên chưa phải offline-first.
+- Game chơi được: luật 2048 và Tic-Tac-Toe (cùng AI) là Kotlin thuần trong `domain/games/engine` có unit test; kỷ lục, thử thách hằng ngày và huy hiệu đi qua `GameRecordsRepository`/`ChallengeRepository`. Chưa có snapshot/khôi phục ván dở khi tiến trình bị hệ điều hành thu hồi.
 - Chưa có MediaSessionService, notification/lock-screen controls, đầy đủ audio focus/noisy cho video, real network sync, TTS/conversion/mixed queue.
-- Chọn tab không đổi playback; floating còn trên Music, dock còn trên Games. Nội dung chừa khoảng trống theo chiều cao floating thực tế.
+- Chọn tab không đổi playback; floating còn trên Music, dock còn trên Games. Floating video là cửa sổ nhỏ kéo được; vị trí do shell giữ nên không đổi khi chuyển tab, và nội dung không chừa chỗ cố định vì người dùng tự đặt cửa sổ.
 - Playback snapshot tách playing thực tế, playRequested, status, suppressed và error. SessionState không giữ cờ playing trùng lặp.
 - Domain tạo audio plans; adapter thực thi. Video mute không tạo C1 conflict.
 - Runtime queue do Media3 adapter sở hữu; UI Next/Previous dùng queue đó, auto-advance dùng cùng playlist repeat-all.

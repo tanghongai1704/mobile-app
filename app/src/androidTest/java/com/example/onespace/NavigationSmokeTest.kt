@@ -69,7 +69,7 @@ class NavigationSmokeTest {
         lateinit var media: MediaViewModel
         compose.runOnIdle { media = ViewModelProvider(compose.activity)[MediaViewModel::class.java] }
         compose.waitUntil(20_000) { media.preferences.value != null }
-        if (media.preferences.value?.onboarded == true && awaitAny("Games")) return
+        if (media.preferences.value?.onboarded == true && awaitAny("Trò chơi")) return
         compose.waitUntil(20_000) {
             compose.onAllNodesWithText("Tất cả trong một app").fetchSemanticsNodes().isNotEmpty() ||
                 compose.onAllNodesWithText("Dùng thử không cần tài khoản").fetchSemanticsNodes().isNotEmpty()
@@ -129,14 +129,14 @@ class NavigationSmokeTest {
         while (compose.onAllNodesWithContentDescription("Đóng").fetchSemanticsNodes().isNotEmpty()) {
             compose.onAllNodesWithContentDescription("Đóng").onFirst().performClick()
         }
-        compose.tapTab("Home")
+        compose.tapTab("Trang chủ")
         openSettings()
         listOf("Mô phỏng mất mạng (demo)", "Tiết kiệm dữ liệu").forEach { label ->
             scrollSetting(label)
             val enabled = compose.onAllNodes(hasText(label).and(isToggleable()).and(isOn()))
             if (enabled.fetchSemanticsNodes().isNotEmpty()) enabled.onFirst().performScrollTo().performClick()
         }
-        compose.tapTab("Home")
+        compose.tapTab("Trang chủ")
     }
 
     @Test fun videoCanFloatOverNewsAndExpandAgain() {
@@ -156,15 +156,15 @@ class NavigationSmokeTest {
     }
 
     @Test fun articleBookmarkSurvivesSwitchingTabs() {
-        compose.tapTab("News")
+        compose.tapTab("Tin tức")
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("Thành phố xanh bắt đầu từ ý nhỏ").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Thành phố xanh bắt đầu từ ý nhỏ").performClick()
         awaitText("Lưu bài viết")
         compose.onNodeWithText("Lưu bài viết").performClick()
-        compose.tapTab("Music")
-        compose.tapTab("News")
+        compose.tapTab("Nhạc")
+        compose.tapTab("Tin tức")
         awaitText("Đã lưu ✓"); compose.onNodeWithText("Đã lưu ✓").assertIsDisplayed()
         compose.onNodeWithContentDescription("Quay lại").performClick()
         compose.onNodeWithText("Đã lưu (1)").performClick()
@@ -172,12 +172,12 @@ class NavigationSmokeTest {
     }
 
     @Test fun musicMiniPlayerReopensNowPlaying() {
-        compose.tapTab("Music")
+        compose.tapTab("Nhạc")
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("Nắng sớm").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Nắng sớm").performClick()
-        compose.tapTab("News")
+        compose.tapTab("Tin tức")
         awaitText("Nắng sớm")
         compose.onNodeWithText("Nắng sớm").performClick()
         compose.waitUntil(10_000) {
@@ -197,9 +197,9 @@ class NavigationSmokeTest {
     @Test fun allTabsAndGamePreviewRemainUsable() {
         saveScreenshot("home")
         compose.tapTab("Video")
-        compose.tapTab("Music")
-        compose.tapTab("News")
-        compose.tapTab("Games")
+        compose.tapTab("Nhạc")
+        compose.tapTab("Tin tức")
+        compose.tapTab("Trò chơi")
         awaitText("2048")
         compose.onNodeWithText("2048").performClick()
         compose.onNodeWithText("Tạm dừng bản demo").performScrollTo().performClick()
@@ -210,7 +210,7 @@ class NavigationSmokeTest {
     }
 
     private fun openSettings() {
-        compose.tapTab("Home")
+        compose.tapTab("Trang chủ")
         compose.onNodeWithContentDescription("Tài khoản").performClick()
         compose.onNodeWithText("Tùy chỉnh").performClick()
         awaitText("Tiết kiệm dữ liệu")
@@ -242,7 +242,7 @@ class NavigationSmokeTest {
         scrollSetting("Mô phỏng mất mạng (demo)")
         compose.onNode(offline).performScrollTo().performClick()
         awaitSwitch("Mô phỏng mất mạng (demo)", enabled = true)
-        compose.tapTab("News")
+        compose.tapTab("Tin tức")
         awaitText("Không có kết nối")
         compose.onNodeWithText("Không có kết nối").assertIsDisplayed()
         openSettings()
@@ -250,7 +250,7 @@ class NavigationSmokeTest {
         compose.onNode(offline).performScrollTo().performClick()
         awaitSwitch("Mô phỏng mất mạng (demo)", enabled = false)
         saveScreenshot("settings")
-        compose.tapTab("News")
+        compose.tapTab("Tin tức")
         awaitText("Mới nhất")
         compose.onNodeWithText("Mới nhất").assertIsDisplayed()
     }
@@ -263,7 +263,7 @@ class NavigationSmokeTest {
         compose.tapTab("Video")
         awaitText("Gần với thiên nhiên thêm chút")
         compose.onAllNodesWithText("Gần với thiên nhiên thêm chút").onFirst().performClick()
-        compose.tapTab("Music")
+        compose.tapTab("Nhạc")
         // The engine publishes videoId asynchronously after the tab switch.
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("floating-video").fetchSemanticsNodes().isNotEmpty()
@@ -274,7 +274,7 @@ class NavigationSmokeTest {
         compose.onNodeWithText("Nắng sớm").performClick()
         awaitText("Tắt tiếng video, phát nhạc")
         compose.onNodeWithText("Tắt tiếng video, phát nhạc").performClick()
-        compose.tapTab("News")
+        compose.tapTab("Tin tức")
         compose.onNodeWithText("Tắt tiếng").assertIsDisplayed()
         compose.onNodeWithText("Nắng sớm").assertIsDisplayed()
         saveScreenshot("video-and-music")
@@ -283,7 +283,7 @@ class NavigationSmokeTest {
     @Test fun nextTrackDoesNotAddAnotherPlayerToTheBackStack() {
         lateinit var session: SessionCoordinator
         compose.runOnIdle { session = ViewModelProvider(compose.activity)[SessionCoordinator::class.java] }
-        compose.tapTab("Music")
+        compose.tapTab("Nhạc")
         awaitText("Nắng sớm")
         compose.onNodeWithText("Nắng sớm").performClick()
         compose.waitUntil(10_000) { session.music.value.queue.isNotEmpty() }
@@ -312,9 +312,9 @@ class NavigationSmokeTest {
         awaitText("Phát")
         compose.onNodeWithText("Phát").performClick()
         compose.waitUntil(15_000) { session.video.value.positionMs in 501..5_000 }
-        compose.tapTab("News")
+        compose.tapTab("Tin tức")
         compose.onNodeWithContentDescription("Đóng").performClick()
-        compose.tapTab("Music")
+        compose.tapTab("Nhạc")
         awaitText("Nắng sớm")
         compose.onNodeWithText("Nắng sớm").performClick()
         compose.waitUntil(60_000) { session.music.value.totalMs > 0 }
@@ -345,9 +345,9 @@ class NavigationSmokeTest {
         awaitText("Mã xác thực chưa đúng. Nhập 6 chữ số, mã demo là 123456.")
         compose.onNodeWithText("Mã OTP").performTextReplacement("123456")
         compose.onNodeWithText("Xác nhận & tiếp tục").performScrollTo().performClick()
-        compose.tapTab("Home")
+        compose.tapTab("Trang chủ")
         compose.activityRule.scenario.recreate()
-        compose.tapTab("Home")
+        compose.tapTab("Trang chủ")
         compose.onNodeWithContentDescription("Tài khoản").performClick()
         awaitText("test@onespace.example")
         compose.onNodeWithText("Đăng xuất").performClick()
@@ -356,7 +356,7 @@ class NavigationSmokeTest {
         awaitText("Dùng thử không cần tài khoản")
         compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
         compose.onNodeWithText("Tiếp tục dùng thử").performClick()
-        compose.tapTab("Home")
+        compose.tapTab("Trang chủ")
         assertEquals(interests, checkNotNull(preferences.preferences.value).selectedTopics)
     }
 

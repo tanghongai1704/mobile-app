@@ -64,6 +64,7 @@ class DemoAuthRepositoryTest {
         override val preferences = MutableStateFlow(
             SessionPreferences(onboarded = true, selectedTopics = setOf("Công nghệ"))
         )
+        override suspend fun setVideoConflictChoice(pauseMusic: Boolean?) = Unit
         override suspend fun setAuthSession(email: String?, guest: Boolean) {
             preferences.value = preferences.value.copy(authEmail = email, guestMode = guest)
         }
@@ -76,6 +77,8 @@ class DemoAuthRepositoryTest {
         override suspend fun setSelectedTopics(topics: Set<String>) = Unit
         override suspend fun setFavoriteTrackIds(ids: Set<String>) = Unit
         override suspend fun setLanguage(language: Language) = Unit
+        override suspend fun setAvatar(emoji: String?) = Unit
+        override suspend fun setAvatarFrame(frameId: String) = Unit
         override suspend fun setSimulateOffline(enabled: Boolean) = Unit
         override suspend fun setNotificationsEnabled(enabled: Boolean) = Unit
         override suspend fun setStreakReminder(enabled: Boolean) = Unit

@@ -16,7 +16,9 @@ data class PetState(
     val stage: PetStage = PetStage.EGG,
     val totalPoints: Int = 0,
     val missionsCompleted: Int = 0,
-    val hasHatched: Boolean = false
+    val hasHatched: Boolean = false,
+    /** Free feeds earned from daily challenges. */
+    val treats: Int = 0
 ) {
     val nextStage: PetStage? get() = PetStage.entries.getOrNull(stage.ordinal + 1)
     val pointsToNextStage: Int? get() = nextStage?.let { it.requiredPoints - totalPoints }

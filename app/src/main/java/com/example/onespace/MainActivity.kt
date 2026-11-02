@@ -17,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.onespace.app.OneSpaceApp
 import com.example.onespace.app.ui.MediaViewModel
 import com.example.onespace.core.designsystem.OneSpaceTheme
+import com.example.onespace.domain.session.repository.Language
 import com.example.onespace.domain.session.repository.ThemeMode
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity() {
                     isAppearanceLightNavigationBars = !darkTheme
                 }
             }
-            OneSpaceTheme(darkTheme = darkTheme) { OneSpaceApp() }
+            OneSpaceTheme(darkTheme = darkTheme, english = prefs?.language == Language.EN) { OneSpaceApp() }
         }
     }
 }

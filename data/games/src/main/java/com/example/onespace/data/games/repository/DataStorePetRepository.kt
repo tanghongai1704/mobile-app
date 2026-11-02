@@ -26,6 +26,7 @@ class DataStorePetRepository(
         val HAS_HATCHED = booleanPreferencesKey("has_hatched")
         val FEED_DATE = stringPreferencesKey("feed_date")
         val FEED_COUNT = intPreferencesKey("feed_count")
+        val TREATS = intPreferencesKey("treats")
     }
 
     override val petState: Flow<PetState> = kotlinx.coroutines.flow.combine(
@@ -40,7 +41,8 @@ class DataStorePetRepository(
             stage = if (hatched && pointsStage == PetStage.EGG) PetStage.BABY else pointsStage,
             totalPoints = totalPoints,
             missionsCompleted = missions,
-            hasHatched = hatched
+            hasHatched = hatched,
+            treats = prefs[Keys.TREATS] ?: 0
         )
     }
 
@@ -55,6 +57,22 @@ class DataStorePetRepository(
     override suspend fun canFeedToday(): Boolean {
         val today = LocalDate.now().toString()
         return context.petDataStore.data.first()[Keys.FEED_DATE] != today
+    }
+
+    override suspend fun grantTreat() {
+        context.petDataStore.edit { prefs -> prefs[Keys.TREATS] = (prefs[Keys.TREATS] ?: 0) + 1 }
+    }
+
+    override suspend fun consumeTreat(): Boolean {
+        var used = false
+        context.petDataStore.edit { prefs ->
+            val treats = prefs[Keys.TREATS] ?: 0
+            if (treats > 0) {
+                prefs[Keys.TREATS] = treats - 1
+                used = true
+            }
+        }
+        return used
     }
 
     override suspend fun recordFeed() {

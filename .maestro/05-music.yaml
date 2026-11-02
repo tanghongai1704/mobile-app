@@ -10,14 +10,14 @@ name: 05 Music
 # wait for the bottom bar, then normalise to Home before doing anything else.
 - extendedWaitUntil:
     visible:
-      text: "Games"
+      text: "Trò chơi"
     timeout: 30000
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Tìm trong OneSpace"
     timeout: 15000
-- tapOn: "Music"
+- tapOn: "Nhạc"
 - extendedWaitUntil:
     visible:
       text: "Tìm bài hát hoặc nghệ sĩ"

@@ -17,8 +17,16 @@ private fun variableFamily(resource: Int) = FontFamily(
     Font(resource, weight = FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700)))
 )
 
-private val DisplayFont = variableFamily(R.font.manrope)
-private val BodyFont = variableFamily(R.font.roboto)
+/** Lexend (variable) for headings and titles. */
+private val DisplayFont = variableFamily(R.font.lexend)
+
+/** Be Vietnam Pro (static weights) for body and labels; designed for Vietnamese diacritics. */
+private val BodyFont = FontFamily(
+    Font(R.font.be_vietnam_pro_regular, FontWeight.Normal),
+    Font(R.font.be_vietnam_pro_medium, FontWeight.Medium),
+    Font(R.font.be_vietnam_pro_semibold, FontWeight.SemiBold),
+    Font(R.font.be_vietnam_pro_bold, FontWeight.Bold)
+)
 private val baseline = Typography()
 
 val OneSpaceTypography = Typography(

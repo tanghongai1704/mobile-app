@@ -43,6 +43,8 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
         val TOPICS = stringSetPreferencesKey("selected_topics")
         val FAVORITE_TRACKS = stringSetPreferencesKey("favorite_tracks")
         val LANGUAGE = stringPreferencesKey("language")
+        val AVATAR = stringPreferencesKey("avatar_emoji")
+        val AVATAR_FRAME = stringPreferencesKey("avatar_frame")
         val SIM_OFFLINE = booleanPreferencesKey("simulate_offline")
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         val STREAK_REMINDER = booleanPreferencesKey("streak_reminder")
@@ -64,6 +66,8 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
             selectedTopics = it[Keys.TOPICS] ?: emptySet(),
             favoriteTrackIds = it[Keys.FAVORITE_TRACKS] ?: emptySet(),
             language = it[Keys.LANGUAGE]?.let(Language::valueOf) ?: Language.VI,
+            avatarEmoji = it[Keys.AVATAR],
+            avatarFrameId = it[Keys.AVATAR_FRAME] ?: "basic",
             simulateOffline = it[Keys.SIM_OFFLINE] ?: false,
             notificationsEnabled = it[Keys.NOTIFICATIONS] ?: false,
             streakReminder = it[Keys.STREAK_REMINDER] ?: true,
@@ -97,6 +101,10 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
     override suspend fun setSelectedTopics(topics: Set<String>) = set { it[Keys.TOPICS] = topics }
     override suspend fun setFavoriteTrackIds(ids: Set<String>) = set { it[Keys.FAVORITE_TRACKS] = ids }
     override suspend fun setLanguage(language: Language) = set { it[Keys.LANGUAGE] = language.name }
+    override suspend fun setAvatar(emoji: String?) = set {
+        if (emoji == null) it.remove(Keys.AVATAR) else it[Keys.AVATAR] = emoji
+    }
+    override suspend fun setAvatarFrame(frameId: String) = set { it[Keys.AVATAR_FRAME] = frameId }
     override suspend fun setSimulateOffline(enabled: Boolean) = set { it[Keys.SIM_OFFLINE] = enabled }
     override suspend fun setNotificationsEnabled(enabled: Boolean) = set { it[Keys.NOTIFICATIONS] = enabled }
     override suspend fun setStreakReminder(enabled: Boolean) = set { it[Keys.STREAK_REMINDER] = enabled }

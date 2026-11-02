@@ -1,5 +1,6 @@
 package com.example.onespace.feature.news.presentation
 
+import com.example.onespace.core.designsystem.fadingEdgeEnd
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -39,12 +40,12 @@ import kotlinx.coroutines.flow.first
 /** First story gets an editorial featured treatment; the rest stay compact cards. */
 @Composable
 private fun FeaturedStory(article: Article, onOpen: (String) -> Unit) {
-    Card(onClick = { onOpen(article.id) }) {
+    AppCard(onClick = { onOpen(article.id) }) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(article.category.uppercase(), color = MaterialTheme.colorScheme.primary,
+            Text(article.category.t().uppercase(), color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.labelMedium)
             Text(article.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Text(article.category + " · " + article.readTime,
+            Text(article.category.t() + " · " + article.readTime,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -74,15 +75,16 @@ internal fun NewsScreen(
     FeaturePage {
         item {
             OutlinedTextField(
+                shape = androidx.compose.foundation.shape.CircleShape, colors = com.example.onespace.core.designsystem.AppFieldDefaults.colors(),
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Tìm bài báo") },
+                placeholder = { Text(tr("Tìm bài báo", "Search articles")) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Xóa tìm kiếm")
+                            Icon(Icons.Filled.Close, contentDescription = tr("Xóa tìm kiếm", "Clear search"))
                         }
                     }
                 },
@@ -91,13 +93,16 @@ internal fun NewsScreen(
         }
         if (q.isEmpty()) {
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item { FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text("Tất cả") }) }
+                LazyRow(
+                    modifier = Modifier.fadingEdgeEnd(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item { FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text(tr("Tất cả", "All")) }) }
                     if (topics.isNotEmpty()) {
-                        item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text("Dành cho bạn") }) }
+                        item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text(tr("Dành cho bạn", "For you")) }) }
                     }
                     items(topicChips, key = { it }) { cat ->
-                        FilterChip(selected = filter == cat, onClick = { filter = cat }, label = { Text(cat) })
+                        FilterChip(selected = filter == cat, onClick = { filter = cat }, label = { Text(cat.t()) })
                     }
                 }
             }
@@ -105,9 +110,9 @@ internal fun NewsScreen(
         if (visible.isEmpty()) {
             item {
                 Text(
-                    if (q.isNotEmpty()) "Không có bài phù hợp"
-                    else if (filter == "saved") "Chưa lưu bài nào"
-                    else "Chưa có tin tức",
+                    if (q.isNotEmpty()) tr("Không có bài phù hợp", "No matching articles")
+                    else if (filter == "saved") tr("Chưa lưu bài nào", "No articles saved")
+                    else tr("Chưa có tin tức", "No news yet"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 24.dp)
@@ -123,28 +128,28 @@ internal fun NewsScreen(
 /** Article card: themed image as focal point, title + source below. */
 @Composable
 private fun NewsCard(article: Article, saved: Boolean, onOpen: (String) -> Unit, onExtractAudio: () -> Unit = {}) {
-    Card(
+    AppCard(
         onClick = { onOpen(article.id) },
         modifier = Modifier.fillMaxWidth()
     ) {
             // Themed header per category, like video thumbs.
-            val (icon, colors) = newsLook(article.category)
+            val (icon, colors) = newsLook(article.category, MaterialTheme.oneSpaceColors.topics)
             Box(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .background(androidx.compose.ui.graphics.Brush.linearGradient(colors))
+                    .background(colors.brush())
             ) {
                 Icon(
                     icon, contentDescription = null,
-                    tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f),
+                    tint = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.9f),
                     modifier = Modifier.align(Alignment.Center).size(48.dp)
                 )
             }
             Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Text(article.title, style = MaterialTheme.typography.titleMedium, maxLines = 2)
                 Text(
-                    article.category,
+                    article.category.t(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -153,13 +158,13 @@ private fun NewsCard(article: Article, saved: Boolean, onOpen: (String) -> Unit,
     }
 
 /** Stable icon + gradient per news category. */
-private fun newsLook(category: String): Pair<androidx.compose.ui.graphics.vector.ImageVector, List<androidx.compose.ui.graphics.Color>> = when (category) {
-    "Thể thao" -> Icons.Filled.SportsSoccer to listOf(androidx.compose.ui.graphics.Color(0xFF00695C), androidx.compose.ui.graphics.Color(0xFF4DB6AC))
-    "Công nghệ" -> Icons.Filled.Devices to listOf(androidx.compose.ui.graphics.Color(0xFF283593), androidx.compose.ui.graphics.Color(0xFF7986CB))
-    "Du lịch" -> Icons.Filled.Flight to listOf(androidx.compose.ui.graphics.Color(0xFFE65100), androidx.compose.ui.graphics.Color(0xFFFFB74D))
-    "Thiên nhiên" -> Icons.Filled.Park to listOf(androidx.compose.ui.graphics.Color(0xFF2E7D32), androidx.compose.ui.graphics.Color(0xFF81C784))
-    "Ẩm thực" -> Icons.Filled.Restaurant to listOf(androidx.compose.ui.graphics.Color(0xFF8D6E63), androidx.compose.ui.graphics.Color(0xFFFFCC80))
-    else -> Icons.Filled.Newspaper to listOf(androidx.compose.ui.graphics.Color(0xFF37474F), androidx.compose.ui.graphics.Color(0xFF78909C))
+private fun newsLook(category: String, topics: TopicGradients): Pair<androidx.compose.ui.graphics.vector.ImageVector, GradientPair> = when (category) {
+    "Thể thao" -> Icons.Filled.SportsSoccer to topics.sport
+    "Công nghệ" -> Icons.Filled.Devices to topics.tech
+    "Du lịch" -> Icons.Filled.Flight to topics.travel
+    "Thiên nhiên" -> Icons.Filled.Park to topics.nature
+    "Ẩm thực" -> Icons.Filled.Restaurant to topics.food
+    else -> Icons.Filled.Newspaper to topics.neutral
 }
 
 /** Reading view: everything is the article. Identity is in the top bar ("← News"). */
@@ -180,7 +185,7 @@ internal fun ArticleScreen(
     onQuizAnswer: (Int, Int) -> Unit = { _, _ -> },
     onOpenRelated: (String) -> Unit = {}
 ) {
-    if (article == null) { Text("Chưa có bài viết này"); return }
+    if (article == null) { Text(tr("Chưa có bài viết này", "This article is not available")); return }
     var fontScale by rememberSaveable(article.id) { mutableStateOf(1f) }
     var quizOfferDone by rememberSaveable(article.id) { mutableStateOf(false) }
     var showQuiz by rememberSaveable(article.id) { mutableStateOf(false) }
@@ -215,7 +220,7 @@ internal fun ArticleScreen(
         // Compact header: category + title + icon-only actions on the right.
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(article.category.uppercase(), color = MaterialTheme.colorScheme.primary,
+                Text(article.category.t().uppercase(), color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelMedium)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -246,14 +251,14 @@ internal fun ArticleScreen(
                 IconButton(onClick = onBookmark) {
                     Icon(
                         Icons.Filled.Schedule,
-                        contentDescription = if (saved) "Bỏ xem sau" else "Xem sau",
+                        contentDescription = if (saved) tr("Bỏ xem sau", "Remove from Read later") else tr("Xem sau", "Read later"),
                         tint = if (saved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(onClick = onToggleDownload) {
                     Icon(
                         if (downloaded) Icons.Filled.DownloadDone else Icons.Filled.Download,
-                        contentDescription = if (downloaded) "Bỏ tải" else "Tải xuống",
+                        contentDescription = if (downloaded) tr("Bỏ tải", "Remove download") else tr("Tải xuống", "Download"),
                         tint = if (downloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -261,7 +266,7 @@ internal fun ArticleScreen(
                 IconButton(onClick = { if (ttsState.isPlaying) onTtsStop() else onListen() }) {
                     Icon(
                         if (ttsState.isPlaying) Icons.Filled.Pause else Icons.Filled.Headphones,
-                        contentDescription = if (ttsState.isPlaying) "Dừng đọc" else "Nghe bài này",
+                        contentDescription = if (ttsState.isPlaying) tr("Dừng đọc", "Stop reading") else tr("Nghe bài này", "Listen to this article"),
                         tint = if (ttsState.isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -269,7 +274,7 @@ internal fun ArticleScreen(
                 IconButton(onClick = onExtractAudio) {
                     Icon(
                         Icons.Filled.LibraryMusic,
-                        contentDescription = "Trích MP3 vào nhạc",
+                        contentDescription = tr("Trích MP3 vào nhạc", "Extract MP3 to music"),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -305,17 +310,17 @@ internal fun ArticleScreen(
             // Insert a themed image between every other paragraph.
             if (pIdx < paragraphs.size - 1 && pIdx % 2 == 1) {
                 item(key = "img-$pIdx") {
-                    val (icon, colors) = newsLook(article.category)
+                    val (icon, colors) = newsLook(article.category, MaterialTheme.oneSpaceColors.topics)
                     Box(
                         Modifier
                             .fillMaxWidth()
                             .aspectRatio(16f / 8f)
-                            .background(androidx.compose.ui.graphics.Brush.linearGradient(colors)),
+                            .background(colors.brush()),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             icon, contentDescription = null,
-                            tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                            tint = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.7f),
                             modifier = Modifier.size(40.dp)
                         )
                     }
@@ -335,21 +340,21 @@ internal fun ArticleScreen(
                 ) {
                     Icon(Icons.Filled.SportsEsports, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Chơi nhanh — kiểm tra hiểu bài")
+                    Text(tr("Chơi nhanh — kiểm tra hiểu bài", "Quick play: check your understanding"))
                 }
             }
         }
         // F-NEWS-11: same-category stories.
         val relatedItems = related.filter { it.id != article.id && it.category == article.category }
         if (relatedItems.isNotEmpty()) {
-            item(key = "related-section") { SectionTitle("Tin liên quan") }
+            item(key = "related-section") { SectionTitle(tr("Tin liên quan", "Related news")) }
             items(relatedItems, key = { "rel-" + it.id }) { other ->
                 NewsCard(other, saved = false, onOpenRelated)
             }
         }
         // F-NEWS-10: quiz must ask before showing.
         if (showQuiz && article.quiz.isNotEmpty()) {
-            item(key = "quiz-section") { SectionTitle("Kiểm tra nhanh") }
+            item(key = "quiz-section") { SectionTitle(tr("Kiểm tra nhanh", "Quick check")) }
             items(article.quiz.size, key = { "quiz-$it" }) { qIndex ->
                 QuizQuestionCard(
                     question = article.quiz[qIndex],
@@ -363,7 +368,7 @@ internal fun ArticleScreen(
                     article.quiz.getOrNull(idx)?.correctIndex == ans
                 }
                 if (quizAnswers.size == article.quiz.size) {
-                    Text("Kết quả: $correct/${article.quiz.size} đúng",
+                    Text(tr("Kết quả: $correct/${article.quiz.size} đúng", "Result: $correct/${article.quiz.size} correct"),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary)
                 }
@@ -383,7 +388,7 @@ private fun QuizQuestionCard(
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "Câu ${questionIndex + 1}: ${question.question}",
+                tr("Câu ${questionIndex + 1}: ${question.question}", "Question ${questionIndex + 1}: ${question.question}"),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )

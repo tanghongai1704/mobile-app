@@ -19,9 +19,9 @@ name: 08 Audio conflict
 # wait for the bottom bar, then normalise to Home before doing anything else.
 - extendedWaitUntil:
     visible:
-      text: "Games"
+      text: "Trò chơi"
     timeout: 30000
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Tìm trong OneSpace"
@@ -46,7 +46,7 @@ name: 08 Audio conflict
       text: "Bão biển qua ống kính nhỏ"
     timeout: 25000
 # Trigger C1: switch to Music and start a track while the video plays
-- tapOn: "Music"
+- tapOn: "Nhạc"
 - extendedWaitUntil:
     visible:
       text: "Nắng sớm"
@@ -66,7 +66,7 @@ name: 08 Audio conflict
 # Trigger C2: open a video while music is playing. Home's first feed card is
 # always v1 - tapping it opens the video and raises the C2 dialog. (Home
 # also hides the music dock, so nothing covers the card.)
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Gần với thiên nhiên thêm chút"

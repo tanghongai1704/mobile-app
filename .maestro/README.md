@@ -72,8 +72,9 @@ khoá preamble chuẩn hoá về Home.
   đang phát" phải dùng video 46s đó.
 - Tab video vẫn phát tiếp trong cửa sổ nổi khi chuyển tab (đã kiểm chứng);
   video "không phát" trong các lần thử trước là do file 10s đã kết thúc.
-- Chuyển tab không tắt video, nhưng cửa sổ nổi/dock nhạc che nửa dưới màn
-  hình: khi cần chạm phần dưới (vd hàng đợi) phải tránh vùng đó.
+- Chuyển tab không tắt video. Cửa sổ nổi nay nhỏ (224dp) và kéo được; flow nào cần
+  chạm vùng nó đang che thì kéo nó đi chỗ khác (hoặc đóng). Dock nhạc vẫn nằm ngay trên thanh tab.
+- Nhãn tab theo ngôn ngữ của app; mặc định là tiếng Việt (Trang chủ/Video/Nhạc/Tin tức/Trò chơi).
 - Chạm tiêu đề bài hát trên feed Nhạc dễ dính vào artist text (clickable)
   → chạm vào text thời lượng ("9:19") để mở player.
 - Sheet "Lưu video": bấm "Tạo" xong phải **swipe xuống** để đóng sheet (BACK

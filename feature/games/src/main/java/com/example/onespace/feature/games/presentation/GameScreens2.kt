@@ -1,5 +1,6 @@
 package com.example.onespace.feature.games.presentation
 
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,94 +11,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.onespace.core.designsystem.SectionTitle
+import com.example.onespace.core.designsystem.oneSpaceColors
 import kotlinx.coroutines.delay
 
 private data class Pt(val x: Int, val y: Int)
-
-/**
- * F-GAME-05/F-GAME-09: Tic-Tac-Toe two players on one device; a win earns
- * 20 XP through the shared point repository.
- */
-@Composable
-internal fun TicTacToeScreen(onWin: () -> Unit = {}) {
-    var board by remember { mutableStateOf(List(9) { "" }) }
-    var turn by remember { mutableStateOf("X") }
-    var winner by remember { mutableStateOf<String?>(null) }
-    var awarded by remember { mutableStateOf(false) }
-    val lines = listOf(
-        Triple(0, 1, 2), Triple(3, 4, 5), Triple(6, 7, 8),
-        Triple(0, 3, 6), Triple(1, 4, 7), Triple(2, 5, 8),
-        Triple(0, 4, 8), Triple(2, 4, 6)
-    )
-    fun checkWin(b: List<String>): String? {
-        lines.forEach { (a, c, d) ->
-            if (b[a].isNotEmpty() && b[a] == b[c] && b[a] == b[d]) return b[a]
-        }
-        return null
-    }
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Tic-Tac-Toe", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(
-            when {
-                winner != null -> "Người chơi $winner thắng!"
-                board.all { it.isNotEmpty() } -> "Hòa!"
-                else -> "Lượt của người chơi $turn"
-            },
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Column(
-            Modifier.widthIn(max = 320.dp).background(
-                MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large
-            ).padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            board.chunked(3).forEachIndexed { row, line ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    line.forEachIndexed { col, value ->
-                        val idx = row * 3 + col
-                        Box(
-                            Modifier.weight(1f).aspectRatio(1f)
-                                .background(
-                                    if (value.isEmpty()) MaterialTheme.colorScheme.surfaceContainerHighest
-                                    else MaterialTheme.colorScheme.secondaryContainer,
-                                    MaterialTheme.shapes.small
-                                )
-                                .clickable {
-                                    if (winner == null && board[idx].isEmpty()) {
-                                        board = board.toMutableList().also { it[idx] = turn }
-                                        val w = checkWin(board)
-                                        if (w != null) {
-                                            winner = w
-                                            if (!awarded) { awarded = true; onWin() }
-                                        } else if (board.all { it.isNotEmpty() }) {
-                                            // draw
-                                        } else turn = if (turn == "X") "O" else "X"
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(value, style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        }
-                    }
-                }
-            }
-        }
-        OutlinedButton(onClick = {
-            board = List(9) { "" }; turn = "X"; winner = null; awarded = false
-        }) { Text("Chơi lại") }
-    }
-}
 
 /**
  * F-GAME-13: Snake — swipe to steer, eat to grow, game over on collision.
@@ -130,13 +51,16 @@ internal fun SnakeScreen(onGameOver: (Int) -> Unit = {}) {
         }
     }
 
+    val foodColor = MaterialTheme.colorScheme.error
+    val snakeHead = MaterialTheme.colorScheme.primary
+    val snakeBody = MaterialTheme.colorScheme.secondary
     Column(
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Rắn săn mồi", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Điểm: $score", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        Text(tr("Rắn săn mồi", "Snake"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(tr("Điểm: $score", "Score: $score"), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
         Canvas(
             Modifier
                 .fillMaxWidth()
@@ -156,14 +80,14 @@ internal fun SnakeScreen(onGameOver: (Int) -> Unit = {}) {
         ) {
             val cell = size.width / 12
             drawRoundRect(
-                color = Color(0xFFE53935),
+                color = foodColor,
                 topLeft = Offset(food.x * cell + 2, food.y * cell + 2),
                 size = androidx.compose.ui.geometry.Size(cell - 4, cell - 4),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
             )
             snake.forEachIndexed { i, p ->
                 drawRoundRect(
-                    color = if (i == 0) Color(0xFF00695C) else Color(0xFF26A69A),
+                    color = if (i == 0) snakeHead else snakeBody,
                     topLeft = Offset(p.x * cell + 2, p.y * cell + 2),
                     size = androidx.compose.ui.geometry.Size(cell - 4, cell - 4),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
@@ -171,12 +95,12 @@ internal fun SnakeScreen(onGameOver: (Int) -> Unit = {}) {
             }
         }
         when {
-            !started -> Button(onClick = { started = true }) { Text("Bắt đầu") }
+            !started -> Button(onClick = { started = true }) { Text(tr("Bắt đầu", "Start")) }
             !alive -> Button(onClick = {
                 snake = listOf(Pt(5, 8), Pt(4, 8), Pt(3, 8)); dir = Pt(1, 0)
                 score = 0; alive = true; reported = false
-            }) { Text("Chơi lại") }
-            else -> Text("Vuốt trên bàn chơi để đổi hướng",
+            }) { Text(tr("Chơi lại", "Play again")) }
+            else -> Text(tr("Vuốt trên bàn chơi để đổi hướng", "Swipe on the board to turn"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -200,21 +124,21 @@ internal fun NewsQuizScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Quiz tin tức", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(tr("Quiz tin tức", "News quiz"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         if (questions.isEmpty()) {
-            Text("Chưa có câu hỏi nào.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("Chưa có câu hỏi nào.", "No questions yet."), color = MaterialTheme.colorScheme.onSurfaceVariant)
             return@Column
         }
         if (index >= questions.size) {
-            Text("Hoàn thành!", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-            Text("Đúng $score/${questions.size} câu",
+            Text(tr("Hoàn thành!", "Done!"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text(tr("Đúng $score/${questions.size} câu", "$score/${questions.size} correct"),
                 style = MaterialTheme.typography.titleMedium)
             Button(onClick = { index = 0; score = 0; picked = null; onRestart() }) {
-                Text("Chơi lại")
+                Text(tr("Chơi lại", "Play again"))
             }
             return@Column
         }
-        Text("Câu ${index + 1}/${questions.size} · Điểm $score",
+        Text(tr("Câu ${index + 1}/${questions.size} · Điểm $score", "Question ${index + 1}/${questions.size} · Score $score"),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         val q = questions[index]
@@ -238,7 +162,7 @@ internal fun NewsQuizScreen(
         }
         if (picked != null) {
             Button(onClick = { index += 1; picked = null }, modifier = Modifier.fillMaxWidth()) {
-                Text("Câu tiếp theo")
+                Text(tr("Câu tiếp theo", "Next question"))
             }
         }
     }
@@ -254,14 +178,15 @@ internal fun LeaderboardScreen(
     var mode by remember { mutableStateOf("week") }
     val board = if (mode == "week") weekly else monthly
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Bảng xếp hạng", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(tr("Bảng xếp hạng", "Leaderboard"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = mode == "week", onClick = { mode = "week" }, label = { Text("Tuần này") })
-            FilterChip(selected = mode == "month", onClick = { mode = "month" }, label = { Text("Tháng này") })
+            FilterChip(selected = mode == "week", onClick = { mode = "week" }, label = { Text(tr("Tuần này", "This week")) })
+            FilterChip(selected = mode == "month", onClick = { mode = "month" }, label = { Text(tr("Tháng này", "This month")) })
         }
-        val rows = (board + ("Bạn" to totalPoints)).sortedByDescending { it.second }
+        val me = tr("Bạn", "You")
+        val rows = (board + (me to totalPoints)).sortedByDescending { it.second }
         rows.forEachIndexed { rank, (name, points) ->
-            val isMe = name == "Bạn"
+            val isMe = name == me
             Surface(
                 color = if (isMe) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceContainer,
@@ -279,7 +204,7 @@ internal fun LeaderboardScreen(
                     Text(name, style = MaterialTheme.typography.bodyLarge,
                         fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
                         modifier = Modifier.weight(1f))
-                    Text("$points điểm", style = MaterialTheme.typography.bodyMedium)
+                    Text(tr("$points điểm", "$points points"), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -360,26 +285,28 @@ internal fun BeatTilesScreen(onGameOver: (Int) -> Unit = {}) {
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Điểm: $score", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(if (combo > 0) "Combo x$combo" else "Miss $misses/3",
+            Text(tr("Điểm: $score", "Score: $score"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(if (combo > 0) "Combo x$combo" else tr("Trượt $misses/3", "Miss $misses/3"),
                 style = MaterialTheme.typography.titleSmall,
                 color = if (combo > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
         }
         // Falling field
+        val laneColors = MaterialTheme.oneSpaceColors.lanes
+        val laneLine = MaterialTheme.colorScheme.outlineVariant
+        val hitZone = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
             val laneW = size.width / 4f
             val hitTop = size.height * 0.78f
             // lanes
-            val line = Color(0x33888888)
+            val line = laneLine
             for (i in 1..3) drawLine(line, Offset(laneW * i, 0f), Offset(laneW * i, size.height), 2f)
             // hit zone
-            drawRect(Color(0x1A41690F), topLeft = Offset(0f, hitTop), size = androidx.compose.ui.geometry.Size(size.width, size.height - hitTop))
+            drawRect(hitZone, topLeft = Offset(0f, hitTop), size = androidx.compose.ui.geometry.Size(size.width, size.height - hitTop))
             // notes: one brand color per lane so the eye locks onto its pad
-            val colors = listOf(0xFF41690F, 0xFF006A68, 0xFF566516, 0xFF7A5900)
-            notes.forEach { n ->
+                        notes.forEach { n ->
                 val top = n.y * size.height
                 drawRoundRect(
-                    color = Color(colors[n.lane]),
+                    color = laneColors[n.lane],
                     topLeft = Offset(n.lane * laneW + 6f, top),
                     size = androidx.compose.ui.geometry.Size(laneW - 12f, laneW * 0.62f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
@@ -406,15 +333,15 @@ internal fun BeatTilesScreen(onGameOver: (Int) -> Unit = {}) {
     if (!running) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = {},
-            title = { Text(if (score > 0) "Hết nhạc!" else "Beat Tiles") },
+            title = { Text(if (score > 0) tr("Hết nhạc!", "Out of music!") else "Beat Tiles") },
             text = {
                 Text(if (score > 0)
-                    "Điểm: $score — combo cao nhất x$bestCombo."
+                    tr("Điểm: $score — combo cao nhất x$bestCombo.", "Score: $score, best combo x$bestCombo.")
                 else
-                    "Nốt nhạc rơi theo nhịp — chạm đúng ô khi nốt chạm vùng sáng ở đáy. Chơi kèm bài đang phát trên dock cho trọn (case C9).")
+                    tr("Nốt nhạc rơi theo nhịp — chạm đúng ô khi nốt chạm vùng sáng ở đáy. Chơi kèm bài đang phát trên dock cho trọn (case C9).", "Notes fall to the beat: tap the lane when a note reaches the glowing zone at the bottom. Best played along with the song in the dock (case C9)."))
             },
             confirmButton = {
-                Button(onClick = { start() }) { Text(if (score > 0) "Chơi lại" else "Bắt đầu") }
+                Button(onClick = { start() }) { Text(if (score > 0) tr("Chơi lại", "Play again") else tr("Bắt đầu", "Start")) }
             }
         )
     }

@@ -1,5 +1,6 @@
 package com.example.onespace.app
 
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -46,14 +47,21 @@ fun OneSpaceApp() {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     var floatingPlayerHeight by remember { mutableIntStateOf(0) }
+    val floatingPosition = rememberFloatingPosition()
 
     val nav = rememberNavController()
     val appState = rememberOneSpaceAppState(nav)
     val entry by nav.currentBackStackEntryAsState()
     val selected = TopLevelDestination.entries.find { it.contains(entry?.destination) }
     val inMain = entry?.destination?.hierarchy?.any { it.hasRoute<AppRoute.Main>() } == true
-    val contextTitle = entry?.destination.contextTitle()
+    val screen = entry?.destination.contextScreen()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // Snackbar texts are used in callbacks, so they are resolved here in composition.
+    val msgMusicStopped = tr("Đã dừng phát nhạc", "Music stopped")
+    val msgUndo = tr("Hoàn tác", "Undo")
+    val msgSavedWatchLater = tr("Đã lưu vào Xem sau", "Saved to Watch later")
     fun select(section: Section) {
+        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick)
         coordinator.enter(section)
         appState.navigateToSection(section)
     }
@@ -76,15 +84,15 @@ fun OneSpaceApp() {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val onHome = selected?.section == Section.HOME && contextTitle == null
+    val onHome = selected?.section == Section.HOME && screen == null
     val videoId = videoState.videoId
     val trackId = musicState.trackId
     // F-GAME-08: inside a game the video renders as a split top half, not the floating window.
     // Feed-in-place: on Home the feed card is the player surface, so the
     // floating window / music dock only take over on the other tabs.
-    val showFloat = inMain && videoId != null && contextTitle != "Video" && contextTitle != "Games" && !onHome
-    val showMini = inMain && trackId != null && contextTitle != "Music" && !onHome
-    val showArticleFloat = inMain && ReadingState.articleId != null && contextTitle != "News"
+    val showFloat = inMain && videoId != null && screen != ContextScreen.VIDEO && screen != ContextScreen.GAMES && !onHome
+    val showMini = inMain && trackId != null && screen != ContextScreen.MUSIC && !onHome
+    val showArticleFloat = inMain && ReadingState.articleId != null && screen != ContextScreen.NEWS
 
     Scaffold(
         snackbarHost = {
@@ -92,10 +100,10 @@ fun OneSpaceApp() {
         },
         topBar = {
             if (inMain) TopAppBar(
-                title = { Text(contextTitle ?: selected?.label ?: "") },
+                title = { Text(screen?.title() ?: selected?.label() ?: "") },
                 navigationIcon = {
-                    if (contextTitle != null) IconButton(onClick = appState::navigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
+                    if (screen != null) IconButton(onClick = appState::navigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("Quay lại", "Back"))
                     }
                 },
                 actions = {
@@ -104,7 +112,7 @@ fun OneSpaceApp() {
                         coordinator.cancelPendingRestore()
                         appState.openProfile()
                     }) {
-                        Icon(Icons.Filled.AccountCircle, contentDescription = "Tài khoản")
+                        Icon(Icons.Filled.AccountCircle, contentDescription = tr("Tài khoản", "Account"))
                     }
                 }
             )
@@ -124,7 +132,7 @@ fun OneSpaceApp() {
                         coordinator.closeMusic()
                         scope.launch {
                             val result = snackbarHostState.showSnackbar(
-                                "Đã dừng phát nhạc", actionLabel = "Hoàn tác",
+                                msgMusicStopped, actionLabel = msgUndo,
                                 // With an action the default is Indefinite — it
                                 // would never leave; give it ~10s instead.
                                 duration = androidx.compose.material3.SnackbarDuration.Long)
@@ -139,13 +147,14 @@ fun OneSpaceApp() {
                     onExpand = { ReadingState.articleId?.let { appState.openArticle(it) } },
                     onClose = ReadingState::close
                 )
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     TopLevelDestination.entries.forEach { tab ->
                         NavigationBarItem(
                             selected = selected == tab,
                             onClick = { select(tab.section) },
                             icon = { Icon(tab.icon, contentDescription = null) },
-                            label = { Text(tab.label) }
+                            label = { Text(tab.label()) }
                         )
                     }
                 }
@@ -159,10 +168,10 @@ fun OneSpaceApp() {
                 // Swipe left/right flips between the five sections —
                 // continuous browsing, even from a player screen where
                 // content keeps running. Games opt out: they own swipes.
-                .pointerInput(inMain, contextTitle, selected) {
+                .pointerInput(inMain, screen, selected) {
                     // Games own their swipes (Snake, tiles); everywhere else
                     // the horizontal swipe keeps the five sections flowing.
-                    if (inMain && contextTitle != "Games" && selected != null) {
+                    if (inMain && screen != ContextScreen.GAMES && selected != null) {
                         val order = TopLevelDestination.entries
                         val idx = order.indexOfFirst { it.section == selected!!.section }
                         val next = order.getOrNull(idx + 1)?.section
@@ -193,12 +202,13 @@ fun OneSpaceApp() {
                 player = media.videoPlayer,
                 title = videoState.title,
                 playback = videoState,
+                position = floatingPosition,
                 onHeightChanged = { floatingPlayerHeight = it },
                 onExpand = { videoId?.let { appState.openVideo(it) } },
                 onToggle = coordinator::toggleVideo,
                 onClose = {
                     coordinator.closeVideo()
-                    scope.launch { snackbarHostState.showSnackbar("Đã lưu vào Xem sau") }
+                    scope.launch { snackbarHostState.showSnackbar(msgSavedWatchLater) }
                 }
             )
         }
@@ -213,10 +223,10 @@ fun OneSpaceApp() {
             coordinator.resolveMusicConflict(rule, remember = dontAskAgain)
         AlertDialog(
             onDismissRequest = { /* one of the three must be chosen */ },
-            title = { Text("Phát \"" + request.track.title + "\"?") },
+            title = { Text(tr("Phát \"", "Play \"") + request.track.title + "\"?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Video đang phát",
+                    Text(tr("Video đang phát", "Video is playing"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
@@ -228,10 +238,10 @@ fun OneSpaceApp() {
                             .padding(vertical = 4.dp)
                     ) {
                         Checkbox(checked = dontAskAgain, onCheckedChange = { dontAskAgain = it })
-                        Text("Không hỏi lại", style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("Không hỏi lại", "Don't ask again"), style = MaterialTheme.typography.bodyMedium)
                     }
-                    ConflictRow("Tắt tiếng video", MediaConflictRule.MUTE_VIDEO, ::choose)
-                    ConflictRow("Dừng video", MediaConflictRule.PAUSE_VIDEO, ::choose)
+                    ConflictRow(tr("Tắt tiếng video", "Mute the video"), MediaConflictRule.MUTE_VIDEO, ::choose)
+                    ConflictRow(tr("Dừng video", "Pause the video"), MediaConflictRule.PAUSE_VIDEO, ::choose)
                 }
             },
             confirmButton = {},
@@ -243,10 +253,10 @@ fun OneSpaceApp() {
         var c2DontAsk by remember(request) { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { /* must choose */ },
-            title = { Text("Mở \"" + request.title + "\"?") },
+            title = { Text(tr("Mở \"", "Open \"") + request.title + "\"?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Nhạc đang phát",
+                    Text(tr("Nhạc đang phát", "Music is playing"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
@@ -258,12 +268,12 @@ fun OneSpaceApp() {
                             .padding(vertical = 4.dp)
                     ) {
                         Checkbox(checked = c2DontAsk, onCheckedChange = { c2DontAsk = it })
-                        Text("Không hỏi lại", style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("Không hỏi lại", "Don't ask again"), style = MaterialTheme.typography.bodyMedium)
                     }
-                    VideoConflictRow("Tắt tiếng video, nhạc vẫn phát") {
+                    VideoConflictRow(tr("Tắt tiếng video, nhạc vẫn phát", "Mute the video, keep the music")) {
                         coordinator.resolveVideoConflict(pauseMusic = false, remember = c2DontAsk)
                     }
-                    VideoConflictRow("Tắt tiếng nhạc, video có tiếng") {
+                    VideoConflictRow(tr("Tắt tiếng nhạc, video có tiếng", "Mute the music, keep the video sound")) {
                         coordinator.resolveVideoConflict(pauseMusic = true, remember = c2DontAsk)
                     }
                 }

@@ -10,9 +10,9 @@ name: 13 States
 # wait for the bottom bar, then normalise to Home before doing anything else.
 - extendedWaitUntil:
     visible:
-      text: "Games"
+      text: "Trò chơi"
     timeout: 30000
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Tìm trong OneSpace"
@@ -60,7 +60,7 @@ name: 13 States
     timeout: 15000
 - tapOn: "Mô phỏng mất mạng (demo)"
 # Home shows the offline banner over the cached feed
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Mất kết nối mạng.*"
@@ -73,7 +73,7 @@ name: 13 States
       text: "Không có kết nối"
     timeout: 20000
 - takeScreenshot: F-COM-16-offline-feed
-- tapOn: "Music"
+- tapOn: "Nhạc"
 - extendedWaitUntil:
     visible:
       text: "Không có kết nối"
@@ -82,7 +82,7 @@ name: 13 States
 # (The News tab keeps showing its already-loaded feed in offline mode, so
 # there is no offline screenshot for it.)
 # Restore connectivity
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - tapOn: "Tài khoản"
 - swipe:
     start: '50%,75%'

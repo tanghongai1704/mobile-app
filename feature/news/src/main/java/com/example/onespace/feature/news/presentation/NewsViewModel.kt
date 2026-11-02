@@ -52,8 +52,9 @@ internal class NewsViewModel @Inject constructor(
     val selectedTopics = preferences.preferences.map { it.selectedTopics }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
-    private val _savedIds = MutableStateFlow<Set<String>>(emptySet())
-    val savedIds: StateFlow<Set<String>> = _savedIds.asStateFlow()
+    /** Bookmarks come straight from the persisted repository, so they survive restarts. */
+    val savedIds: StateFlow<Set<String>> = observeSaved()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     private val _quizAnswers = MutableStateFlow<Map<String, Map<Int, Int>>>(emptyMap())
     val quizAnswers: StateFlow<Map<String, Map<Int, Int>>> = _quizAnswers.asStateFlow()
@@ -115,13 +116,7 @@ internal class NewsViewModel @Inject constructor(
     }
 
     fun bookmark(id: String) {
-        viewModelScope.launch {
-            toggleBookmarkUseCase(id)
-            // Update local state
-            val current = _savedIds.value.toMutableSet()
-            if (id in current) current.remove(id) else current.add(id)
-            _savedIds.value = current
-        }
+        viewModelScope.launch { toggleBookmarkUseCase(id) }
     }
 
     fun listen(article: com.example.onespace.domain.news.model.Article) {

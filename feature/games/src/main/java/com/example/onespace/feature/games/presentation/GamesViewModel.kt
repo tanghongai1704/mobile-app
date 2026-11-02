@@ -13,13 +13,29 @@ import kotlinx.coroutines.flow.*
 internal class GamesViewModel @Inject constructor(
     getGames: GetGames,
     preferences: SessionPreferencesRepository,
-    points: com.example.onespace.domain.session.repository.PointRepository
+    points: com.example.onespace.domain.session.repository.PointRepository,
+    observeAllBestScores: com.example.onespace.domain.games.usecase.ObserveAllBestScores,
+    observeChallenge: com.example.onespace.domain.games.usecase.ObserveDailyChallenge,
+    observeStreak: com.example.onespace.domain.session.usecase.ObserveStreak,
+    reporter: ChallengeReporter
 ) : ViewModel() {
     private val refresh = MutableStateFlow(0)
 
-    val uiState = combine(getGames(), refresh) { games, _ -> ContentUiState(items = games) }
+    val uiState = combine(getGames(), refresh, observeAllBestScores()) { games, _, bests ->
+        ContentUiState(items = games.map { it.copy(bestScore = bests[it.id] ?: 0) })
+    }
         .catch { emit(ContentUiState(error = "Không tải được danh sách game.")) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ContentUiState(isLoading = true))
+
+    /** Today's challenge (progress persists across launches). */
+    val challenge = observeChallenge()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val streakDays = observeStreak().map { it.currentStreak }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** Fires when any game finishes the challenge, so the hub can celebrate too. */
+    val completions = reporter.completions
 
     /** Demo switch from Settings: feeds render their offline state while on. */
     val offline = preferences.preferences.map { it.simulateOffline }

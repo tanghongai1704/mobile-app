@@ -1,5 +1,6 @@
 package com.example.onespace.core.designsystem
 
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -14,11 +15,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,20 +54,20 @@ fun Modifier.shimmer(): Modifier = composed {
     }
 }
 
-/** Feed placeholder while the catalog loads: content-shaped shimmer blocks. */
+/** Feed placeholder while the catalog loads: rounded, content-shaped shimmer blocks inside the page gutter. */
 @Composable
 fun SkeletonFeed(rows: Int = 4) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         repeat(rows) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(48.dp).shimmer())
+                Box(Modifier.size(48.dp).clip(CircleShape).shimmer())
                 Spacer(Modifier.size(16.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.fillMaxWidth(0.72f).height(18.dp).shimmer())
-                    Box(Modifier.fillMaxWidth(0.45f).height(14.dp).shimmer())
+                    Box(Modifier.fillMaxWidth(0.72f).height(16.dp).clip(MaterialTheme.shapes.small).shimmer())
+                    Box(Modifier.fillMaxWidth(0.45f).height(12.dp).clip(MaterialTheme.shapes.small).shimmer())
                 }
                 Spacer(Modifier.size(8.dp))
-                Box(Modifier.size(20.dp).shimmer())
+                Box(Modifier.size(20.dp).clip(CircleShape).shimmer())
             }
         }
     }
@@ -85,8 +88,13 @@ fun EmptyState(spec: EmptySpec) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(spec.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(48.dp))
+        Box(
+            Modifier.size(72.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(spec.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(36.dp))
+        }
         Text(spec.title, style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         Button(onClick = spec.onCta) { Text(spec.cta) }
@@ -99,7 +107,7 @@ fun ErrorState(
     title: String,
     message: String,
     onRetry: () -> Unit,
-    retryLabel: String = "Thử lại",
+    retryLabel: String = tr("Thử lại", "Try again"),
     secondaryLabel: String? = null,
     onSecondary: (() -> Unit)? = null
 ) {
@@ -108,6 +116,13 @@ fun ErrorState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Box(
+            Modifier.size(72.dp).background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(androidx.compose.material.icons.Icons.Filled.CloudOff, contentDescription = null,
+                tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(36.dp))
+        }
         Text(title, style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
         Text(message, style = MaterialTheme.typography.bodyMedium,

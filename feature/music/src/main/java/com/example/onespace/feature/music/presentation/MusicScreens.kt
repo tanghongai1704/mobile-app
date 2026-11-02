@@ -1,5 +1,8 @@
 package com.example.onespace.feature.music.presentation
 
+import com.example.onespace.core.designsystem.t
+
+import com.example.onespace.core.designsystem.fadingEdgeEnd
 import androidx.compose.animation.core.animateFloat
 
 import androidx.compose.foundation.layout.*
@@ -91,15 +94,16 @@ internal fun MusicScreen(
     FeaturePage {
         item {
             OutlinedTextField(
+                shape = androidx.compose.foundation.shape.CircleShape, colors = com.example.onespace.core.designsystem.AppFieldDefaults.colors(),
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Tìm bài hát hoặc nghệ sĩ") },
+                placeholder = { Text(tr("Tìm bài hát hoặc nghệ sĩ", "Search songs or artists")) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Xóa tìm kiếm")
+                            Icon(Icons.Filled.Close, contentDescription = tr("Xóa tìm kiếm", "Clear search"))
                         }
                     }
                 },
@@ -108,13 +112,16 @@ internal fun MusicScreen(
         }
         if (searchQuery.isBlank()) {
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item { FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text("Tất cả") }) }
-                    item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text("Dành cho bạn") }) }
-                    item { FilterChip(selected = filter == "loved", onClick = { filter = "loved" }, label = { Text("Yêu thích") }) }
-                    item { FilterChip(selected = filter == "extracted", onClick = { filter = "extracted" }, label = { Text("Từ video") }) }
+                LazyRow(
+                    modifier = Modifier.fadingEdgeEnd(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item { FilterChip(selected = filter == "all", onClick = { filter = "all" }, label = { Text(tr("Tất cả", "All")) }) }
+                    item { FilterChip(selected = filter == "foryou", onClick = { filter = "foryou" }, label = { Text(tr("Dành cho bạn", "For you")) }) }
+                    item { FilterChip(selected = filter == "loved", onClick = { filter = "loved" }, label = { Text(tr("Yêu thích", "Favourites")) }) }
+                    item { FilterChip(selected = filter == "extracted", onClick = { filter = "extracted" }, label = { Text(tr("Từ video", "From videos")) }) }
                     items(genreChips, key = { it }) { g ->
-                        FilterChip(selected = filter == g, onClick = { filter = g }, label = { Text(g) })
+                        FilterChip(selected = filter == g, onClick = { filter = g }, label = { Text(g.t()) })
                     }
                 }
             }
@@ -129,7 +136,7 @@ internal fun MusicScreen(
             }
             // "Từ video" is a filter chip, not a bottom section.
             if (filter == "extracted" && extracted.isNotEmpty()) {
-                item { SectionTitle("Từ video của bạn") }
+                item { SectionTitle(tr("Từ video của bạn", "From your videos")) }
                 items(extracted, key = { "ext-" + it.videoId }) { entry ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -166,20 +173,20 @@ internal fun MusicScreen(
                             .clickable { onOpenArtist(artist) }
                             .padding(vertical = 10.dp)
                     ) {
-                        val (grad, letter) = artistLook(artist)
+                        val (grad, letter) = artistLook(artist, MaterialTheme.oneSpaceColors.topics)
                         Box(
                             Modifier.size(40.dp).background(
-                                androidx.compose.ui.graphics.Brush.linearGradient(grad),
+                                grad.brush(),
                                 androidx.compose.foundation.shape.CircleShape
                             ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(letter, color = androidx.compose.ui.graphics.Color.White)
+                            Text(letter, color = MaterialTheme.oneSpaceColors.onMedia)
                         }
                         Column {
                             Text(artist, style = MaterialTheme.typography.titleSmall)
                             Text(
-                                tracks.count { it.artist == artist }.toString() + " bài hát",
+                                tracks.count { it.artist == artist }.toString() + tr(" bài hát", " songs"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -194,13 +201,13 @@ internal fun MusicScreen(
                 }
             } else {
                 item {
-                    Text("Không có bài hát phù hợp",
+                    Text(tr("Không có bài hát phù hợp", "No matching songs"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 12.dp))
                 }
                 if (relatedTracks.isNotEmpty()) {
-                    item { SectionTitle("Liên quan") }
+                    item { SectionTitle(tr("Liên quan", "Related")) }
                     items(relatedTracks, key = { "rel-" + it.id }) { track ->
                         TrackCard(track, track.id in favorites, track.id in downloaded,
                             onOpen, onToggleFavorite, onToggleDownload, onOpenArtist)
@@ -237,10 +244,10 @@ private fun TrackCard(
     ) {
         // Artist avatar: gradient tile with the artist's initial so
         // different artists are visually distinguishable.
-        val (grad, letter) = artistLook(track.artist)
+        val (grad, letter) = artistLook(track.artist, MaterialTheme.oneSpaceColors.topics)
         Box(
             Modifier.size(48.dp).background(
-                androidx.compose.ui.graphics.Brush.linearGradient(grad),
+                grad.brush(),
                 androidx.compose.foundation.shape.CircleShape
             ),
             contentAlignment = Alignment.Center
@@ -248,7 +255,7 @@ private fun TrackCard(
             Text(
                 letter,
                 style = MaterialTheme.typography.titleLarge,
-                color = androidx.compose.ui.graphics.Color.White
+                color = MaterialTheme.oneSpaceColors.onMedia
             )
         }
         Spacer(Modifier.width(12.dp))
@@ -277,13 +284,13 @@ private fun TrackCard(
         // F-MUS-07: the badges are direct toggles.
         if (favorite) {
             IconButton(onClick = { onToggleFavorite(track.id) }) {
-                Icon(Icons.Filled.Favorite, contentDescription = "Bỏ yêu thích",
+                Icon(Icons.Filled.Favorite, contentDescription = tr("Bỏ yêu thích", "Remove from favourites"),
                     tint = MaterialTheme.colorScheme.error)
             }
         }
         if (downloaded) {
             Text(
-                "Đã tải",
+                tr("Đã tải", "Downloaded"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.clickable {
@@ -295,19 +302,9 @@ private fun TrackCard(
 }
 
 /** Stable gradient + initial per artist so all songs by one artist look the same. */
-private fun artistLook(artist: String): Pair<List<androidx.compose.ui.graphics.Color>, String> {
-    val colors = listOf(
-        listOf(androidx.compose.ui.graphics.Color(0xFF1565C0), androidx.compose.ui.graphics.Color(0xFF64B5F6)),
-        listOf(androidx.compose.ui.graphics.Color(0xFF6A1B9A), androidx.compose.ui.graphics.Color(0xFFCE93D8)),
-        listOf(androidx.compose.ui.graphics.Color(0xFF2E7D32), androidx.compose.ui.graphics.Color(0xFFA5D6A7)),
-        listOf(androidx.compose.ui.graphics.Color(0xFFE65100), androidx.compose.ui.graphics.Color(0xFFFFCC80)),
-        listOf(androidx.compose.ui.graphics.Color(0xFF00695C), androidx.compose.ui.graphics.Color(0xFF80CBC4)),
-        listOf(androidx.compose.ui.graphics.Color(0xFF880E4F), androidx.compose.ui.graphics.Color(0xFFF48FB1)),
-        listOf(androidx.compose.ui.graphics.Color(0xFF283593), androidx.compose.ui.graphics.Color(0xFF9FA8DA)),
-        listOf(androidx.compose.ui.graphics.Color(0xFF4527A0), androidx.compose.ui.graphics.Color(0xFFB39DDB))
-    )
-    val hash = artist.hashCode()
-    return colors[kotlin.math.abs(hash) % colors.size] to artist.take(1).uppercase()
+private fun artistLook(artist: String, topics: TopicGradients): Pair<GradientPair, String> {
+    val pool = topics.all
+    return pool[kotlin.math.abs(artist.hashCode()) % pool.size] to artist.take(1).uppercase()
 }
 
 /** Full player: artwork, meta, seek bar, transport. Identity is in the top bar ("← Music"). */
@@ -333,7 +330,7 @@ internal fun NowPlayingScreen(
     onMoveQueueItem: (Int, Int) -> Unit = { _, _ -> },
     onAddToPlaylist: (String) -> Unit = {}
 ) {
-    if (track == null) { Text("Chưa có bài này"); return }
+    if (track == null) { Text(tr("Chưa có bài này", "This song is not available")); return }
     var showQueue by remember { mutableStateOf(false) }
     var showSaveSheet by remember { mutableStateOf(false) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -357,16 +354,16 @@ internal fun NowPlayingScreen(
                     IconButton(onClick = onToggleFavorite) {
                         Icon(
                             if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = if (favorite) "Bỏ yêu thích" else "Yêu thích",
+                            contentDescription = if (favorite) tr("Bỏ yêu thích", "Remove from favourites") else tr("Yêu thích", "Favourites"),
                             tint = if (favorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = onToggleDownload) {
-                        Icon(Icons.Filled.Download, contentDescription = if (downloaded) "Bỏ tải xuống" else "Tải xuống",
+                        Icon(Icons.Filled.Download, contentDescription = if (downloaded) tr("Bỏ tải xuống", "Remove download") else tr("Tải xuống", "Download"),
                             tint = if (downloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { showSaveSheet = true }) {
-                        Icon(Icons.Filled.BookmarkBorder, contentDescription = "Lưu")
+                        Icon(Icons.Filled.BookmarkBorder, contentDescription = tr("Lưu", "Save"))
                     }
                 }
             }
@@ -394,33 +391,33 @@ internal fun NowPlayingScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 IconButton(onClick = onPrevious, enabled = playback.queue.size > 1) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Bài trước",
+                    Icon(Icons.Filled.SkipPrevious, contentDescription = tr("Bài trước", "Previous"),
                         modifier = Modifier.size(32.dp))
                 }
                 IconButton(onClick = { onSeekTo((playback.positionMs - 10_000).coerceAtLeast(0)) }) {
-                    Icon(Icons.Filled.Replay10, contentDescription = "Lùi 10 giây",
+                    Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"),
                         modifier = Modifier.size(28.dp))
                 }
                 FilledIconButton(onClick = onToggle, modifier = Modifier.size(56.dp)) {
                     Icon(
                         if (playback.playRequested && playback.error == null) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playback.playRequested && playback.error == null) "Tạm dừng" else "Phát",
+                        contentDescription = if (playback.playRequested && playback.error == null) tr("Tạm dừng", "Pause") else tr("Phát", "Play"),
                         modifier = Modifier.size(28.dp)
                     )
                 }
                 IconButton(onClick = { onSeekTo((playback.positionMs + 10_000).coerceAtMost(playback.totalMs)) }) {
-                    Icon(Icons.Filled.Forward10, contentDescription = "Tới 10 giây",
+                    Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"),
                         modifier = Modifier.size(28.dp))
                 }
                 IconButton(onClick = onNext, enabled = playback.queue.size > 1) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Tiếp theo",
+                    Icon(Icons.Filled.SkipNext, contentDescription = tr("Tiếp theo", "Next"),
                         modifier = Modifier.size(32.dp))
                 }
             }
             Spacer(Modifier.height(8.dp))
             // F-MUS-05: the queue behind the player.
             TextButton(onClick = { showQueue = !showQueue }) {
-                Text(if (showQueue) "Ẩn hàng đợi" else "Xem hàng đợi (" + playback.queue.size + " bài)")
+                Text(if (showQueue) tr("Ẩn hàng đợi", "Hide queue") else tr("Xem hàng đợi (", "View queue (") + playback.queue.size + tr(" bài)", " songs)"))
             }
             if (showQueue) {
                 // F-MUS-05: one-time queue, not a playlist — flows top to
@@ -434,19 +431,20 @@ internal fun NowPlayingScreen(
                 playback.queue.forEachIndexed { index, q ->
                     val current = q.id == playback.trackId
                     val dragging = q.id == draggingId
+                    val rowShape = MaterialTheme.shapes.small
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .zIndex(if (dragging) 1f else 0f)
                             .graphicsLayer {
-                                shape = RoundedCornerShape(12.dp)
+                                shape = rowShape
                                 translationY = if (dragging) dragOffset else 0f
                                 shadowElevation = if (dragging) 12f else 0f
                             }
                             .background(
                                 if (dragging) MaterialTheme.colorScheme.surface else Color.Transparent,
-                                RoundedCornerShape(12.dp)
+                                MaterialTheme.shapes.small
                             )
                             .onSizeChanged { rowHeightPx = it.height.toFloat() }
                             .pointerInput(q.id) {
@@ -511,7 +509,7 @@ internal fun NowPlayingScreen(
                                 // Animated equalizer bars only while playing.
                                 if (isPlaying) EqualizerIcon()
                                 Text(
-                                    if (isPlaying) "Đang phát" else "Tạm dừng",
+                                    if (isPlaying) tr("Đang phát", "Now playing") else tr("Tạm dừng", "Pause"),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.primary
@@ -560,11 +558,11 @@ internal fun MusicPlaylistScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        if (items.isEmpty()) "0 bài" else items.size.toString() + " bài",
+                        if (items.isEmpty()) tr("0 bài", "0 songs") else items.size.toString() + tr(" bài", " songs"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    TextButton(onClick = { onDelete(name) }) { Text("Xóa playlist") }
+                    TextButton(onClick = { onDelete(name) }) { Text(tr("Xóa playlist", "Delete playlist")) }
                 }
                 if (items.isNotEmpty()) {
                     // Order and repeat are player-level toggles here; they stay
@@ -573,15 +571,15 @@ internal fun MusicPlaylistScreen(
                         Button(onClick = { onPlay(items) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Phát")
+                            Text(tr("Phát", "Play"))
                         }
                         IconButton(onClick = onToggleShuffle) {
-                            Icon(Icons.Filled.Shuffle, contentDescription = "Phát ngẫu nhiên",
+                            Icon(Icons.Filled.Shuffle, contentDescription = tr("Phát ngẫu nhiên", "Shuffle play"),
                                 tint = if (shuffle) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = onToggleRepeat) {
-                            Icon(Icons.Filled.Repeat, contentDescription = "Lặp lại",
+                            Icon(Icons.Filled.Repeat, contentDescription = tr("Lặp lại", "Repeat"),
                                 tint = if (repeat) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -609,10 +607,10 @@ internal fun MusicArtistScreen(
     FeaturePage {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                val (grad, letter) = artistLook(artist)
+                val (grad, letter) = artistLook(artist, MaterialTheme.oneSpaceColors.topics)
                 Box(
                     Modifier.size(72.dp).background(
-                        androidx.compose.ui.graphics.Brush.linearGradient(grad),
+                        grad.brush(),
                         androidx.compose.foundation.shape.CircleShape
                     ),
                     contentAlignment = Alignment.Center
@@ -620,21 +618,21 @@ internal fun MusicArtistScreen(
                     Text(
                         letter,
                         style = MaterialTheme.typography.headlineMedium,
-                        color = androidx.compose.ui.graphics.Color.White
+                        color = MaterialTheme.oneSpaceColors.onMedia
                     )
                 }
                 Spacer(Modifier.width(16.dp))
                 Column {
                     Text(artist, style = MaterialTheme.typography.titleLarge)
                     Text(
-                        own.size.toString() + " bài hát",
+                        own.size.toString() + tr(" bài hát", " songs"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
-        item { SectionTitle("Bài hát") }
+        item { SectionTitle(tr("Bài hát", "Songs")) }
         items(own, key = { it.id }) { track ->
             TrackCard(track, favorite = false, downloaded = false, onOpen = onOpen, onToggleFavorite = {}, onToggleDownload = { _, _, _ -> })
         }
@@ -656,7 +654,7 @@ private fun MusicSaveSheet(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SectionTitle("Lưu bài hát")
+            SectionTitle(tr("Lưu bài hát", "Save song"))
             com.example.onespace.core.designsystem.AppPlaylistStore.playlists.forEach { (name, pl) ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -680,7 +678,7 @@ private fun MusicSaveSheet(
             OutlinedTextField(
                 value = newName,
                 onValueChange = { newName = it },
-                label = { Text("Playlist mới") },
+                label = { Text(tr("Playlist mới", "New playlist")) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -691,7 +689,7 @@ private fun MusicSaveSheet(
                 },
                 enabled = newName.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Tạo") }
+            ) { Text(tr("Tạo", "Create")) }
         }
     }
 }
@@ -729,7 +727,7 @@ private fun EqualizerIcon() {
                     .size(width = 3.dp, height = (14 * h).dp)
                     .background(
                         MaterialTheme.colorScheme.primary,
-                        androidx.compose.foundation.shape.RoundedCornerShape(2.dp)
+                        MaterialTheme.shapes.extraSmall
                     )
             )
         }

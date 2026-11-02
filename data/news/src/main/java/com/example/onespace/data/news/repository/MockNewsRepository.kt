@@ -8,16 +8,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 
-internal class MockNewsRepository : NewsRepository {
-    private val savedIds = MutableStateFlow<Set<String>>(emptySet())
+/** Catalog is bundled demo data; the bookmarks themselves are real and survive restarts. */
+internal class MockNewsRepository(private val saved: SavedArticlesStore) : NewsRepository {
+    override fun observeSavedIds(): Flow<Set<String>> = saved.ids
 
-    override fun observeSavedIds(): Flow<Set<String>> = savedIds
-
-    override suspend fun toggleBookmark(id: String) {
-        val current = savedIds.value.toMutableSet()
-        if (id in current) current.remove(id) else current.add(id)
-        savedIds.value = current
-    }
+    override suspend fun toggleBookmark(id: String) = saved.toggle(id)
 
     override fun observeCatalog() = flow {
         delay(400)

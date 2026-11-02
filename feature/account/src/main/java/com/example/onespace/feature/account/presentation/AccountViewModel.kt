@@ -32,6 +32,7 @@ internal class AccountViewModel @Inject constructor(
     observePet: ObservePet,
     observeShop: ObserveShop,
     observeContinue: ObserveContinueWatching,
+    observeGameBadges: com.example.onespace.domain.games.usecase.ObserveGameBadges,
     private val feedPet: FeedPet,
     private val purchaseItem: PurchaseItem,
     preferences: SessionPreferencesRepository
@@ -44,9 +45,9 @@ internal class AccountViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val gamification: StateFlow<AccountGamificationState> = combine(
-        observeTotalPoints(), observeStreak(), observePet(), observeShop()
-    ) { points, streak, pet, shop ->
-        AccountGamificationState(points, streak, pet, shop)
+        observeTotalPoints(), observeStreak(), observePet(), observeShop(), observeGameBadges()
+    ) { points, streak, pet, shop, badges ->
+        AccountGamificationState(points, streak, pet, shop, badges)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccountGamificationState())
 
     /** One-shot outcome message for feed/purchase actions. */
@@ -59,6 +60,7 @@ internal class AccountViewModel @Inject constructor(
         viewModelScope.launch {
             _feedback.value = when (feedPet()) {
                 FeedResult.SUCCESS -> "Đã cho thú ăn (−30 điểm)"
+                FeedResult.SUCCESS_WITH_TREAT -> "Đã cho thú ăn bằng thức ăn thưởng (miễn phí)"
                 FeedResult.NOT_ENOUGH_POINTS -> "Không đủ 30 điểm để cho ăn"
                 FeedResult.LIMIT_REACHED -> "Hôm nay đã cho ăn rồi"
             }

@@ -1,5 +1,6 @@
 package com.example.onespace.feature.music.navigation
 
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.runtime.*
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,7 +32,7 @@ fun NavGraphBuilder.musicGraph(
                 state,
                 offline = offline,
                 onRetry = vm::retry,
-                empty = EmptySpec(Icons.Filled.MusicNote, "Kho nhạc trống", "Làm mới", vm::retry)
+                empty = EmptySpec(Icons.Filled.MusicNote, tr("Kho nhạc trống", "The music library is empty"), tr("Làm mới", "Refresh"), vm::retry)
             ) { tracks ->
                 val extracted by vm.extracted.collectAsStateWithLifecycle()
                 MusicScreen(

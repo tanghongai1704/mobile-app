@@ -1,5 +1,6 @@
 package com.example.onespace.core.designsystem
 
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -23,8 +24,12 @@ fun FloatingArticleCard(
     onClose: () -> Unit
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        tonalElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.large.copy(
+            bottomStart = androidx.compose.foundation.shape.ZeroCornerSize,
+            bottomEnd = androidx.compose.foundation.shape.ZeroCornerSize
+        ),
+        shadowElevation = 3.dp,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onExpand)
     ) {
         Row(
@@ -40,7 +45,7 @@ fun FloatingArticleCard(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    "Đang đọc",
+                    tr("Đang đọc", "Reading"),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -52,7 +57,7 @@ fun FloatingArticleCard(
                 )
             }
             IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = "Đóng")
+                Icon(Icons.Filled.Close, contentDescription = tr("Đóng", "Close"))
             }
         }
     }

@@ -1,5 +1,8 @@
 package com.example.onespace.feature.video.navigation
 
+import com.example.onespace.core.designsystem.oneSpaceColors
+import androidx.compose.foundation.background
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.runtime.*
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,7 +40,7 @@ fun NavGraphBuilder.videoGraph(
                 state,
                 offline = offline,
                 onRetry = vm::retry,
-                empty = EmptySpec(Icons.Filled.PlayCircle, "Chưa có video nào", "Làm mới", vm::retry)
+                empty = EmptySpec(Icons.Filled.PlayCircle, tr("Chưa có video nào", "No videos yet"), tr("Làm mới", "Refresh"), vm::retry)
             ) { videos ->
                 VideoScreen(
                     videos, topics, history,
@@ -117,7 +120,7 @@ fun NavGraphBuilder.videoGraph(
                 val relatedList = if (playlistName != null)
                     videos.filter { it.id in (com.example.onespace.core.designsystem.AppPlaylistStore.playlists[playlistName]?.videoIds ?: emptyList()) }
                 else videos
-                val relatedLabel = playlistName ?: "Liên quan"
+                val relatedLabel = playlistName ?: tr("Liên quan", "Related")
                 // YouTube-style playlist autoplay: a finished video rolls
                 // into the next one; only real playback (status ENDED) counts,
                 // a restore parked at the end position must not trigger it.
@@ -152,7 +155,17 @@ fun NavGraphBuilder.videoGraph(
                 val quality by vm.quality.collectAsStateWithLifecycle()
                 // Session volume lives on the coordinator, not per-video state.
                 val volume by session.videoVolume.collectAsStateWithLifecycle()
+                val quizCombo by vm.quizCombo.collectAsStateWithLifecycle()
+                val quizRound by vm.quizRound.collectAsStateWithLifecycle()
                 var mp3Offer by remember { mutableStateOf(false) }
+                // Strings used inside click callbacks are resolved here, in composition.
+                val msgDownloadAdded = tr("Đã thêm vào Đã tải (Hồ sơ)", "Added to Downloaded (Profile)")
+                val msgDownloadRemoved = tr("Đã bỏ khỏi Đã tải", "Removed from Downloaded")
+                val shareTemplate = tr("Xem \"%s\" trên OneSpace", "Watch \"%s\" on OneSpace")
+                val msgShare = tr("Chia sẻ", "Share")
+                val msgWatchLaterRemoved = tr("Đã bỏ khỏi Xem sau", "Removed from Watch later")
+                val msgWatchLaterAdded = tr("Đã thêm vào Xem sau", "Added to Watch later")
+                val msgMp3Saved = tr("Đã lưu vào thư viện Nhạc (mục Từ video của bạn)", "Saved to your Music library (From your videos)")
                 val context = androidx.compose.ui.platform.LocalContext.current
                 VideoDetailScreen(
                     video = video,
@@ -165,7 +178,11 @@ fun NavGraphBuilder.videoGraph(
                     positionMs = if (active) playback.positionMs else 0,
                     totalMs = if (active) playback.totalMs else 0,
                     videoSurface = { modifier, onDoubleTap ->
-                        VideoSurface(vm.player, modifier, onDoubleTap)
+                        VideoSurface(
+                            vm.player,
+                            modifier.background(androidx.compose.material3.MaterialTheme.oneSpaceColors.mediaBackdrop),
+                            onDoubleTap
+                        )
                     },
                     audioOnly = audioOnly,
                     onAudioOnly = { vm.toggleAudioOnly() },
@@ -191,7 +208,7 @@ fun NavGraphBuilder.videoGraph(
                             )
                             android.widget.Toast.makeText(
                                 context,
-                                if (v.id !in downloads) "Đã thêm vào Đã tải (Hồ sơ)" else "Đã bỏ khỏi Đã tải",
+                                if (v.id !in downloads) msgDownloadAdded else msgDownloadRemoved,
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -199,14 +216,16 @@ fun NavGraphBuilder.videoGraph(
                     // F-VID-10: holding the video opens this confirm, not a button.
                     onExtractMp3 = { mp3Offer = true },
                     onOpenArtist = onOpenArtist,
-                    onQuizCorrect = { vm.awardEndOfVideoQuiz() },
+                    quizCombo = quizCombo,
+                    quizRound = quizRound,
+                    onQuizAnswered = vm::answerQuiz,
                     onShare = {
                         video?.let { v ->
                             val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(android.content.Intent.EXTRA_TEXT, "Xem \"${v.title}\" trên OneSpace")
+                                putExtra(android.content.Intent.EXTRA_TEXT, shareTemplate.format(v.title))
                             }
-                            context.startActivity(android.content.Intent.createChooser(sendIntent, "Chia sẻ"))
+                            context.startActivity(android.content.Intent.createChooser(sendIntent, msgShare))
                         }
                     },
                     onWatchLater = {
@@ -215,7 +234,7 @@ fun NavGraphBuilder.videoGraph(
                             vm.toggleWatchLater(v.id, v.title)
                             android.widget.Toast.makeText(
                                 context,
-                                if (wasSaved) "Đã bỏ khỏi Xem sau" else "Đã thêm vào Xem sau",
+                                if (wasSaved) msgWatchLaterRemoved else msgWatchLaterAdded,
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -260,19 +279,19 @@ fun NavGraphBuilder.videoGraph(
                 if (mp3Offer) {
                     androidx.compose.material3.AlertDialog(
                         onDismissRequest = { mp3Offer = false },
-                        title = { androidx.compose.material3.Text("Trích xuất MP3?") },
-                        text = { androidx.compose.material3.Text("Lưu âm thanh của video này vào thư viện nhạc để nghe offline?") },
+                        title = { androidx.compose.material3.Text(tr("Trích xuất MP3?", "Extract MP3?")) },
+                        text = { androidx.compose.material3.Text(tr("Lưu âm thanh của video này vào thư viện nhạc để nghe offline?", "Save this video's audio to your music library for offline listening?")) },
                         confirmButton = {
                             androidx.compose.material3.TextButton(onClick = {
                                 mp3Offer = false
                                 video?.let { v ->
                                     vm.addExtracted(v.id, v.title, v.creator, v.url, v.duration)
-                                    android.widget.Toast.makeText(context, "Đã lưu vào thư viện Nhạc (mục Từ video của bạn)", android.widget.Toast.LENGTH_SHORT).show()
+                                    android.widget.Toast.makeText(context, msgMp3Saved, android.widget.Toast.LENGTH_SHORT).show()
                                 }
-                            }) { androidx.compose.material3.Text("Trích xuất") }
+                            }) { androidx.compose.material3.Text(tr("Trích xuất", "Extract")) }
                         },
                         dismissButton = {
-                            androidx.compose.material3.TextButton(onClick = { mp3Offer = false }) { androidx.compose.material3.Text("Hủy") }
+                            androidx.compose.material3.TextButton(onClick = { mp3Offer = false }) { androidx.compose.material3.Text(tr("Hủy", "Cancel")) }
                         }
                     )
                 }

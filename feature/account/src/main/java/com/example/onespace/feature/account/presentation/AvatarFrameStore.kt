@@ -1,27 +1,36 @@
 package com.example.onespace.feature.account.presentation
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import com.example.onespace.core.designsystem.oneSpaceColors
 
 /**
- * F-COM-09: avatar frames unlock by point milestone; the pick lives in a
- * process-level store until it moves to DataStore.
+ * F-COM-09: avatar frames unlock by point milestone. The picked frame and avatar are saved in
+ * the session preferences (DataStore), so this object only describes the available frames.
  */
-internal data class AvatarFrame(val id: String, val name: String, val color: Long, val unlockPoints: Int)
+internal enum class FrameTier { BASIC, BRONZE, SILVER, GOLD }
+
+internal data class AvatarFrame(val id: String, val name: String, val tier: FrameTier, val unlockPoints: Int)
+
+/** Frame colour comes from the theme, so it follows light/dark. */
+internal val AvatarFrame.color: Color
+    @Composable get() = with(MaterialTheme.oneSpaceColors.frames) {
+        when (tier) {
+            FrameTier.BASIC -> basic
+            FrameTier.BRONZE -> bronze
+            FrameTier.SILVER -> silver
+            FrameTier.GOLD -> gold
+        }
+    }
 
 internal object AvatarFrameStore {
     val frames = listOf(
-        AvatarFrame("basic", "Cơ bản", 0xFF9E9E9E, 0),
-        AvatarFrame("dong", "Đồng", 0xFFCD7F32, 50),
-        AvatarFrame("bac", "Bạc", 0xFF90A4AE, 100),
-        AvatarFrame("vang", "Vàng", 0xFFFFC107, 200)
+        AvatarFrame("basic", "Cơ bản", FrameTier.BASIC, 0),
+        AvatarFrame("dong", "Đồng", FrameTier.BRONZE, 50),
+        AvatarFrame("bac", "Bạc", FrameTier.SILVER, 100),
+        AvatarFrame("vang", "Vàng", FrameTier.GOLD, 200)
     )
-
-    var selected by mutableStateOf("basic")
-
-    /** F-COM-09: the picked avatar emoji; null keeps the initial-letter avatar. */
-    var avatar by mutableStateOf<String?>(null)
 
     fun unlocked(totalPoints: Int): List<AvatarFrame> = frames.filter { it.unlockPoints <= totalPoints }
 

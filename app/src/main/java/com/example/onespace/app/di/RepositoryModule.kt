@@ -15,6 +15,15 @@ import com.example.onespace.data.games.repository.createMissionRepository
 import com.example.onespace.data.games.repository.createStreakRepository
 import com.example.onespace.data.games.repository.createPetRepository
 import com.example.onespace.data.games.repository.createShopRepository
+import com.example.onespace.data.games.repository.createGameRecordsRepository
+import com.example.onespace.data.games.repository.createChallengeRepository
+import com.example.onespace.domain.games.repository.ChallengeRepository
+import com.example.onespace.domain.games.usecase.ObserveDailyChallenge
+import com.example.onespace.domain.games.usecase.ReportChallengeProgress
+import com.example.onespace.domain.games.repository.GameRecordsRepository
+import com.example.onespace.domain.games.usecase.ObserveAllBestScores
+import com.example.onespace.domain.games.usecase.ObserveBestScore
+import com.example.onespace.domain.games.usecase.SubmitGameScore
 import com.example.onespace.domain.session.repository.MissionRepository
 import com.example.onespace.domain.session.repository.PointRepository
 import com.example.onespace.domain.session.repository.StreakRepository
@@ -65,7 +74,8 @@ object RepositoryModule {
     @Provides fun signOut(repository: AuthRepository) = SignOut(repository)
     @Provides @Singleton fun videos(): VideoRepository = createVideoRepository()
     @Provides @Singleton fun music(): MusicRepository = createMusicRepository()
-    @Provides @Singleton fun news(): NewsRepository = createNewsRepository()
+    @Provides @Singleton
+    fun news(@ApplicationContext context: android.content.Context): NewsRepository = createNewsRepository(context)
     @Provides @Singleton fun games(): GamesRepository = createGamesRepository()
 
     @Provides @Singleton
@@ -91,6 +101,28 @@ object RepositoryModule {
     @Provides @Singleton
     fun shop(@ApplicationContext context: android.content.Context): ShopRepository =
         createShopRepository(context)
+
+    @Provides @Singleton
+    fun gameRecords(@ApplicationContext context: android.content.Context): GameRecordsRepository =
+        createGameRecordsRepository(context)
+
+    @Provides @Singleton
+    fun dailyChallenge(@ApplicationContext context: android.content.Context): ChallengeRepository =
+        createChallengeRepository(context)
+
+    @Provides fun observeDailyChallenge(repository: ChallengeRepository) = ObserveDailyChallenge(repository)
+    @Provides fun reportChallengeProgress(
+        challenges: ChallengeRepository,
+        points: PointRepository,
+        streak: StreakRepository,
+        pet: PetRepository,
+        records: GameRecordsRepository
+    ) = ReportChallengeProgress(challenges, points, streak, pet, records)
+
+    @Provides fun observeBestScore(repository: GameRecordsRepository) = ObserveBestScore(repository)
+    @Provides fun observeGameBadges(repository: GameRecordsRepository) = com.example.onespace.domain.games.usecase.ObserveGameBadges(repository)
+    @Provides fun observeAllBestScores(repository: GameRecordsRepository) = ObserveAllBestScores(repository)
+    @Provides fun submitGameScore(repository: GameRecordsRepository) = SubmitGameScore(repository)
 
     @Provides fun trackMissionAction(missions: MissionRepository, points: PointRepository, pet: PetRepository) = TrackMissionAction(missions, points, pet)
     @Provides fun observeDailyMissions(repository: MissionRepository) = ObserveDailyMissions(repository)

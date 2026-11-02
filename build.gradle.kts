@@ -81,6 +81,15 @@ abstract class VerifyArchitectureTask : DefaultTask() {
                         reject("feature must expose navigation callbacks, not a controller")
                     }
                 }
+                if (area == "feature" || area == "app") {
+                    // Design tokens live in core:designsystem; screens only read the theme.
+                    val code = text.replace(Regex("(?s)/\\*.*?\\*/"), "")
+                        .replace(Regex("(?m)//.*$"), "")
+                    if (Regex("""\bColor\(\s*0x|\b0x[0-9A-Fa-f]{8}\b|\bColor\.(White|Black|Red|Green|Blue|Yellow|Cyan|Magenta|Gray|DarkGray|LightGray)\b|\bFontFamily\(|\bR\.font\.""")
+                            .containsMatchIn(code)) {
+                        reject("hard-coded colour or font; use MaterialTheme.colorScheme, MaterialTheme.oneSpaceColors or MaterialTheme.typography")
+                    }
+                }
                 if (relative.startsWith("app/src/main/") &&
                     Regex("/com/example/onespace/(domain|data|feature|core)/").containsMatchIn(relative)) {
                     reject("business/feature/core sources must live outside app")

@@ -1,5 +1,10 @@
 package com.example.onespace.app.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -65,8 +70,13 @@ fun AppNavigation(
         }
     }
 
+    // Short cross-fades with a hint of depth; the default fade is slow enough to feel laggy.
     NavHost(navController = nav, startDestination = AppRoute.Splash,
-        route = AppRoute.Root::class, modifier = modifier) {
+        route = AppRoute.Root::class, modifier = modifier,
+        enterTransition = { fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.98f) },
+        exitTransition = { fadeOut(tween(120)) },
+        popEnterTransition = { fadeIn(tween(220)) },
+        popExitTransition = { fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.98f) }) {
         composable<AppRoute.Splash> {
             val state by startup.uiState.collectAsStateWithLifecycle()
             LaunchedEffect(state) {

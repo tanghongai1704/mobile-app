@@ -32,15 +32,21 @@ fun NavGraphBuilder.accountGraph(
             val gamification by avm.gamification.collectAsStateWithLifecycle()
             val feedback by avm.feedback.collectAsStateWithLifecycle()
             val context = androidx.compose.ui.platform.LocalContext.current
+            val english = com.example.onespace.core.designsystem.LocalEnglish.current
             androidx.compose.runtime.LaunchedEffect(feedback) {
                 feedback?.let {
-                    android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+                    val shown = if (english) com.example.onespace.core.designsystem.Translations.english(it) else it
+                    android.widget.Toast.makeText(context, shown, android.widget.Toast.LENGTH_SHORT).show()
                     avm.consumeFeedback()
                 }
             }
             val continueWatching by avm.continueWatching.collectAsStateWithLifecycle()
             AccountScreen(
                 authEmail = prefs.authEmail,
+                avatarEmoji = prefs.avatarEmoji,
+                avatarFrameId = prefs.avatarFrameId,
+                onAvatarChange = vm::setAvatar,
+                onAvatarFrameChange = vm::setAvatarFrame,
                 gamification = gamification,
                 continueWatching = continueWatching,
                 onFeedPet = avm::feed,
@@ -90,7 +96,8 @@ fun NavGraphBuilder.accountGraph(
             BadgeGridScreen(
                 totalPoints = gamification.totalPoints,
                 currentStreak = gamification.streak.currentStreak,
-                petStage = gamification.pet.stage
+                petStage = gamification.pet.stage,
+                gameBadges = gamification.gameBadges
             )
         }
         composable<AccountRoute.Notifications> {

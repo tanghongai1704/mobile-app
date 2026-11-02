@@ -17,8 +17,9 @@ class SessionPolicyTest {
         assertTrue(SessionPolicy.background(state).gamePaused)
     }
     @Test fun audibleVideoMustPauseMusicButMutedVideoCanCoexist() {
-        assertTrue(SessionPolicy.resolveVideoStart(muted = false).pauseMusic)
-        assertFalse(SessionPolicy.resolveVideoStart(muted = true).pauseMusic)
+        assertEquals(VideoStartPlan.Play(pauseMusic = true), SessionPolicy.resolveVideoStart(musicPlaying = false, muted = false))
+        assertEquals(VideoStartPlan.Play(pauseMusic = false), SessionPolicy.resolveVideoStart(musicPlaying = false, muted = true))
+        assertEquals(VideoStartPlan.AskUser, SessionPolicy.resolveVideoStart(musicPlaying = true, muted = false))
     }
     @Test fun firstAudibleCollisionRequiresAChoice() {
         assertEquals(MusicStartPlan.AskUser, SessionPolicy.resolveMusicStart(true, null))

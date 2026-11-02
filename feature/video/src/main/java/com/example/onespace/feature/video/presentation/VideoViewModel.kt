@@ -8,6 +8,7 @@ import com.example.onespace.core.media.MediaPlaybackCoordinator
 import com.example.onespace.domain.session.VideoStartPlan
 import com.example.onespace.domain.session.repository.SessionPreferencesRepository
 import com.example.onespace.domain.video.model.VideoQuality
+import com.example.onespace.domain.video.quiz.QuizCombo
 import com.example.onespace.domain.video.repository.ContinueEntry
 import com.example.onespace.domain.video.usecase.GetVideo
 import com.example.onespace.domain.video.usecase.ObserveContinueWatching
@@ -15,6 +16,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+
+/** Records key of the longest end-of-video quiz combo. */
+internal const val QUIZ_COMBO_RECORD_ID = "video_quiz_combo"
 
 @HiltViewModel
 internal class VideoViewModel @Inject constructor(
@@ -24,6 +28,7 @@ internal class VideoViewModel @Inject constructor(
     preferences: SessionPreferencesRepository,
     private val viewingSession: com.example.onespace.domain.video.repository.ViewingSessionRepository,
     private val addPoints: com.example.onespace.domain.session.usecase.AddPoints,
+    private val submitScore: com.example.onespace.domain.games.usecase.SubmitGameScore,
     private val extractedAudio: com.example.onespace.domain.music.repository.ExtractedAudioRepository,
     private val downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository
 ) : ViewModel() {
@@ -120,9 +125,30 @@ internal class VideoViewModel @Inject constructor(
         }
     }
 
-    /** F-VID-18: reward for answering the end-of-video quiz correctly. */
-    fun awardEndOfVideoQuiz() {
-        viewModelScope.launch { addPoints("quiz_cuoi_video", 20) }
+    /** Correct end-of-video quiz answers in a row; a wrong answer resets it. */
+    private val _quizCombo = MutableStateFlow(0)
+    val quizCombo = _quizCombo.asStateFlow()
+
+    /** Quizzes answered this session; rotates the question type. */
+    private val _quizRound = MutableStateFlow(0)
+    val quizRound = _quizRound.asStateFlow()
+
+    /**
+     * F-VID-18: records an end-of-video quiz answer and returns the points it earned.
+     * The reward grows with the combo (see QuizCombo).
+     */
+    fun answerQuiz(correct: Boolean): Int {
+        val combo = QuizCombo.next(_quizCombo.value, correct)
+        _quizCombo.value = combo
+        _quizRound.value += 1
+        val reward = if (correct) QuizCombo.reward(combo) else 0
+        if (correct) {
+            viewModelScope.launch {
+                addPoints("quiz_cuoi_video", reward)
+                submitScore(QUIZ_COMBO_RECORD_ID, combo)
+            }
+        }
+        return reward
     }
 
     fun toggleWatchLater(videoId: String, title: String = "") {

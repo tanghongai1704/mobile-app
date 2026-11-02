@@ -25,6 +25,8 @@ internal class SettingsViewModel @Inject constructor(
     fun setThemeMode(mode: ThemeMode) { viewModelScope.launch { preferences.setThemeMode(mode) } }
     fun setDataSaver(enabled: Boolean) { viewModelScope.launch { preferences.setDataSaver(enabled) } }
     fun setLanguage(language: Language) { viewModelScope.launch { preferences.setLanguage(language) } }
+    fun setAvatar(emoji: String) { viewModelScope.launch { preferences.setAvatar(emoji) } }
+    fun setAvatarFrame(frameId: String) { viewModelScope.launch { preferences.setAvatarFrame(frameId) } }
     fun setNotificationsEnabled(enabled: Boolean) {
         viewModelScope.launch { preferences.setNotificationsEnabled(enabled) }
     }

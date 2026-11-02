@@ -1,5 +1,6 @@
 package com.example.onespace.app.ui
 
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -16,11 +17,11 @@ fun StartupScreen(state: StartupUiState, onRetry: () -> Unit) {
             verticalArrangement = Arrangement.Center) {
             OneSpaceBrand()
             Spacer(Modifier.height(24.dp))
-            Text("Bốn cách tận hưởng. Một không gian.", style = MaterialTheme.typography.bodyLarge)
+            Text(tr("Bốn cách tận hưởng. Một không gian.", "Four ways to enjoy. One space."), style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(32.dp))
             if (state is StartupUiState.Error) {
-                Text("Chưa thể khôi phục phiên trên thiết bị.")
-                TextButton(onClick = onRetry) { Text("Thử lại") }
+                Text(tr("Chưa thể khôi phục phiên trên thiết bị.", "Couldn't restore the session on this device."))
+                TextButton(onClick = onRetry) { Text(tr("Thử lại", "Try again")) }
             } else CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
         }
     }

@@ -2,6 +2,9 @@ package com.example.onespace.app.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -15,33 +18,52 @@ import com.example.onespace.feature.news.navigation.NewsRoute
 import com.example.onespace.feature.games.navigation.GamesRoute
 
 enum class TopLevelDestination(
-    val section: Section, val route: Any, val label: String, val icon: ImageVector
+    val section: Section, val route: Any, private val labelVi: String, private val labelEn: String, val icon: ImageVector
 ) {
-    HOME(Section.HOME, HomeRoute.Graph, "Home", Icons.Filled.Home),
-    VIDEO(Section.VIDEO, VideoRoute.Graph, "Video", Icons.Filled.SmartDisplay),
-    MUSIC(Section.MUSIC, MusicRoute.Graph, "Music", Icons.Filled.MusicNote),
-    NEWS(Section.NEWS, NewsRoute.Graph, "News", Icons.Filled.Newspaper),
-    GAMES(Section.GAMES, GamesRoute.Graph, "Games", Icons.Filled.SportsEsports);
+    HOME(Section.HOME, HomeRoute.Graph, "Trang chủ", "Home", Icons.Filled.Home),
+    VIDEO(Section.VIDEO, VideoRoute.Graph, "Video", "Video", Icons.Filled.SmartDisplay),
+    MUSIC(Section.MUSIC, MusicRoute.Graph, "Nhạc", "Music", Icons.Filled.MusicNote),
+    NEWS(Section.NEWS, NewsRoute.Graph, "Tin tức", "News", Icons.Filled.Newspaper),
+    GAMES(Section.GAMES, GamesRoute.Graph, "Trò chơi", "Games", Icons.Filled.SportsEsports);
+
+    @Composable
+    @ReadOnlyComposable
+    fun label(): String = tr(labelVi, labelEn)
 
     fun contains(destination: NavDestination?): Boolean =
         destination?.hierarchy?.any { it.hasRoute(route::class) } == true
 }
 
-internal fun NavDestination?.contextTitle(): String? = when {
+/** Which kind of secondary screen is on top; logic keys off this, never off the (translated) title. */
+enum class ContextScreen(private val titleVi: String, private val titleEn: String) {
+    VIDEO("Video", "Video"),
+    MUSIC("Nhạc", "Music"),
+    NEWS("Tin tức", "News"),
+    GAMES("Trò chơi", "Games"),
+    ACCOUNT("Tài khoản", "Account"),
+    SETTINGS("Tùy chỉnh", "Settings"),
+    PROFILE("Hồ sơ", "Profile");
+
+    @Composable
+    @ReadOnlyComposable
+    fun title(): String = tr(titleVi, titleEn)
+}
+
+internal fun NavDestination?.contextScreen(): ContextScreen? = when {
     this == null -> null
-    hasRoute<VideoRoute.Detail>() -> "Video"
-    hasRoute<VideoRoute.Artist>() -> "Video"
-    hasRoute<VideoRoute.Playlist>() -> "Video"
-    hasRoute<MusicRoute.NowPlaying>() -> "Music"
-    hasRoute<MusicRoute.Playlist>() -> "Music"
-    hasRoute<NewsRoute.Article>() -> "News"
-    hasRoute<GamesRoute.Game>() -> "Games"
-    hasRoute<AccountRoute.Profile>() -> "Tài khoản"
-    hasRoute<AccountRoute.Settings>() -> "Tùy chỉnh"
-    hasRoute<AccountRoute.Wrapped>() -> "Hồ sơ"
-    hasRoute<AccountRoute.Notifications>() -> "Hồ sơ"
-    hasRoute<AccountRoute.Playlists>() -> "Hồ sơ"
-    hasRoute<AccountRoute.Downloads>() -> "Hồ sơ"
-    hasRoute<AccountRoute.Badges>() -> "Hồ sơ"
+    hasRoute<VideoRoute.Detail>() -> ContextScreen.VIDEO
+    hasRoute<VideoRoute.Artist>() -> ContextScreen.VIDEO
+    hasRoute<VideoRoute.Playlist>() -> ContextScreen.VIDEO
+    hasRoute<MusicRoute.NowPlaying>() -> ContextScreen.MUSIC
+    hasRoute<MusicRoute.Playlist>() -> ContextScreen.MUSIC
+    hasRoute<NewsRoute.Article>() -> ContextScreen.NEWS
+    hasRoute<GamesRoute.Game>() -> ContextScreen.GAMES
+    hasRoute<AccountRoute.Profile>() -> ContextScreen.ACCOUNT
+    hasRoute<AccountRoute.Settings>() -> ContextScreen.SETTINGS
+    hasRoute<AccountRoute.Wrapped>() -> ContextScreen.PROFILE
+    hasRoute<AccountRoute.Notifications>() -> ContextScreen.PROFILE
+    hasRoute<AccountRoute.Playlists>() -> ContextScreen.PROFILE
+    hasRoute<AccountRoute.Downloads>() -> ContextScreen.PROFILE
+    hasRoute<AccountRoute.Badges>() -> ContextScreen.PROFILE
     else -> null
 }

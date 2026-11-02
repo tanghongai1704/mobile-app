@@ -9,15 +9,15 @@ name: 14 Cross navigation
 # wait for the bottom bar, then normalise to Home before doing anything else.
 - extendedWaitUntil:
     visible:
-      text: "Games"
+      text: "Trò chơi"
     timeout: 30000
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Tìm trong OneSpace"
     timeout: 15000
 # Setup: start a song on the Music tab
-- tapOn: "Music"
+- tapOn: "Nhạc"
 - extendedWaitUntil:
     visible:
       text: "Nắng sớm"
@@ -27,7 +27,7 @@ name: 14 Cross navigation
     visible: 'Xem hàng đợi \(.*'
     timeout: 20000
 # Read an article with music playing (F-NEWS-07): dock stays above the nav bar
-- tapOn: "News"
+- tapOn: "Tin tức"
 - extendedWaitUntil:
     visible:
       text: "Thành phố xanh bắt đầu từ ý nhỏ"
@@ -43,7 +43,7 @@ name: 14 Cross navigation
     timeout: 10000
 - takeScreenshot: F-NEWS-07-music-while-reading
 # Leave News: the article shrinks into the floating "Đang đọc" card (F-NEWS-10)
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Đang đọc"
@@ -56,7 +56,7 @@ name: 14 Cross navigation
       text: "A+"
     timeout: 15000
 # Unified search from Home across all sections (F-COM-11)
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - tapOn: "Tìm trong OneSpace"
 - inputText: "xanh"
 - pressKey: enter
@@ -76,7 +76,7 @@ name: 14 Cross navigation
     timeout: 15000
 - takeScreenshot: F-MUS-02-dock-video
 # Music dock while gaming (games own their swipes but keep the dock)
-- tapOn: "Games"
+- tapOn: "Trò chơi"
 - extendedWaitUntil:
     visible:
       text: "Tập trung chút, số lớn hơn."

@@ -25,6 +25,10 @@ data class SessionPreferences(
     /** F-MUS-07: favorite track ids, persisted so the library survives restarts. */
     val favoriteTrackIds: Set<String> = emptySet(),
     val language: Language = Language.VI,
+    /** Profile picture emoji; null keeps the initial-letter avatar. */
+    val avatarEmoji: String? = null,
+    /** Id of the selected avatar frame (unlocked by points). */
+    val avatarFrameId: String = "basic",
     /** Demo switch so graders can exercise the offline/error states deterministically. */
     val simulateOffline: Boolean = false,
     val notificationsEnabled: Boolean = false,
@@ -47,6 +51,8 @@ interface SessionPreferencesRepository {
     suspend fun setSelectedTopics(topics: Set<String>)
     suspend fun setFavoriteTrackIds(ids: Set<String>)
     suspend fun setLanguage(language: Language)
+    suspend fun setAvatar(emoji: String?)
+    suspend fun setAvatarFrame(frameId: String)
     suspend fun setSimulateOffline(enabled: Boolean)
     suspend fun setNotificationsEnabled(enabled: Boolean)
     suspend fun setStreakReminder(enabled: Boolean)

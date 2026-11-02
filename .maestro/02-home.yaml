@@ -1,6 +1,6 @@
 # 02 - Home feed (F-VID-02, F-VID-04, F-COM-04/05/06/11)
 # Labels from feature/home/.../HomeScreen.kt
-# Bottom nav labels are ENGLISH in this app: Home / Video / Music / News / Games.
+# Bottom nav labels follow the app language; the default is Vietnamese: Trang chủ / Video / Nhạc / Tin tức / Trò chơi.
 # NOTE: only ever tap a bottom tab that differs from the current screen title,
 # otherwise the top-bar title and the nav item share the same text.
 appId: com.example.onespace
@@ -11,9 +11,9 @@ name: 02 Home
 # wait for the bottom bar, then normalise to Home before doing anything else.
 - extendedWaitUntil:
     visible:
-      text: "Games"
+      text: "Trò chơi"
     timeout: 30000
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Tìm trong OneSpace"

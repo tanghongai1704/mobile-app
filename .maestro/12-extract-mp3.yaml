@@ -10,9 +10,9 @@ name: 12 Extract MP3
 # wait for the bottom bar, then normalise to Home before doing anything else.
 - extendedWaitUntil:
     visible:
-      text: "Games"
+      text: "Trò chơi"
     timeout: 30000
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Tìm trong OneSpace"
@@ -38,7 +38,7 @@ name: 12 Extract MP3
 - tapOn: "Trích xuất"
 - takeScreenshot: F-VID-10-extract-confirm
 # The extracted audio lands in the Music tab behind the "Từ video" chip
-- tapOn: "Music"
+- tapOn: "Nhạc"
 - extendedWaitUntil:
     visible:
       text: "Tìm bài hát hoặc nghệ sĩ"

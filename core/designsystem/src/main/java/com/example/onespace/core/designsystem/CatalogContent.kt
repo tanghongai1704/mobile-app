@@ -1,5 +1,6 @@
 package com.example.onespace.core.designsystem
 
+import com.example.onespace.core.designsystem.tr
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,8 +30,8 @@ fun <T> CatalogContent(
     when {
         offline -> Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
             ErrorState(
-                title = "Không có kết nối",
-                message = "Hiển thị nội dung đã tải khi có mạng lại.",
+                title = tr("Không có kết nối", "No connection"),
+                message = tr("Hiển thị nội dung đã tải khi có mạng lại.", "Downloaded content shows up again once you are back online."),
                 onRetry = onRetry,
                 secondaryLabel = offlineSecondary?.first,
                 onSecondary = offlineSecondary?.second
@@ -41,7 +42,7 @@ fun <T> CatalogContent(
         }
         state.error != null -> Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
             ErrorState(
-                title = "Lỗi hệ thống",
+                title = tr("Lỗi hệ thống", "Something went wrong"),
                 message = state.error.orEmpty(),
                 onRetry = onRetry
             )

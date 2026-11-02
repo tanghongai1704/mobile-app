@@ -11,14 +11,14 @@ name: 06 News
 # wait for the bottom bar, then normalise to Home before doing anything else.
 - extendedWaitUntil:
     visible:
-      text: "Games"
+      text: "Trò chơi"
     timeout: 30000
-- tapOn: "Home"
+- tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
       text: "Tìm trong OneSpace"
     timeout: 15000
-- tapOn: "News"
+- tapOn: "Tin tức"
 - extendedWaitUntil:
     visible:
       text: "Tìm bài báo"
