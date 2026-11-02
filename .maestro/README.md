@@ -61,7 +61,7 @@ khoá preamble chuẩn hoá về Home.
 - Nhãn tab dưới cùng là **tiếng Anh** (`Home/Video/Music/News/Games`); phần
   còn lại tiếng Việt. Chỉ tap tab **khác** với tiêu đề màn hình hiện tại.
 - App **khôi phục section cuối** khi cold start → mọi flow có preamble:
-  chờ "Games" (thanh tab) → tap "Home" → chờ "Tìm trong OneSpace".
+  chờ "Games" (thanh tab) → tap "Home" → chờ "Playlist của tôi".
 - Text của Maestro khớp **regex toàn chuỗi** (không có `exact:`): nhãn động
   dùng `'Xem sau \(.*'`; chuỗi có `(` phải escape; tiền tố phải thêm `.*`.
 - Bàn phím: `pressKey: enter` chỉ đóng bàn phím trên ô search; với ô nhập

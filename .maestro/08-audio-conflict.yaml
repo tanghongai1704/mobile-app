@@ -24,7 +24,7 @@ name: 08 Audio conflict
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 # C1 setup: open the 46s video (search by its creator, ASCII query)
 - tapOn: "Video"
@@ -32,6 +32,7 @@ name: 08 Audio conflict
     visible:
       text: "Tìm video hoặc kênh"
     timeout: 20000
+- tapOn: "Tìm kiếm"
 - tapOn: "Tìm video hoặc kênh"
 - inputText: "onespace"
 - pressKey: enter

@@ -14,7 +14,7 @@ name: 14 Cross navigation
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 # Setup: start a song on the Music tab
 - tapOn: "Nhạc"
@@ -24,7 +24,7 @@ name: 14 Cross navigation
     timeout: 20000
 - tapOn: "9:19"   # duration text: tapping the title can hit the overlapping clickable artist text
 - extendedWaitUntil:
-    visible: 'Xem hàng đợi \(.*'
+    visible: 'Xem hàng đợi.*'
     timeout: 20000
 # Read an article with music playing (F-NEWS-07): dock stays above the nav bar
 - tapOn: "Tin tức"
@@ -57,6 +57,7 @@ name: 14 Cross navigation
     timeout: 15000
 # Unified search from Home across all sections (F-COM-11)
 - tapOn: "Trang chủ"
+- tapOn: "Tìm kiếm"
 - tapOn: "Tìm trong OneSpace"
 - inputText: "xanh"
 - pressKey: enter

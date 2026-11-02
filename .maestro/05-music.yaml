@@ -15,7 +15,7 @@ name: 05 Music
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 - tapOn: "Nhạc"
 - extendedWaitUntil:
@@ -26,11 +26,11 @@ name: 05 Music
 # Now Playing (F-MUS-01)
 - tapOn: "9:19"   # duration text: tapping the title can hit the overlapping clickable artist text
 - extendedWaitUntil:
-    visible: 'Xem hàng đợi \(.*'
+    visible: 'Xem hàng đợi.*'
     timeout: 20000
 - takeScreenshot: F-MUS-01-player
 # Queue (F-MUS-05)
-- tapOn: 'Xem hàng đợi \(.*'
+- tapOn: 'Xem hàng đợi.*'
 - extendedWaitUntil:
     visible:
       text: "Đang phát"
@@ -66,6 +66,7 @@ name: 05 Music
 # MediaSession notification code exists; the in-app dock above covers the
 # equivalent UX. Manifest marks F-MUS-03 as not covered.
 # Search (F-MUS-06): ASCII query "lo-fi" matches the artist "Nhóm Lo-fi"
+- tapOn: "Tìm kiếm"
 - tapOn: "Tìm bài hát hoặc nghệ sĩ"
 - inputText: "lo-fi"
 - pressKey: enter
@@ -88,5 +89,5 @@ name: 05 Music
 - extendedWaitUntil:
     visible: 'Đã dừng phát nhạc'
     timeout: 8000
-# (F-MUS-08 "Dành cho bạn" chip omitted: the clear-search step proved flaky;
+# (F-MUS-08 "Đề xuất" chip omitted: the clear-search step proved flaky;
 # the artist page screenshot above covers the suggestion FR)

@@ -14,7 +14,7 @@ name: 09 Gamification
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 # Profile is reachable from Home only (top-bar account icon)
 - tapOn: "Tài khoản"

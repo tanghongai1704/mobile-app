@@ -16,7 +16,7 @@ name: 03 Video
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 - tapOn: "Video"
 - extendedWaitUntil:
@@ -24,8 +24,8 @@ name: 03 Video
       text: "Tìm video hoặc kênh"
     timeout: 20000
 - takeScreenshot: F-VID-02-video-feed
-# "Dành cho bạn" keeps the onboarding topics first
-- tapOn: "Dành cho bạn"
+# "Đề xuất" keeps the onboarding topics first
+- tapOn: "Đề xuất"
 - extendedWaitUntil:
     visible:
       text: "Gần với thiên nhiên thêm chút"
@@ -33,6 +33,7 @@ name: 03 Video
 - takeScreenshot: F-VID-02-video-foryou
 - tapOn: "Tất cả"
 # Search: channel matches first, then videos (F-VID-03)
+- tapOn: "Tìm kiếm"
 - tapOn: "Tìm video hoặc kênh"
 - inputText: "onespace"
 - pressKey: enter
@@ -157,6 +158,7 @@ name: 03 Video
 - tapOn: "Quay lại"
 # End-of-video quiz (F-VID-15): play a 10s video and wait for the offer
 - tapOn: "Video"
+- tapOn: "Tìm kiếm"
 - tapOn: "Tìm video hoặc kênh"
 - inputText: "xanh"
 - pressKey: enter

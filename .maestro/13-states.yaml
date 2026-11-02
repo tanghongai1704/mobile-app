@@ -15,9 +15,10 @@ name: 13 States
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 # Search with no results (empty state)
+- tapOn: "Tìm kiếm"
 - tapOn: "Tìm trong OneSpace"
 - inputText: "zzzzzz"
 - pressKey: enter

@@ -16,7 +16,7 @@ name: 06 News
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 - tapOn: "Tin tức"
 - extendedWaitUntil:
@@ -87,6 +87,7 @@ name: 06 News
     visible:
       text: "Tìm bài báo"
     timeout: 15000
+- tapOn: "Tìm kiếm"
 - tapOn: "Tìm bài báo"
 - inputText: "Caf"
 - pressKey: enter

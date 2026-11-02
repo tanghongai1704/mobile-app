@@ -16,7 +16,7 @@ name: 02 Home
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 - takeScreenshot: F-VID-02-home-feed
 # Gamification banner: XP + streak chip + daily missions
@@ -41,6 +41,7 @@ name: 02 Home
       text: "Đề xuất cho bạn"
     timeout: 15000
 # Cross-content search (F-COM-11): "xanh" matches videos (Góc xanh) + articles
+- tapOn: "Tìm kiếm"
 - tapOn: "Tìm trong OneSpace"
 - inputText: "xanh"
 - pressKey: enter

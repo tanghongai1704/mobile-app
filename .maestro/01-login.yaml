@@ -60,6 +60,6 @@ name: 01 Login
 - tapOn: "Đăng nhập"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 30000
 - takeScreenshot: F-COM-01-loggedin-home

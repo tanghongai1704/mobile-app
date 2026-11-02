@@ -16,7 +16,7 @@ name: 10 Shop
 - tapOn: "Trang chủ"
 - extendedWaitUntil:
     visible:
-      text: "Tìm trong OneSpace"
+      text: "Playlist của tôi"
     timeout: 15000
 - tapOn: "Tài khoản"
 - scrollUntilVisible:
