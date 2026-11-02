@@ -39,7 +39,7 @@ internal class NewsViewModel @Inject constructor(
     private val pauseTts: PauseTts,
     private val stopTtsUseCase: StopTts,
     private val trackMissionAction: TrackMissionAction,
-    ttsEngine: TtsEngine
+    private val tts: TtsEngine
 ) : ViewModel() {
     private val refresh = MutableStateFlow(0)
 
@@ -59,7 +59,7 @@ internal class NewsViewModel @Inject constructor(
     private val _quizAnswers = MutableStateFlow<Map<String, Map<Int, Int>>>(emptyMap())
     val quizAnswers: StateFlow<Map<String, Map<Int, Int>>> = _quizAnswers.asStateFlow()
 
-    val ttsState: StateFlow<TtsState> = ttsEngine.state
+    val ttsState: StateFlow<TtsState> = tts.state
 
     /** F-MUS-12: downloaded articles, persisted in Room (DB v5). */
     val downloads = downloadedContent.observeByType("news")
@@ -76,13 +76,25 @@ internal class NewsViewModel @Inject constructor(
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" to "7:33"
     )
 
-    fun addExtractedAudio(articleId: String, title: String, category: String) {
-        val (url, duration) = demoAudio[kotlin.math.abs(articleId.hashCode()) % demoAudio.size]
+    /**
+     * F-NEWS-05: reads the article aloud into an audio file and adds it to the Music library
+     * ("From your videos"). When the device has no Vietnamese voice the demo audio is saved
+     * instead; [onDone] says which one happened (true = the real reading).
+     */
+    fun addExtractedAudio(articleId: String, title: String, category: String, body: String, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
+            val spoken = runCatching {
+                tts.synthesizeToFile(listOf(title) + body.split("\n\n").filter { it.isNotBlank() }, "article-$articleId")
+            }.getOrNull()
+            val (url, duration) = if (spoken != null) {
+                val s = spoken.durationMs / 1000
+                spoken.url to "%d:%02d".format(s / 60, s % 60)
+            } else demoAudio[kotlin.math.abs(articleId.hashCode()) % demoAudio.size]
             // F-NEWS-05: only the first extraction of an article pays the bonus.
             val existing = extractedAudio.observeAll().first().any { it.videoId == articleId }
             extractedAudio.add(articleId, title, category, url, duration)
             if (!existing) pointRepository.add("extract_audio", 5)
+            onDone(spoken != null)
         }
     }
 

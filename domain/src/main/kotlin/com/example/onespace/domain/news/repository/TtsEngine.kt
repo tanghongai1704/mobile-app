@@ -11,4 +11,13 @@ interface TtsEngine {
     suspend fun pause()
     suspend fun stop()
     suspend fun release()
+
+    /**
+     * Reads [paragraphs] into one audio file named after [name]. Returns where it is stored and
+     * how long it is, or null when the device cannot do it (no engine or no Vietnamese voice).
+     */
+    suspend fun synthesizeToFile(paragraphs: List<String>, name: String): SynthesizedAudio? = null
 }
+
+/** A finished text-to-speech file: a playable [url] and its length. */
+data class SynthesizedAudio(val url: String, val durationMs: Long)

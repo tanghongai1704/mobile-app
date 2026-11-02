@@ -67,8 +67,8 @@ fun NavGraphBuilder.newsGraph(
                             vm.toggleDownload(it.id, it.title, it.category + " · " + it.readTime)
                         }
                     },
-                    onExtractAudio = {
-                        article?.let { vm.addExtractedAudio(it.id, it.title, it.category) }
+                    onExtractAudio = { done ->
+                        article?.let { vm.addExtractedAudio(it.id, it.title, it.category, it.body, done) }
                     },
                     onReadComplete = vm::onArticleRead,
                     ttsState = ttsState,

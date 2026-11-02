@@ -400,8 +400,10 @@ abstract class FeedbackShots(mode: String) : ScreenshotBase(mode) {
         }
         optional("beat") {
             openScrolling("Beat Tiles")
+            shot("k14-beat-notice")
+            compose.onNodeWithText("Chơi toàn màn hình").performClick(); settle()
             shot("k14-beat-menu")
-            compose.onNodeWithText("Chọn bài hát của bạn").performClick(); settle(); shot("k15-beat-songs")
+            compose.onNodeWithText("Chọn bài hát của bạn").performSemanticsAction(SemanticsActions.OnClick); settle(); shot("k15-beat-songs")
             back()
         }
     }

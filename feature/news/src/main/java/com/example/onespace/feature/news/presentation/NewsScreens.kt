@@ -174,7 +174,7 @@ internal fun ArticleScreen(
     onBookmark: () -> Unit,
     downloaded: Boolean = false,
     onToggleDownload: () -> Unit = {},
-    onExtractAudio: () -> Unit = {},
+    onExtractAudio: ((Boolean) -> Unit) -> Unit = { it(false) },
     onReadComplete: () -> Unit = {},
     quizAnswers: Map<Int, Int> = emptyMap(),
     onQuizAnswer: (Int, Int) -> Unit = { _, _ -> },
@@ -186,7 +186,8 @@ internal fun ArticleScreen(
     var showQuiz by rememberSaveable(article.id) { mutableStateOf(false) }
     var showExtract by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val msgExtracted = tr("Đã lưu âm thanh vào thư viện Nhạc (Từ video của bạn)", "Audio saved to your Music library (From your videos)")
+    val msgExtracted = tr("Đã đọc bài báo thành MP3 và lưu vào thư viện Nhạc (Từ video của bạn)", "Article read aloud and saved to your Music library (From your videos)")
+    val msgExtractedDemo = tr("Máy chưa có giọng đọc tiếng Việt nên đã lưu âm thanh mẫu vào thư viện Nhạc", "No Vietnamese voice on this device, so a sample audio was saved to your Music library")
     var readCounted by rememberSaveable(article.id) { mutableStateOf(false) }
     val bodyStyle = MaterialTheme.typography.bodyLarge.copy(
         fontSize = MaterialTheme.typography.bodyLarge.fontSize * fontScale,
@@ -300,7 +301,7 @@ internal fun ArticleScreen(
                         .fillMaxWidth()
                         .pointerInput(article.id) {
                             detectTapGestures(
-                                onLongPress = { onExtractAudio() }
+                                onLongPress = { showExtract = true }
                             )
                         }
                 )
@@ -387,8 +388,9 @@ internal fun ArticleScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showExtract = false
-                    onExtractAudio()
-                    android.widget.Toast.makeText(context, msgExtracted, android.widget.Toast.LENGTH_LONG).show()
+                    onExtractAudio { real ->
+                        android.widget.Toast.makeText(context, if (real) msgExtracted else msgExtractedDemo, android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }) { Text(tr("Trích xuất", "Extract")) }
             },
             dismissButton = { TextButton(onClick = { showExtract = false }) { Text(tr("Hủy", "Cancel")) } }
