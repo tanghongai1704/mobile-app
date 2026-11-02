@@ -424,7 +424,7 @@ internal fun BeatTilesScreen(bpm: Int? = null, songTitle: String? = null, onGame
                 Text(if (score > 0)
                     tr("Điểm: $score — combo cao nhất x$bestCombo.", "Score: $score, best combo x$bestCombo.")
                 else
-                    tr("Nốt nhạc rơi theo nhịp — chạm đúng ô khi nốt chạm vùng sáng ở đáy. Chơi kèm bài đang phát trên dock cho trọn (case C9).", "Notes fall to the beat: tap the lane when a note reaches the glowing zone at the bottom. Best played along with the song in the dock (case C9)."))
+                    tr("Nốt nhạc rơi theo nhịp — chạm đúng ô khi nốt chạm vùng sáng ở đáy.", "Notes fall to the beat: tap the lane when a note reaches the glowing zone at the bottom."))
             },
             confirmButton = {
                 Button(onClick = { start() }) { Text(if (score > 0) tr("Chơi lại", "Play again") else tr("Bắt đầu", "Start")) }

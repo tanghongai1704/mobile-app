@@ -40,6 +40,8 @@ fun NavGraphBuilder.homeGraph(
                 gamification = gamification,
                 offline = offline,
                 watchLater = watchLater,
+                onRemoveFromWatchLater = { videoId -> vm.removeFromWatchLater(videoId) },
+                onWatchedFromLater = { videoId -> vm.watchedFromLater(videoId) },
                 onOpenVideo = onOpenVideo,
                 onPlayTrack = onPlayTrack,
                 onOpenArticle = onOpenArticle,

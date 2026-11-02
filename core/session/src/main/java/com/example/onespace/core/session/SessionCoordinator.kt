@@ -252,6 +252,20 @@ class SessionCoordinator @Inject constructor(
         }
         port.setMusicSpeed(_musicSpeed.value)
     }
+
+    /** Video playback speed for this session: x1 -> x1.5 -> x2 -> x0.5 -> x1 ... */
+    private val _videoSpeed = MutableStateFlow(1f)
+    val videoSpeed: StateFlow<Float> = _videoSpeed.asStateFlow()
+
+    fun cycleVideoSpeed() {
+        _videoSpeed.value = when (_videoSpeed.value) {
+            1f -> 1.5f
+            1.5f -> 2f
+            2f -> 0.5f
+            else -> 1f
+        }
+        port.setVideoSpeed(_videoSpeed.value)
+    }
     fun moveQueueItem(fromIndex: Int, toIndex: Int) = port.moveTrackInQueue(fromIndex, toIndex)
 
     fun nextTrack() {

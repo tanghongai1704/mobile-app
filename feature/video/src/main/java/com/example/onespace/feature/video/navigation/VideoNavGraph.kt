@@ -45,10 +45,7 @@ fun NavGraphBuilder.videoGraph(
                 val context = androidx.compose.ui.platform.LocalContext.current
                 val downloads by vm.downloads.collectAsStateWithLifecycle()
                 val watchLater by vm.watchLaterIds.collectAsStateWithLifecycle()
-                val volume by session.videoVolume.collectAsStateWithLifecycle()
-                var lastVolume by remember { mutableStateOf(1f) }
                 var saveTarget by remember { mutableStateOf<com.example.onespace.domain.video.model.Video?>(null) }
-                val systemVolume = rememberSystemVolume()
                 val shareTemplate = tr("Xem \"%s\" trên OneSpace", "Watch \"%s\" on OneSpace")
                 val msgShare = tr("Chia sẻ", "Share")
                 val msgDownloadAdded = tr("Đã thêm vào Đã tải (Hồ sơ)", "Added to Downloaded (Profile)")
@@ -84,12 +81,6 @@ fun NavGraphBuilder.videoGraph(
                     },
                     onOpenChannel = onOpenArtist,
                     cardActions = actions,
-                    volume = volume,
-                    onToggleMute = {
-                        if (volume > 0f) { lastVolume = volume; session.setVideoVolume(0f) }
-                        else session.setVideoVolume(lastVolume.coerceAtLeast(0.2f))
-                    },
-                    systemVolume = systemVolume,
                     savedVideo = saveTarget,
                     watchLaterIds = watchLater,
                     onToggleWatchLater = { v ->
@@ -208,6 +199,9 @@ fun NavGraphBuilder.videoGraph(
                 val quality by vm.quality.collectAsStateWithLifecycle()
                 // Session volume lives on the coordinator, not per-video state.
                 val volume by session.videoVolume.collectAsStateWithLifecycle()
+                // The detail screen's speaker button: mute at once, restore on the next tap.
+                var lastVolume by remember { mutableStateOf(1f) }
+                val systemVolume = rememberSystemVolume()
                 val quizCombo by vm.quizCombo.collectAsStateWithLifecycle()
                 val quizRound by vm.quizRound.collectAsStateWithLifecycle()
                 var mp3Offer by remember { mutableStateOf(false) }
@@ -247,6 +241,11 @@ fun NavGraphBuilder.videoGraph(
                     onSpeed = vm::setSpeed,
                     volume = volume,
                     onVolume = session::setVideoVolume,
+                    onToggleMute = {
+                        if (volume > 0f) { lastVolume = volume; session.setVideoVolume(0f) }
+                        else session.setVideoVolume(lastVolume.coerceAtLeast(0.2f))
+                    },
+                    systemVolume = systemVolume,
                     quality = quality,
                     onQuality = vm::setQuality,
                     onSeekTo = session::seekVideoTo,

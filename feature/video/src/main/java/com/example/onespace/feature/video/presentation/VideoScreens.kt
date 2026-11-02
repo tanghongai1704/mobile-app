@@ -79,9 +79,6 @@ internal fun VideoScreen(
     onOpen: (String) -> Unit,
     onOpenChannel: (String) -> Unit = {},
     cardActions: VideoCardActions? = null,
-    volume: Float = 1f,
-    onToggleMute: () -> Unit = {},
-    systemVolume: Float? = null,
     savedVideo: Video? = null,
     watchLaterIds: Set<String> = emptySet(),
     onToggleWatchLater: (Video) -> Unit = {},
@@ -118,8 +115,6 @@ internal fun VideoScreen(
 
     val english = LocalEnglish.current
     FeaturePage {
-        // Top-left speaker: tap to mute at once; the bar shows the phone volume while it changes.
-        item { VolumeControl(volume, onToggleMute, systemVolume) }
         if (q.isEmpty()) {
             item {
                 LazyRow(
@@ -263,7 +258,12 @@ internal fun VideoScreen(
 
 /** Speaker button (mute toggle) with a bar that appears while the phone volume is being changed. */
 @Composable
-private fun VolumeControl(volume: Float, onToggleMute: () -> Unit, systemVolume: Float?) {
+private fun VolumeControl(
+    volume: Float,
+    onToggleMute: () -> Unit,
+    systemVolume: Float?,
+    tint: Color = MaterialTheme.oneSpaceColors.onMedia
+) {
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(systemVolume) {
         if (systemVolume != null) {
@@ -277,7 +277,7 @@ private fun VolumeControl(volume: Float, onToggleMute: () -> Unit, systemVolume:
             Icon(
                 if (volume <= 0f) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                 contentDescription = if (volume <= 0f) tr("Bật tiếng", "Unmute") else tr("Tắt tiếng", "Mute"),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = tint
             )
         }
         androidx.compose.animation.AnimatedVisibility(visible = shown && systemVolume != null) {
@@ -530,6 +530,8 @@ internal fun VideoDetailScreen(
     onSoundOnly: () -> Unit = {},
     volume: Float = 1f,
     onVolume: (Float) -> Unit = {},
+    onToggleMute: () -> Unit = {},
+    systemVolume: Float? = null,
     speed: Float = 1f,
     onSpeed: (Float) -> Unit = {},
     quality: String = "Auto",
@@ -620,10 +622,18 @@ internal fun VideoDetailScreen(
                         }
                 )
                 // F-VID-17: speed and mute badges stay readable even when the controls are hidden.
+                // The speaker button sits with them: tap to mute at once; the bar shows the
+                // phone volume while it changes.
                 Row(
                     Modifier.align(Alignment.TopStart).padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    VolumeControl(
+                        volume, onToggleMute, systemVolume,
+                        tint = if (audioOnly) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.oneSpaceColors.onMedia
+                    )
                     if (speed != 1f) Surface(
                         color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
                         shape = MaterialTheme.shapes.small
@@ -778,8 +788,8 @@ internal fun VideoDetailScreen(
                         )
                     }
                 }
-                // Channel · length, then the three actions with their labels.
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                // Channel · length, then the three actions lined up on the right.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onShare) {
                         Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(6.dp))

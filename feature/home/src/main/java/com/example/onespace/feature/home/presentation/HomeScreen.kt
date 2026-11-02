@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -39,6 +42,10 @@ import com.example.onespace.domain.session.port.MusicPlayback
 import com.example.onespace.domain.session.port.VideoPlayback
 import com.example.onespace.domain.news.model.Article
 import com.example.onespace.domain.video.model.Video
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 
 data class HomeUiState(
     val videos: List<Video> = emptyList(),
@@ -75,6 +82,8 @@ internal fun HomeScreen(
     gamification: GamificationUiState = GamificationUiState(),
     offline: Boolean = false,
     watchLater: Set<String> = emptySet(),
+    onRemoveFromWatchLater: (String) -> Unit = {},
+    onWatchedFromLater: (String) -> Unit = {},
     onMissionClick: (String) -> Unit = {},
     onOpenPlaylists: () -> Unit = {},
     onOpenVideo: (id: String, title: String) -> Unit,
@@ -129,7 +138,13 @@ internal fun HomeScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        androidx.compose.material3.Text(tr("Playlist của tôi", "My playlists"), maxLines = 1)
+                        androidx.compose.material3.Text(
+                            if (com.example.onespace.core.designsystem.AppPlaylistStore.playlists.isEmpty())
+                                tr("Playlist của tôi", "My playlists")
+                            else
+                                tr("Playlist (", "Playlists (") + com.example.onespace.core.designsystem.AppPlaylistStore.playlists.size + ")",
+                            maxLines = 1
+                        )
                     }
                 }
             }
@@ -232,15 +247,34 @@ internal fun HomeScreen(
                     }
                 } else {
                     items(watchLater.mapNotNull { id -> state.videos.find { it.id == id } }, key = { it.id }) { video ->
-                        ContentCard(
-                            title = video.title,
-                            subtitle = video.creator + " · " + video.duration,
-                            icon = androidx.compose.material.icons.Icons.Filled.PlayCircle,
-                            onClick = {
-                                showWatchlist = false
-                                onOpenVideo(video.id, video.title)
-                            }
-                        )
+                        // Swipe left to remove from Watch later; tap to open the video.
+                        var offsetX by remember { mutableFloatStateOf(0f) }
+                        Box(
+                            Modifier
+                                .offset { IntOffset(offsetX.roundToInt(), 0) }
+                                .pointerInput(video.id) {
+                                    detectHorizontalDragGestures(
+                                        onDragEnd = {
+                                            if (offsetX < -120f) onRemoveFromWatchLater(video.id)
+                                            offsetX = 0f
+                                        },
+                                        onHorizontalDrag = { _, dragAmount ->
+                                            if (dragAmount < 0) offsetX += dragAmount
+                                        }
+                                    )
+                                }
+                        ) {
+                            ContentCard(
+                                title = video.title,
+                                subtitle = video.creator + " · " + video.duration,
+                                icon = androidx.compose.material.icons.Icons.Filled.PlayCircle,
+                                onClick = {
+                                    showWatchlist = false
+                                    onWatchedFromLater(video.id)
+                                    onOpenVideo(video.id, video.title)
+                                }
+                            )
+                        }
                     }
                     item { Spacer(Modifier.height(24.dp)) }
                 }
@@ -450,20 +484,44 @@ private fun VideoPostCard(
                     onDoubleTap = onToggle
                 )
             }
-            // Round play button: start inline playback / pause-resume.
-            Surface(
-                onClick = { if (isCurrent) onToggle() else onPlayAtHome() },
-                shape = CircleShape,
-                color = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.92f),
-                shadowElevation = 4.dp,
-                modifier = Modifier.align(Alignment.Center).size(52.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        if (isCurrent && isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isCurrent) tr("Tạm dừng", "Pause") else tr("Phát ", "Play ") + video.title,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+            if (isCurrent) {
+                // Transport row like the floating window: back 10 / play-pause /
+                // forward 10 — semi-transparent circles centered on the frame.
+                Row(
+                    Modifier.align(Alignment.Center),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    InlineVideoControl(Icons.Filled.Replay10, tr("Lùi 10 giây", "Back 10 seconds")) {
+                        onSeekTo((positionMs - 10_000).coerceAtLeast(0))
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    InlineVideoControl(
+                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        if (isPlaying) tr("Tạm dừng", "Pause") else tr("Phát tiếp", "Resume"),
+                        Modifier.size(46.dp)
+                    ) { onToggle() }
+                    Spacer(Modifier.width(10.dp))
+                    InlineVideoControl(Icons.Filled.Forward10, tr("Tới 10 giây", "Forward 10 seconds")) {
+                        val target = positionMs + 10_000
+                        onSeekTo(if (totalMs > 0) target.coerceAtMost(totalMs) else target)
+                    }
+                }
+            } else {
+                // Round play button: start inline playback.
+                Surface(
+                    onClick = onPlayAtHome,
+                    shape = CircleShape,
+                    color = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.92f),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.align(Alignment.Center).size(52.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = tr("Phát ", "Play ") + video.title,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
             if (!isCurrent) {
@@ -479,6 +537,19 @@ private fun VideoPostCard(
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
+            }
+            // Thin draggable progress along the bottom edge while this card is
+            // the inline player: press the knob, drag, release to seek.
+            if (isCurrent && totalMs > 0) {
+                ScrubBar(
+                    positionMs, totalMs,
+                    onSeek = onSeekTo,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    trackHeight = 3.dp,
+                    knobRadius = 5.dp,
+                    trackColor = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.3f),
+                    progressColor = MaterialTheme.oneSpaceColors.onMedia
+                )
             }
         }
         Column(
@@ -496,6 +567,26 @@ private fun VideoPostCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+/** One semi-transparent circle button of the inline transport row, like the floating window. */
+@Composable
+private fun InlineVideoControl(
+    icon: ImageVector,
+    description: String,
+    modifier: Modifier = Modifier.size(40.dp),
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.oneSpaceColors.mediaScrim,
+        modifier = modifier
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = description, tint = MaterialTheme.oneSpaceColors.onMedia)
         }
     }
 }

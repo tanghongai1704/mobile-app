@@ -30,7 +30,7 @@ internal class HomeViewModel @Inject constructor(
     observeDailyMissions: ObserveDailyMissions,
     ensureTodayMissions: EnsureTodayMissions,
     preferences: com.example.onespace.domain.session.repository.SessionPreferencesRepository,
-    viewingSession: com.example.onespace.domain.video.repository.ViewingSessionRepository
+    private val viewingSession: com.example.onespace.domain.video.repository.ViewingSessionRepository
 ) : ViewModel() {
     /** F-VID-02 flavor on the Home feed: topic picks first when topics exist. */
     private val topics = preferences.preferences.map { it.selectedTopics }
@@ -72,6 +72,16 @@ internal class HomeViewModel @Inject constructor(
     val watchLater = viewingSession.observeWatchlist()
         .map { list -> list.map { it.videoId }.toSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** Remove a single video from the watch later list (swipe/X on the card). */
+    fun removeFromWatchLater(videoId: String) {
+        viewModelScope.launch { viewingSession.removeFromWatchlist(videoId) }
+    }
+
+    /** Watching a video from the list means it's no longer "watch later". */
+    fun watchedFromLater(videoId: String) {
+        viewModelScope.launch { viewingSession.removeFromWatchlist(videoId) }
+    }
 
     /** Demo switch from Settings: renders the offline banner while on. */
     val offline = preferences.preferences.map { it.simulateOffline }

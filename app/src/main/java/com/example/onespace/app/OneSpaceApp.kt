@@ -43,6 +43,7 @@ fun OneSpaceApp() {
     // One coordinator for the entire shell; catalog ViewModels live inside feature graphs.
     val coordinator: SessionCoordinator = hiltViewModel()
     val media: MediaViewModel = hiltViewModel()
+    val tts: TtsControlsViewModel = hiltViewModel()
     val downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository =
         hiltViewModel<DownloadsViewModel>().repository
     val musicState by coordinator.music.collectAsStateWithLifecycle()
@@ -54,6 +55,8 @@ fun OneSpaceApp() {
     val density = LocalDensity.current
     var floatingPlayerHeight by remember { mutableIntStateOf(0) }
     val floatingPosition = rememberFloatingPosition()
+    // The floating window's speaker button: mute at once, restore on the next tap.
+    var lastVideoVolume by remember { mutableStateOf(1f) }
 
     val nav = rememberNavController()
     val appState = rememberOneSpaceAppState(nav)
@@ -68,6 +71,10 @@ fun OneSpaceApp() {
     val msgSavedWatchLater = tr("Đã lưu vào Xem sau", "Saved to Watch later")
     // One search per top-level section; the field drops down under the top bar.
     val musicSpeed by coordinator.musicSpeed.collectAsStateWithLifecycle()
+    val videoSpeed by coordinator.videoSpeed.collectAsStateWithLifecycle()
+    val videoVolume by coordinator.videoVolume.collectAsStateWithLifecycle()
+    // TTS truth for the reading card: keeps flowing while the reader is on other tabs.
+    val ttsState by tts.engine.state.collectAsStateWithLifecycle()
     var recordSource by remember { mutableStateOf<RecordSource?>(null) }
     val searches = remember { Section.entries.associateWith { com.example.onespace.core.designsystem.SearchState() } }
     val activeSearch = selected?.let { searches[it.section] }
@@ -144,6 +151,18 @@ fun OneSpaceApp() {
                             contentDescription = tr("Tìm kiếm", "Search")
                         )
                     }
+                    // Guess-song shortcut: a small game icon next to the search magnifier, Music tab only.
+                    if (screen == null && selected?.section == com.example.onespace.domain.session.Section.MUSIC) {
+                        IconButton(onClick = {
+                            coordinator.cancelPendingRestore()
+                            appState.openGame("g3")
+                        }) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Filled.SportsEsports,
+                                contentDescription = tr("Chơi Đoán bài hát", "Play Guess the Song")
+                            )
+                        }
+                    }
                     // Profile is secondary: reachable from Home only, not every screen.
                     if (onHome) IconButton(onClick = {
                         coordinator.cancelPendingRestore()
@@ -175,6 +194,7 @@ fun OneSpaceApp() {
                     onToggle = coordinator::toggleMusic,
                     speed = musicSpeed,
                     onCycleSpeed = coordinator::cycleMusicSpeed,
+                    onSeekTo = coordinator::seekMusicTo,
                     onClose = {
                         // Undo pattern: the user can bring the music back within 4 seconds.
                         val lastId = trackId
@@ -194,6 +214,13 @@ fun OneSpaceApp() {
                 )
                 if (showArticleFloat) FloatingArticleCard(
                     title = ReadingState.title,
+                    ttsActive = ttsState.totalSegments > 0,
+                    ttsPlaying = ttsState.isPlaying,
+                    ttsProgress = ttsState.progress,
+                    onToggleTts = {
+                        if (ttsState.isPlaying) scope.launch { tts.engine.pause() }
+                        else scope.launch { tts.engine.play() }
+                    },
                     onExpand = { ReadingState.articleId?.let { appState.openArticle(it) } },
                     onClose = ReadingState::close
                 )
@@ -261,6 +288,13 @@ fun OneSpaceApp() {
                 onExpand = { videoId?.let { appState.openVideo(it) } },
                 onToggle = coordinator::toggleVideo,
                 onSeekBy = coordinator::seekVideoBy,
+                speed = videoSpeed,
+                onCycleSpeed = coordinator::cycleVideoSpeed,
+                onToggleMute = {
+                    if (videoVolume > 0f) { lastVideoVolume = videoVolume; coordinator.setVideoVolume(0f) }
+                    else coordinator.setVideoVolume(lastVideoVolume.coerceAtLeast(0.2f))
+                },
+                onSeekTo = coordinator::seekVideoTo,
                 onClose = {
                     coordinator.closeVideo()
                     scope.launch { snackbarHostState.showSnackbar(msgSavedWatchLater) }
@@ -335,10 +369,10 @@ fun OneSpaceApp() {
                         Checkbox(checked = c2DontAsk, onCheckedChange = { c2DontAsk = it })
                         Text(tr("Không hỏi lại", "Don't ask again"), style = MaterialTheme.typography.bodyMedium)
                     }
-                    VideoConflictRow(tr("Tắt tiếng video, nhạc vẫn phát", "Mute the video, keep the music")) {
+                    VideoConflictRow(tr("Tắt tiếng video", "Mute the video")) {
                         coordinator.resolveVideoConflict(pauseMusic = false, remember = c2DontAsk)
                     }
-                    VideoConflictRow(tr("Tắt tiếng nhạc, video có tiếng", "Mute the music, keep the video sound")) {
+                    VideoConflictRow(tr("Dừng nhạc", "Stop the music")) {
                         coordinator.resolveVideoConflict(pauseMusic = true, remember = c2DontAsk)
                     }
                 }
@@ -379,4 +413,10 @@ private fun ConflictRow(
 @dagger.hilt.android.lifecycle.HiltViewModel
 class DownloadsViewModel @javax.inject.Inject constructor(
     val repository: com.example.onespace.domain.session.repository.DownloadedContentRepository
+) : androidx.lifecycle.ViewModel()
+
+/** Shell access to the shared TTS engine: the reading card shows its progress and pauses/resumes it. */
+@dagger.hilt.android.lifecycle.HiltViewModel
+class TtsControlsViewModel @javax.inject.Inject constructor(
+    val engine: com.example.onespace.domain.news.repository.TtsEngine
 ) : androidx.lifecycle.ViewModel()

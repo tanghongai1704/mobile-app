@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import com.example.onespace.core.designsystem.AppCard
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -57,7 +59,8 @@ import com.example.onespace.domain.session.port.PlaybackStatus
 @Composable
 fun MusicMiniPlayer(
     title: String, playback: MusicPlayback, onExpand: () -> Unit, onToggle: () -> Unit, onClose: () -> Unit,
-    speed: Float = 1f, onCycleSpeed: () -> Unit = {}
+    speed: Float = 1f, onCycleSpeed: () -> Unit = {},
+    onSeekTo: (Long) -> Unit = {}
 ) {
     val playing = playback.playRequested && playback.error == null
     Surface(
@@ -68,37 +71,48 @@ fun MusicMiniPlayer(
         ),
         shadowElevation = 3.dp
     ) {
-        Row(Modifier.fillMaxWidth()
-            .clickable(onClick = onExpand)
-            .padding(start = 14.dp, end = 4.dp)
-            .heightIn(min = 60.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(40.dp).background(
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), MaterialTheme.shapes.medium
-                ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.MusicNote, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Column {
+            Row(Modifier.fillMaxWidth()
+                .clickable(onClick = onExpand)
+                .padding(start = 14.dp, end = 4.dp)
+                .heightIn(min = 60.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(40.dp).background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), MaterialTheme.shapes.medium
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.MusicNote, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                    Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
+                    PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
+                }
+                // Speed: x1 -> x1.5 -> x2 -> x0.5 -> x1 ..., one tap each.
+                TextButton(onClick = onCycleSpeed, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)) {
+                    Text("x" + (if (speed % 1f == 0f) speed.toInt().toString() else speed.toString()),
+                        style = MaterialTheme.typography.labelLarge)
+                }
+                IconButton(onClick = onToggle) {
+                    Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"))
+                }
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Filled.Close, contentDescription = tr("Đóng", "Close"))
+                }
             }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
-                Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
-                PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
-            }
-            // Speed: x1 -> x1.5 -> x2 -> x0.5 -> x1 ..., one tap each.
-            TextButton(onClick = onCycleSpeed, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)) {
-                Text("x" + (if (speed % 1f == 0f) speed.toInt().toString() else speed.toString()),
-                    style = MaterialTheme.typography.labelLarge)
-            }
-            IconButton(onClick = onToggle) {
-                Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"))
-            }
-            IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = tr("Đóng", "Close"))
-            }
+            // Thin draggable progress at the bottom of the dock: position of the
+            // song, drag (or tap) to seek. It sits outside the clickable row so
+            // a drag never opens the player.
+            ScrubBar(
+                playback.positionMs, playback.totalMs,
+                onSeek = onSeekTo,
+                trackHeight = 2.dp,
+                knobRadius = 4.dp
+            )
         }
     }
 }
@@ -139,7 +153,11 @@ fun BoxScope.FloatingVideo(
     onClose: () -> Unit,
     position: FloatingPosition,
     onHeightChanged: (Int) -> Unit = {},
-    onSeekBy: (Long) -> Unit = {}
+    onSeekBy: (Long) -> Unit = {},
+    speed: Float = 1f,
+    onCycleSpeed: () -> Unit = {},
+    onToggleMute: () -> Unit = {},
+    onSeekTo: (Long) -> Unit = {}
 ) {
     val playing = playback.playRequested && playback.error == null
     DraggableFloating(position, onHeightChanged) {
@@ -163,8 +181,8 @@ fun BoxScope.FloatingVideo(
                     )
                     FloatingAction(Icons.Filled.Close, tr("Đóng", "Close"), onClose)
                 }
-                // Progress of the video while only its sound is playing.
-                ScrubBar(playback.positionMs, playback.totalMs, interactive = false, trackHeight = 3.dp)
+                // Progress of the video while only its sound is playing; drag to seek.
+                ScrubBar(playback.positionMs, playback.totalMs, onSeek = onSeekTo, trackHeight = 3.dp)
             }
         } else {
             // Tap shows back-10 / play-pause / forward-10 and close / expand; they fade after 2s.
@@ -203,9 +221,21 @@ fun BoxScope.FloatingVideo(
                                     Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"), tint = onMedia)
                                 }
                             }
-                            Row(Modifier.align(Alignment.BottomEnd).padding(bottom = 3.dp)) {
-                                FloatingAction(Icons.Filled.OpenInFull, tr("Mở rộng", "Expand"), onExpand, onMedia)
-                                FloatingAction(Icons.Filled.Close, tr("Đóng", "Close"), onClose, onMedia)
+                            // Bottom row: speaker toggle on the left, expand / close on the right.
+                            Row(
+                                Modifier.align(Alignment.BottomStart).padding(bottom = 3.dp).fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                FloatingAction(
+                                    if (playback.muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                                    if (playback.muted) tr("Bật tiếng", "Unmute") else tr("Tắt tiếng", "Mute"),
+                                    onToggleMute, onMedia
+                                )
+                                Row {
+                                    FloatingAction(Icons.Filled.OpenInFull, tr("Mở rộng", "Expand"), onExpand, onMedia)
+                                    FloatingAction(Icons.Filled.Close, tr("Đóng", "Close"), onClose, onMedia)
+                                }
                             }
                         }
                     }
@@ -214,42 +244,33 @@ fun BoxScope.FloatingVideo(
                         Modifier.align(Alignment.TopCenter).padding(top = 5.dp).size(width = 28.dp, height = 4.dp)
                             .background(MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.7f), CircleShape)
                     )
-                    if (playback.muted) {
-                        Surface(
-                            color = MaterialTheme.oneSpaceColors.mediaScrim,
-                            shape = MaterialTheme.shapes.small,
-                            modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
-                        ) {
-                            Text(
-                                tr("Tắt tiếng", "Muted"),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.oneSpaceColors.onMedia,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                    // Coloured progress along the bottom edge of the window.
-                    ScrubBar(
-                        playback.positionMs, playback.totalMs,
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        interactive = false, trackHeight = 3.dp,
-                        trackColor = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.3f)
-                    )
                 }
-                Column(Modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
-                    Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
-                    // The channel name replaces the old "Video · floating window" caption.
-                    Text(
-                        playback.creator.ifBlank { title },
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(
+                    Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                        // The channel name replaces the old "Video · floating window" caption.
+                        Text(
+                            playback.creator.ifBlank { title },
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // Speed: x1 -> x1.5 -> x2 -> x0.5 -> x1 ..., one tap each.
+                    TextButton(onClick = onCycleSpeed, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)) {
+                        Text("x" + (if (speed % 1f == 0f) speed.toInt().toString() else speed.toString()),
+                            style = MaterialTheme.typography.labelLarge)
+                    }
                 }
                 PlaybackFeedback(
                     playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error,
                     Modifier.padding(horizontal = 10.dp).padding(bottom = 6.dp)
                 )
+                // Thin draggable progress along the bottom edge of the panel: drag to seek.
+                ScrubBar(playback.positionMs, playback.totalMs, onSeek = onSeekTo, trackHeight = 3.dp)
             }
         }
     }

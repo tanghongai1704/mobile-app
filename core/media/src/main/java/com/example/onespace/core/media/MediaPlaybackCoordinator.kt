@@ -8,6 +8,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import com.example.onespace.domain.music.model.Track
 import com.example.onespace.domain.session.VideoStartPlan
 import com.example.onespace.domain.session.port.PlaybackStatus
@@ -60,6 +61,11 @@ class MediaPlaybackCoordinator @Inject constructor(
     // back to the next decoder keeps real streams playing instead of erroring out.
     private val renderersFactory = DefaultRenderersFactory(context)
         .setEnableDecoderFallback(true)
+        .setMediaCodecSelector { mimeType, requiresSecure, requiresTunneling ->
+            val all = MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, requiresSecure, requiresTunneling)
+            val nonGoldfish = all.filterNot { it.name.contains("goldfish") }
+            if (nonGoldfish.isNotEmpty()) nonGoldfish else all
+        }
 
     private val videoEngine: ExoPlayer = ExoPlayer.Builder(context, renderersFactory)
         // The app arbitrates the video voice itself (case C1): muting must keep the
@@ -319,6 +325,10 @@ class MediaPlaybackCoordinator @Inject constructor(
         // The C1 conflict mute stays until a new video starts.
         if (!videoMutedByConflict) videoEngine.volume = videoVolume
         if (videoEngine.currentMediaItem != null) syncVideoState()
+    }
+
+    override fun setVideoSpeed(speed: Float) {
+        videoEngine.playbackParameters = androidx.media3.common.PlaybackParameters(speed)
     }
 
     override fun dismissVideo(toWatchlist: Boolean) {

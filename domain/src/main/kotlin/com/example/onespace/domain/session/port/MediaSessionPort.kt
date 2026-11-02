@@ -74,4 +74,7 @@ interface MediaSessionPort {
 
     /** User's video volume, 0 (mute) to 1 (full); session state, never persisted. */
     fun setVideoVolume(volume: Float)
+
+    /** Playback speed of the video engine (1 = normal). */
+    fun setVideoSpeed(speed: Float) {}
 }
