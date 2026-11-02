@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Mirrors core/designsystem Color.kt (Coral Spark); XML cannot read Compose colours. -->
-    <color name="window_background">#0F0E0E</color>
-    <color name="brand_primary">#FF8D8A</color>
-    <color name="brand_secondary">#FC7E9C</color>
-    <color name="brand_tertiary">#CEA3FF</color>
+    <!-- Mirrors core/designsystem Color.kt (Blue Calm); XML cannot read Compose colours. -->
+    <color name="window_background">#131315</color>
+    <color name="brand_primary">#85ADFF</color>
+    <color name="brand_secondary">#BDC7DC</color>
+    <color name="brand_tertiary">#E7B6EC</color>
 </resources>

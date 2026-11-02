@@ -37,7 +37,7 @@ Auth là **demo local**: nhập email hợp lệ → OTP **123456**. Mã hết h
 
 ## Chức năng
 
-Material 3 light/dark theme "Coral Spark" (san hô, seed `#E5484D`, bảng màu sinh theo Material Theme Builder), Lexend headings + Be Vietnam Pro body đóng gói offline. Mọi màu nằm trong `core/designsystem` (`Color.kt`, `ExtendedColors.kt`); feature chỉ dùng `MaterialTheme.colorScheme` và `MaterialTheme.oneSpaceColors`. Có onboarding, login/verify, Home, catalog/detail và settings.
+Material 3 light/dark theme "Blue Calm" (xanh dịu, seed `#3B82F6`, bảng màu sinh theo Material Theme Builder), Lexend headings + Be Vietnam Pro body đóng gói offline. Mọi màu nằm trong `core/designsystem` (`Color.kt`, `ExtendedColors.kt`); feature chỉ dùng `MaterialTheme.colorScheme` và `MaterialTheme.oneSpaceColors`. Có onboarding, login/verify, Home, catalog/detail và settings.
 
 Video/nhạc dùng ExoPlayer phát sample stream thật, có controls, music dock và conflict policy. Floating video là cửa sổ nhỏ (224dp) kéo đặt ở bất kỳ đâu, tự dính mép trái/phải khi thả và nhớ vị trí qua các tab. Room lưu progress/watchlist/điểm/nhiệm vụ; DataStore lưu settings/phiên, tin đã lưu, playlist, avatar và khung avatar.
 

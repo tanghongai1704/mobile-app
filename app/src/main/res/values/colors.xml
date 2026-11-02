@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Mirrors core/designsystem Color.kt (Coral Spark); XML cannot read Compose colours. -->
-    <color name="window_background">#FBF5F4</color>
-    <color name="brand_primary">#AF242E</color>
-    <color name="brand_secondary">#9E3653</color>
-    <color name="brand_tertiary">#7243A9</color>
+    <!-- Mirrors core/designsystem Color.kt (Blue Calm); XML cannot read Compose colours. -->
+    <color name="window_background">#FBF8FB</color>
+    <color name="brand_primary">#0057BD</color>
+    <color name="brand_secondary">#555F71</color>
+    <color name="brand_tertiary">#78507F</color>
     <!-- Launcher icon is identical in light and dark: no night overrides. -->
-    <color name="launcher_background">#AF242E</color>
-    <color name="launcher_dot_primary">#FFF4F4</color>
-    <color name="launcher_dot_secondary">#FFC2CC</color>
-    <color name="launcher_dot_tertiary">#CA9CFF</color>
+    <color name="launcher_background">#0057BD</color>
+    <color name="launcher_dot_primary">#F0F2FF</color>
+    <color name="launcher_dot_secondary">#D9E3F9</color>
+    <color name="launcher_dot_tertiary">#FDD6FF</color>
 </resources>
