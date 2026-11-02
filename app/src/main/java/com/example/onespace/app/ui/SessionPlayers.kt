@@ -4,6 +4,13 @@ import com.example.onespace.core.designsystem.oneSpaceColors
 import com.example.onespace.core.designsystem.tr
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.draw.alpha
+import com.example.onespace.core.designsystem.ScrubBar
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -131,41 +138,77 @@ fun BoxScope.FloatingVideo(
     onToggle: () -> Unit,
     onClose: () -> Unit,
     position: FloatingPosition,
-    onHeightChanged: (Int) -> Unit = {}
+    onHeightChanged: (Int) -> Unit = {},
+    onSeekBy: (Long) -> Unit = {}
 ) {
     val playing = playback.playRequested && playback.error == null
-    val actions: @Composable RowScope.() -> Unit = {
-        FloatingAction(Icons.Filled.OpenInFull, tr("Mở rộng", "Expand"), onExpand)
-        FloatingAction(
-            if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-            if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"), onToggle
-        )
-        FloatingAction(Icons.Filled.Close, tr("Đóng", "Close"), onClose)
-    }
     DraggableFloating(position, onHeightChanged) {
         // F-VID-09: sound-only mode renders a music-style mini player, no surface.
         if (com.example.onespace.core.designsystem.AudioOnlyState.active) {
-            Row(
-                Modifier.width(264.dp).padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Filled.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
-                    PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
+            Column(Modifier.width(264.dp)) {
+                Row(
+                    Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                        PlaybackFeedback(playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error)
+                    }
+                    FloatingAction(Icons.Filled.OpenInFull, tr("Mở rộng", "Expand"), onExpand)
+                    FloatingAction(
+                        if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"), onToggle
+                    )
+                    FloatingAction(Icons.Filled.Close, tr("Đóng", "Close"), onClose)
                 }
-                actions()
+                // Progress of the video while only its sound is playing.
+                ScrubBar(playback.positionMs, playback.totalMs, interactive = false, trackHeight = 3.dp)
             }
         } else {
+            // Tap shows back-10 / play-pause / forward-10 and close / expand; they fade after 2s.
+            var controls by remember { mutableStateOf(false) }
+            var touches by remember { mutableIntStateOf(0) }
+            LaunchedEffect(controls, touches, playing) {
+                if (controls && playing) { kotlinx.coroutines.delay(2000); controls = false }
+            }
+            val alpha by androidx.compose.animation.core.animateFloatAsState(
+                if (controls) 1f else 0f, androidx.compose.animation.core.tween(300), label = "floating-controls"
+            )
             Column(Modifier.width(224.dp)) {
                 Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
                     VideoSurface(player, Modifier.fillMaxSize().background(MaterialTheme.oneSpaceColors.mediaBackdrop))
-                    // The video view would swallow touches; this layer shields it (without consuming
-                    // anything) so a drag that starts on the picture still moves the whole window.
+                    // The video view would swallow touches; this layer shields it so a drag that
+                    // starts on the picture still moves the whole window, and a tap shows controls.
                     Box(Modifier.matchParentSize().pointerInput(Unit) {
-                        awaitPointerEventScope { while (true) awaitPointerEvent() }
+                        detectTapGestures(onTap = { controls = !controls; touches++ })
                     })
+                    if (alpha > 0.01f) {
+                        val onMedia = MaterialTheme.oneSpaceColors.onMedia
+                        Box(Modifier.matchParentSize().alpha(alpha)) {
+                            Box(Modifier.matchParentSize().background(MaterialTheme.oneSpaceColors.mediaScrim.copy(alpha = 0.35f)))
+                            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { touches++; onSeekBy(-10_000) }, modifier = Modifier.size(40.dp)) {
+                                    Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"), tint = onMedia)
+                                }
+                                IconButton(onClick = { touches++; onToggle() }, modifier = Modifier.size(44.dp)) {
+                                    Icon(
+                                        if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                        contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"),
+                                        tint = onMedia, modifier = Modifier.size(30.dp)
+                                    )
+                                }
+                                IconButton(onClick = { touches++; onSeekBy(10_000) }, modifier = Modifier.size(40.dp)) {
+                                    Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"), tint = onMedia)
+                                }
+                            }
+                            Row(Modifier.align(Alignment.BottomEnd).padding(bottom = 3.dp)) {
+                                FloatingAction(Icons.Filled.OpenInFull, tr("Mở rộng", "Expand"), onExpand, onMedia)
+                                FloatingAction(Icons.Filled.Close, tr("Đóng", "Close"), onClose, onMedia)
+                            }
+                        }
+                    }
                     // Grab handle: the whole window drags, this just says so.
                     Box(
                         Modifier.align(Alignment.TopCenter).padding(top = 5.dp).size(width = 28.dp, height = 4.dp)
@@ -185,18 +228,23 @@ fun BoxScope.FloatingVideo(
                             )
                         }
                     }
+                    // Coloured progress along the bottom edge of the window.
+                    ScrubBar(
+                        playback.positionMs, playback.totalMs,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                        interactive = false, trackHeight = 3.dp,
+                        trackColor = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.3f)
+                    )
                 }
-                Row(Modifier.padding(start = 10.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
-                        Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
-                        Text(
-                            if (playback.playing) tr("Đang phát · cửa sổ nổi", "Playing · floating window") else tr("Video · cửa sổ nổi", "Video · floating window"),
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    actions()
+                Column(Modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
+                    Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                    // The channel name replaces the old "Video · floating window" caption.
+                    Text(
+                        playback.creator.ifBlank { title },
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 PlaybackFeedback(
                     playback.status == PlaybackStatus.BUFFERING, playback.suppressed, playback.error,
@@ -208,9 +256,12 @@ fun BoxScope.FloatingVideo(
 }
 
 @Composable
-private fun FloatingAction(icon: ImageVector, description: String, onClick: () -> Unit) {
+private fun FloatingAction(
+    icon: ImageVector, description: String, onClick: () -> Unit,
+    tint: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified
+) {
     IconButton(onClick = onClick, modifier = Modifier.size(34.dp)) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(19.dp))
+        Icon(icon, contentDescription = description, tint = if (tint == androidx.compose.ui.graphics.Color.Unspecified) LocalContentColor.current else tint, modifier = Modifier.size(19.dp))
     }
 }
 

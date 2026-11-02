@@ -237,6 +237,7 @@ fun OneSpaceApp() {
                 onHeightChanged = { floatingPlayerHeight = it },
                 onExpand = { videoId?.let { appState.openVideo(it) } },
                 onToggle = coordinator::toggleVideo,
+                onSeekBy = coordinator::seekVideoBy,
                 onClose = {
                     coordinator.closeVideo()
                     scope.launch { snackbarHostState.showSnackbar(msgSavedWatchLater) }

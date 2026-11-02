@@ -143,7 +143,7 @@ internal fun AccountScreen(
                         style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        if (authEmail == null) tr("Chế độ dùng thử · tiến độ tạm thời", "Trial mode · progress is temporary")
+                        if (authEmail == null) tr("Chế độ dùng thử", "Trial mode")
                         else tr("Tài khoản OneSpace · khung ", "OneSpace account · frame ") + frame.name.t(),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -188,42 +188,7 @@ internal fun AccountScreen(
                 Icons.Filled.ShoppingBag
             ) { showShop = true }
         }
-        // F-VID-05: resume rows live on the profile page (moved from Home).
-        if (continueWatching.isNotEmpty()) {
-            item {
-                SectionTitle(tr("Tiếp tục", "Continue"))
-                Column(
-                    Modifier.padding(top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    continueWatching.forEach { entry ->
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    entry.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
-                            },
-                            supportingContent = {
-                                Text(
-                                    tr("đã xem đến ", "watched up to ") + com.example.onespace.core.common.formatMsWhole(entry.positionMs),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            },
-                            leadingContent = {
-                                Icon(
-                                    Icons.Filled.PlayCircle, contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            },
-                            modifier = Modifier.clickable { onOpenVideo(entry.videoId, entry.title) }
-                        )
-                    }
-                }
-            }
-        }
+        // "Continue" is gone: a video closed mid-way lands in Watch later on Home.
         item { ContentCard(tr("Đã tải", "Downloaded"), tr("Video, nhạc và bài báo đã lưu để xem offline", "Videos, music and articles saved for offline"), Icons.Filled.Download, onDownloads) }
         item { ContentCard(tr("Playlist của tôi", "My playlists"), tr("Mọi playlist video và nhạc, quản lý một chỗ", "All video and music playlists in one place"), Icons.Filled.LibraryMusic, onPlaylists) }
         item { ContentCard(tr("Tổng kết tháng", "Monthly recap"), tr("Điểm, chuỗi ngày và huy hiệu của bạn", "Your points, streak and badges"), Icons.Filled.Insights, onWrapped) }

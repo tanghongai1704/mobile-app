@@ -302,6 +302,8 @@ abstract class FloatingShots(mode: String) : ScreenshotBase(mode) {
         tab("Tin tức"); settle()
         shot("f01-floating-default")
         val start = bounds()
+        compose.onNodeWithTag("floating-video").performClick(); settle()
+        shot("f01b-floating-controls")
         val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
         // 224dp plus margins is well under the old 320dp window (which took 88% of the screen width).
         assertTrue("window should be compact, was ${start.width}px of ${root.width}px", start.width < root.width * 0.7f)

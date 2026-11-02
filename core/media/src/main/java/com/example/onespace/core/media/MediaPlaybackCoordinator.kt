@@ -346,6 +346,7 @@ class MediaPlaybackCoordinator @Inject constructor(
         _video.value = VideoPlayback(
             videoId = item.mediaId,
             title = item.mediaMetadata.title?.toString().orEmpty(),
+            creator = item.mediaMetadata.artist?.toString().orEmpty(),
             playing = videoEngine.isPlaying,
             playRequested = videoEngine.playWhenReady && videoEngine.playbackState != Player.STATE_ENDED,
             status = statusOf(videoEngine),

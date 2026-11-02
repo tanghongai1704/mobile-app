@@ -33,7 +33,9 @@ data class VideoPlayback(
     val playRequested: Boolean = playing,
     val status: PlaybackStatus = if (playing) PlaybackStatus.READY else PlaybackStatus.IDLE,
     val suppressed: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /** Channel of the video (shown in the floating window). */
+    val creator: String = ""
 ) {
     // Buffering video still owns its audio intent; muted/ended/error video does not.
     val audible: Boolean get() = videoId != null && playRequested && !muted &&
