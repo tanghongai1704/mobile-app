@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.media3.common.Player
+import com.example.onespace.app.record.ScreenRecorder
 import com.example.onespace.core.designsystem.oneSpaceColors
 import com.example.onespace.core.designsystem.tr
 import com.example.onespace.core.media.VideoSurface
@@ -77,9 +78,9 @@ private enum class RecordKind { WithVideo, WithAudio }
  * short explanation), count 3-2-1, then record. While recording the screen is taken over (video
  * full screen, back does nothing); only the stop button leaves it.
  *
- * The voice goes to an .m4a file in the app's recordings folder. Capturing the screen itself needs
- * MediaProjection and a foreground service and is not wired up yet: the video mode records the
- * voice while showing the video full screen.
+ * "With the video" records the screen (and the microphone) into an .mp4 through MediaProjection
+ * and a foreground service ([ScreenRecorder]); "with the sound" records the voice only into an
+ * .m4a. Both land in the app's recordings folder.
  */
 @Composable
 fun RecordFlow(
@@ -101,15 +102,34 @@ fun RecordFlow(
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
     val savedMsg = tr("Đã lưu bản ghi vào thư mục Bản ghi của ứng dụng", "Recording saved to the app's Recordings folder")
+    // A screen take that stops by itself (the user ended it from the system) still needs closing.
     val failedMsg = tr("Không ghi được. Thử lại sau nhé", "Could not record. Please try again")
 
+    // The result of the system "start recording the screen" prompt, needed to capture the picture.
+    var grant by remember { mutableStateOf<Pair<Int, Intent>?>(null) }
+    val capture = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        if (result.resultCode == android.app.Activity.RESULT_OK && data != null) {
+            grant = result.resultCode to data
+            count = 3; stage = RecordStage.Countdown
+        } else stage = RecordStage.Mode
+    }
+
+    /** Microphone is settled: the screen prompt comes next when the picture is recorded too. */
+    fun afterMic() {
+        if (kind == RecordKind.WithVideo) {
+            val mpm = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
+            capture.launch(mpm.createScreenCaptureIntent())
+        } else { count = 3; stage = RecordStage.Countdown }
+    }
+
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) { count = 3; stage = RecordStage.Countdown } else stage = RecordStage.MicDenied
+        if (granted) afterMic() else stage = RecordStage.MicDenied
     }
 
     fun choose(k: RecordKind) {
         kind = k
-        if (micAllowed()) { count = 3; stage = RecordStage.Countdown } else stage = RecordStage.MicIntro
+        if (micAllowed()) afterMic() else stage = RecordStage.MicIntro
     }
 
     DisposableEffect(Unit) { onDispose { recorder.release() } }
@@ -117,7 +137,11 @@ fun RecordFlow(
     LaunchedEffect(stage) {
         if (stage == RecordStage.Countdown) {
             while (count > 0) { delay(1000); count -= 1 }
-            if (recorder.start(source.title)) {
+            val started = if (kind == RecordKind.WithVideo) {
+                grant?.let { (code, data) -> ScreenRecorder.start(context, code, data, source.title) }
+                grant != null && ScreenRecorder.awaitReady()
+            } else recorder.start(source.title)
+            if (started) {
                 elapsed = 0; paused = false; micOn = true
                 if (!isPlaying()) onPlayPauseSource()
                 stage = RecordStage.Recording
@@ -132,7 +156,7 @@ fun RecordFlow(
     }
 
     fun stop() {
-        val saved = recorder.stop()
+        val saved = if (kind == RecordKind.WithVideo) ScreenRecorder.stop() else recorder.stop()
         runCatching { (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).isMicrophoneMute = false }
         if (isPlaying()) onPlayPauseSource()
         if (saved) android.widget.Toast.makeText(context, savedMsg, android.widget.Toast.LENGTH_LONG).show()
@@ -227,7 +251,9 @@ fun RecordFlow(
                             micOn = micOn,
                             onPauseResume = {
                                 paused = !paused
-                                if (paused) recorder.pause() else recorder.resume()
+                                if (kind == RecordKind.WithVideo) {
+                                    if (paused) ScreenRecorder.pause() else ScreenRecorder.resume()
+                                } else if (paused) recorder.pause() else recorder.resume()
                                 onPlayPauseSource()
                             },
                             onMic = {
