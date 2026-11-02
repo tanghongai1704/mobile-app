@@ -134,11 +134,20 @@ private fun NewsCard(article: Article, saved: Boolean, onOpen: (String) -> Unit,
             }
             Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Text(article.title, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                Text(
-                    article.category.t(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        article.category.t(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    // Reading time on the same line, bottom right, when the article can be read.
+                    if (article.readMinutes() > 0) Text(
+                        article.readMinutes().let { tr("$it phút đọc", "$it min read") },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -175,6 +184,9 @@ internal fun ArticleScreen(
     var fontScale by rememberSaveable(article.id) { mutableStateOf(1f) }
     var quizOfferDone by rememberSaveable(article.id) { mutableStateOf(false) }
     var showQuiz by rememberSaveable(article.id) { mutableStateOf(false) }
+    var showExtract by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val msgExtracted = tr("Đã lưu âm thanh vào thư viện Nhạc (Từ video của bạn)", "Audio saved to your Music library (From your videos)")
     var readCounted by rememberSaveable(article.id) { mutableStateOf(false) }
     val bodyStyle = MaterialTheme.typography.bodyLarge.copy(
         fontSize = MaterialTheme.typography.bodyLarge.fontSize * fontScale,
@@ -256,8 +268,8 @@ internal fun ArticleScreen(
                         tint = if (ttsState.isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                // F-NEWS-05 / F-VID-10: visible button to extract as MP3.
-                IconButton(onClick = onExtractAudio) {
+                // F-NEWS-05 / F-VID-10: visible button to extract as MP3 (asks first).
+                IconButton(onClick = { showExtract = true }) {
                     Icon(
                         Icons.Filled.LibraryMusic,
                         contentDescription = tr("Trích MP3 vào nhạc", "Extract MP3 to music"),
@@ -330,14 +342,6 @@ internal fun ArticleScreen(
                 }
             }
         }
-        // F-NEWS-11: same-category stories.
-        val relatedItems = related.filter { it.id != article.id && it.category == article.category }
-        if (relatedItems.isNotEmpty()) {
-            item(key = "related-section") { SectionTitle(tr("Tin liên quan", "Related news")) }
-            items(relatedItems, key = { "rel-" + it.id }) { other ->
-                NewsCard(other, saved = false, onOpenRelated)
-            }
-        }
         // F-NEWS-10: quiz must ask before showing.
         if (showQuiz && article.quiz.isNotEmpty()) {
             item(key = "quiz-section") { SectionTitle(tr("Kiểm tra nhanh", "Quick check")) }
@@ -354,12 +358,41 @@ internal fun ArticleScreen(
                     article.quiz.getOrNull(idx)?.correctIndex == ans
                 }
                 if (quizAnswers.size == article.quiz.size) {
-                    Text(tr("Kết quả: $correct/${article.quiz.size} đúng", "Result: $correct/${article.quiz.size} correct"),
+                    Text(tr("Kết quả: $correct/${article.quiz.size} đúng · +${correct * 15} điểm", "Result: $correct/${article.quiz.size} correct · +${correct * 15} points"),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
+        // F-NEWS-11: same-category stories.
+        val relatedItems = related.filter { it.id != article.id && it.category == article.category }
+        if (relatedItems.isNotEmpty()) {
+            item(key = "related-section") { SectionTitle(tr("Tin liên quan", "Related news")) }
+            items(relatedItems, key = { "rel-" + it.id }) { other ->
+                NewsCard(other, saved = false, onOpenRelated)
+            }
+        }
+    }
+    if (showExtract) {
+        AlertDialog(
+            onDismissRequest = { showExtract = false },
+            icon = { Icon(Icons.Filled.LibraryMusic, contentDescription = null) },
+            title = { Text(tr("Trích xuất MP3", "Extract MP3")) },
+            text = {
+                Text(tr(
+                    "Lưu âm thanh của bài báo này vào thư viện nhạc để nghe lại bất cứ lúc nào.",
+                    "Save the audio of this article to your music library to listen anytime."
+                ))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExtract = false
+                    onExtractAudio()
+                    android.widget.Toast.makeText(context, msgExtracted, android.widget.Toast.LENGTH_LONG).show()
+                }) { Text(tr("Trích xuất", "Extract")) }
+            },
+            dismissButton = { TextButton(onClick = { showExtract = false }) { Text(tr("Hủy", "Cancel")) } }
+        )
     }
     // (quiz dialog removed — replaced by a play button below the article)
 }
