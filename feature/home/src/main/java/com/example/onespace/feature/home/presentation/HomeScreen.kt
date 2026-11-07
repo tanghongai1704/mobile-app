@@ -12,6 +12,12 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.PlayArrow
@@ -20,6 +26,7 @@ import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
@@ -34,6 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.Settings
 import com.example.onespace.core.common.formatMsWhole
 import com.example.onespace.core.designsystem.*
 import com.example.onespace.core.media.VideoSurface
@@ -82,6 +92,8 @@ internal fun HomeScreen(
     gamification: GamificationUiState = GamificationUiState(),
     offline: Boolean = false,
     watchLater: Set<String> = emptySet(),
+    downloadedIds: Set<String> = emptySet(),
+    onToggleDownload: (id: String, type: String, title: String, subtitle: String) -> Unit = { _, _, _, _ -> },
     onRemoveFromWatchLater: (String) -> Unit = {},
     onWatchedFromLater: (String) -> Unit = {},
     onMissionClick: (String) -> Unit = {},
@@ -93,6 +105,10 @@ internal fun HomeScreen(
     // leaving Home is what turns playback into the floating window / dock.
     onPlayVideoAtHome: (id: String, title: String) -> Unit = { _, _ -> },
     onPlayMusicAtHome: (id: String, title: String) -> Unit = { _, _ -> },
+    // Music speed for the inline feed card: same x1 -> x1.5 -> x2 -> x0.5
+    // cycle as the dock's speed button.
+    musicSpeed: Float = 1f,
+    onCycleMusicSpeed: () -> Unit = {},
     videoPlayer: androidx.media3.common.Player? = null,
     videoPlayback: VideoPlayback? = null,
     musicPlayback: MusicPlayback? = null,
@@ -105,6 +121,8 @@ internal fun HomeScreen(
     val searchState = com.example.onespace.core.designsystem.LocalSearchState.current
     val searchQuery = searchState.query
     var showWatchlist by remember { mutableStateOf(false) }
+    // Swipe hint lives outside the sheet so dismissing it survives a reopen.
+    var showSwipeHint by remember { mutableStateOf(true) }
     // System back clears an active search before leaving the app.
     androidx.activity.compose.BackHandler(enabled = searchQuery.isNotEmpty()) {
         searchState.close()
@@ -116,33 +134,44 @@ internal fun HomeScreen(
     FeaturePage {
         if (q.isEmpty()) {
             item {
-                // F-VID-04: the watchlist lives on Home; "My playlists" is a shortcut to the
-                // same list that stays in the account.
+                // F-VID-04: the watchlist lives on Home; "Danh sách phát" is a shortcut to the
+                // same list that stays in the account. One row, unequal weights (0.4/0.6) and
+                // labelMedium so both full labels fit even with large counts.
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    androidx.compose.material3.FilledTonalButton(onClick = { showWatchlist = true }, modifier = Modifier.weight(1f)) {
-                        androidx.compose.material3.Icon(
+                    androidx.compose.material3.FilledTonalButton(
+                        onClick = { showWatchlist = true },
+                        modifier = Modifier.weight(0.4f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp)
+                    ) {
+                        Icon(
                             androidx.compose.material.icons.Icons.Filled.Schedule,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(Modifier.width(6.dp))
-                        androidx.compose.material3.Text(
+                        Spacer(Modifier.width(4.dp))
+                        Text(
                             if (watchLater.isEmpty()) tr("Xem sau", "Watch later") else tr("Xem sau (", "Watch later (") + watchLater.size + ")",
+                            style = MaterialTheme.typography.labelMedium,
                             maxLines = 1
                         )
                     }
-                    androidx.compose.material3.FilledTonalButton(onClick = onOpenPlaylists, modifier = Modifier.weight(1f)) {
-                        androidx.compose.material3.Icon(
-                            androidx.compose.material.icons.Icons.Filled.LibraryMusic,
+                    androidx.compose.material3.FilledTonalButton(
+                        onClick = onOpenPlaylists,
+                        modifier = Modifier.weight(0.6f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.LibraryMusic,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(Modifier.width(6.dp))
-                        androidx.compose.material3.Text(
+                        Spacer(Modifier.width(4.dp))
+                        Text(
                             if (com.example.onespace.core.designsystem.AppPlaylistStore.playlists.isEmpty())
-                                tr("Playlist của tôi", "My playlists")
+                                tr("Danh sách phát", "Playlists")
                             else
-                                tr("Playlist (", "Playlists (") + com.example.onespace.core.designsystem.AppPlaylistStore.playlists.size + ")",
+                                tr("Danh sách phát (", "Playlists (") + com.example.onespace.core.designsystem.AppPlaylistStore.playlists.size + ")",
+                            style = MaterialTheme.typography.labelMedium,
                             maxLines = 1
                         )
                     }
@@ -152,7 +181,7 @@ internal fun HomeScreen(
         if (q.isNotEmpty()) {
             if (videos.isEmpty() && tracks.isEmpty() && articles.isEmpty()) {
                 item {
-                    androidx.compose.material3.Text(
+                    Text(
                         tr("Không có kết quả cho \"", "No results for \"") + q + "\"",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -195,7 +224,7 @@ internal fun HomeScreen(
                     shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    androidx.compose.material3.Text(
+                    Text(
                         tr("Mất kết nối mạng — đang hiển thị nội dung đã lưu.", "You are offline. Showing saved content."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
@@ -213,6 +242,8 @@ internal fun HomeScreen(
                     post = post,
                     onPlayVideoAtHome = onPlayVideoAtHome,
                     onPlayMusicAtHome = onPlayMusicAtHome,
+                    musicSpeed = musicSpeed,
+                    onCycleMusicSpeed = onCycleMusicSpeed,
                     onOpenArticle = onOpenArticle,
                     onOpenVideo = onOpenVideo,
                     onOpenTrack = onPlayTrack,
@@ -222,7 +253,9 @@ internal fun HomeScreen(
                     onToggleVideo = onToggleVideo,
                     onToggleMusic = onToggleMusic,
                     onSeekVideo = onSeekVideo,
-                    onSeekMusic = onSeekMusic
+                    onSeekMusic = onSeekMusic,
+                    downloadedIds = downloadedIds,
+                    onToggleDownload = onToggleDownload
                 )
             }
         }
@@ -238,7 +271,7 @@ internal fun HomeScreen(
                 item { SectionTitle(tr("Xem sau", "Watch later")) }
                 if (watchLater.isEmpty()) {
                     item {
-                        androidx.compose.material3.Text(
+                        Text(
                             tr("Chưa lưu video nào. Mở một video, bấm Lưu và chọn Xem sau.", "No videos saved yet. Open a video, tap Save and choose Watch later."),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -246,6 +279,43 @@ internal fun HomeScreen(
                         )
                     }
                 } else {
+                    // Demo onboarding: shown on every sheet open while there is
+                    // something to swipe — teaches the left-swipe delete; the X
+                    // hides it once the gesture is understood.
+                    if (showSwipeHint) item(key = "watchlist-swipe-hint") {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.SwipeLeft,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    tr("Quẹt trái để xoá khỏi danh sách", "Swipe left to remove"),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(onClick = { showSwipeHint = false }) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = tr("Đóng", "Close"),
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                     items(watchLater.mapNotNull { id -> state.videos.find { it.id == id } }, key = { it.id }) { video ->
                         // Swipe left to remove from Watch later; tap to open the video.
                         var offsetX by remember { mutableFloatStateOf(0f) }
@@ -286,7 +356,7 @@ internal fun HomeScreen(
 @Composable
 private fun GamificationBanner(state: GamificationUiState, onMissionClick: (String) -> Unit = {}) {    // Neutral card with small tonal accents so the banner blends into the
     // feed instead of shouting over it.
-    AppCard(shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -411,6 +481,8 @@ private fun FeedPost(
     post: FeedPost,
     onPlayVideoAtHome: (id: String, title: String) -> Unit,
     onPlayMusicAtHome: (id: String, title: String) -> Unit,
+    musicSpeed: Float,
+    onCycleMusicSpeed: () -> Unit,
     onOpenArticle: (id: String) -> Unit,
     onOpenVideo: (id: String, title: String) -> Unit,
     onOpenTrack: (id: String, title: String) -> Unit,
@@ -420,7 +492,9 @@ private fun FeedPost(
     onToggleVideo: () -> Unit,
     onToggleMusic: () -> Unit,
     onSeekVideo: (positionMs: Long) -> Unit,
-    onSeekMusic: (positionMs: Long) -> Unit
+    onSeekMusic: (positionMs: Long) -> Unit,
+    downloadedIds: Set<String> = emptySet(),
+    onToggleDownload: (String, String, String, String) -> Unit = { _, _, _, _ -> }
 ) {
     post.video?.let {
         val current = videoPlayback?.takeIf { p -> p.videoId == it.id }
@@ -434,7 +508,11 @@ private fun FeedPost(
             onPlayAtHome = { onPlayVideoAtHome(it.id, it.title) },
             onToggle = onToggleVideo,
             onSeekTo = onSeekVideo,
-            onOpenDetail = { onOpenVideo(it.id, it.title) }
+            onOpenDetail = { onOpenVideo(it.id, it.title) },
+            downloaded = it.id in downloadedIds,
+            onToggleDownload = { onToggleDownload(it.id, "video", it.title, it.creator) },
+            onSoundOnly = { com.example.onespace.core.designsystem.AudioOnlyState.set(true) },
+            onMinimize = { onOpenVideo(it.id, it.title) }
         )
     }
     post.track?.let {
@@ -448,12 +526,17 @@ private fun FeedPost(
             onPlayAtHome = { onPlayMusicAtHome(it.id, it.title) },
             onToggle = onToggleMusic,
             onSeekTo = onSeekMusic,
-            onOpenDetail = { onOpenTrack(it.id, it.title) }
+            musicSpeed = musicSpeed,
+            onCycleSpeed = onCycleMusicSpeed,
+            onOpenDetail = { onOpenTrack(it.id, it.title) },
+            downloadedIds = downloadedIds,
+            onToggleDownload = onToggleDownload
         )
     }
     post.article?.let { ArticlePostCard(it) { onOpenArticle(it.id) } }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VideoPostCard(
     video: Video,
@@ -465,10 +548,51 @@ private fun VideoPostCard(
     onPlayAtHome: () -> Unit,
     onToggle: () -> Unit,
     onSeekTo: (positionMs: Long) -> Unit,
-    onOpenDetail: () -> Unit
+    onOpenDetail: () -> Unit,
+    downloaded: Boolean = false,
+    onToggleDownload: () -> Unit = {},
+    onSoundOnly: () -> Unit = {},
+    onMinimize: () -> Unit = {}
 ) {
+    // "Thêm vào Danh sách phát" opens a save sheet, like the Video tab.
+    var showSaveSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    if (showSaveSheet) {
+        androidx.compose.material3.ModalBottomSheet(onDismissRequest = { showSaveSheet = false }) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).fillMaxHeight(0.6f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item { SectionTitle(tr("Lưu", "Save")) }
+                com.example.onespace.core.designsystem.AppPlaylistStore.playlists.keys.forEach { name ->
+                    item(key = name) {
+                        ContentCard(
+                            title = name,
+                            subtitle = com.example.onespace.core.designsystem.AppPlaylistStore.playlists[name]?.let {
+                                it.videoIds.size.toString() + " video · " + it.trackIds.size + " bài hát"
+                            } ?: "",
+                            icon = Icons.Filled.LibraryMusic,
+                            onClick = {
+                                com.example.onespace.core.designsystem.AppPlaylistStore.addVideo(name, video.id)
+                                showSaveSheet = false
+                            }
+                        )
+                    }
+                }
+                item {
+                    ContentCard(
+                        title = tr("Danh sách phát mới", "New playlist"),
+                        subtitle = tr("Tạo từ video này", "Create from this video"),
+                        icon = Icons.Filled.BookmarkBorder,
+                        onClick = {
+                            com.example.onespace.core.designsystem.AppPlaylistStore.addVideo(video.title.take(20), video.id)
+                            showSaveSheet = false
+                        }
+                    )
+                }
+            }
+        }
+    }
     AppCard(
-        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenDetail)
     ) {
         Box(
@@ -485,25 +609,60 @@ private fun VideoPostCard(
                 )
             }
             if (isCurrent) {
-                // Transport row like the floating window: back 10 / play-pause /
-                // forward 10 — semi-transparent circles centered on the frame.
+                // Scrim over the frame while the controls are up, like the video
+                // detail screen: darkens the picture so the ghost buttons read.
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.3f)))
+                // Transport row centered on the frame — same sizes as the video
+                // detail screen: 30dp icons, 56dp pause, 8dp spacing.
                 Row(
                     Modifier.align(Alignment.Center),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    InlineVideoControl(Icons.Filled.Replay10, tr("Lùi 10 giây", "Back 10 seconds")) {
-                        onSeekTo((positionMs - 10_000).coerceAtLeast(0))
+                    IconButton(onClick = { onSeekTo((positionMs - 10_000).coerceAtLeast(0)) }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia, modifier = Modifier.size(30.dp))
                     }
-                    Spacer(Modifier.width(10.dp))
-                    InlineVideoControl(
-                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        if (isPlaying) tr("Tạm dừng", "Pause") else tr("Phát tiếp", "Resume"),
-                        Modifier.size(46.dp)
-                    ) { onToggle() }
-                    Spacer(Modifier.width(10.dp))
-                    InlineVideoControl(Icons.Filled.Forward10, tr("Tới 10 giây", "Forward 10 seconds")) {
+                    IconButton(onClick = onToggle, modifier = Modifier.size(56.dp)) {
+                        Icon(
+                            if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) tr("Tạm dừng", "Pause") else tr("Phát tiếp", "Resume"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                    IconButton(onClick = {
                         val target = positionMs + 10_000
                         onSeekTo(if (totalMs > 0) target.coerceAtMost(totalMs) else target)
+                    }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia, modifier = Modifier.size(30.dp))
+                    }
+                }
+                // Bottom row: time + audio-only + minimize + settings — same ghost
+                // style as the video detail (plain IconButton, no circles), with
+                // bottom padding that clears the ScrubBar on the card's lower edge.
+                Row(
+                    Modifier.align(Alignment.BottomStart).padding(start = 12.dp, end = 12.dp, bottom = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        formatMsWhole(positionMs) + " / " + (if (totalMs > 0) formatMsWhole(totalMs) else video.duration),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.oneSpaceColors.onMedia,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = onSoundOnly, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.Headphones, contentDescription = tr("Chỉ nghe âm thanh", "Audio only"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia, modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(onClick = onMinimize, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.PictureInPictureAlt, contentDescription = tr("Thu nhỏ", "Minimise"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia, modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(onClick = onOpenDetail, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.Settings, contentDescription = tr("Cài đặt phát", "Playback settings"),
+                            tint = MaterialTheme.oneSpaceColors.onMedia, modifier = Modifier.size(22.dp))
                     }
                 }
             } else {
@@ -548,7 +707,7 @@ private fun VideoPostCard(
                     trackHeight = 3.dp,
                     knobRadius = 5.dp,
                     trackColor = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.3f),
-                    progressColor = MaterialTheme.oneSpaceColors.onMedia
+                    progressColor = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -556,12 +715,52 @@ private fun VideoPostCard(
             Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                video.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2, overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = androidx.compose.ui.Alignment.Top) {
+                Text(
+                    video.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                // ⋮: Chia sẻ, Tải xuống, Thêm vào Danh sách phát — same as Video tab.
+                var menuOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                val context = androidx.compose.ui.platform.LocalContext.current
+                Box {
+                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = tr("Thêm tùy chọn", "More options"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(tr("Chia sẻ", "Share")) },
+                            leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, video.title + " — " + video.creator)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(intent, "Share"))
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (downloaded) tr("Bỏ tải", "Remove download") else tr("Tải xuống", "Download")) },
+                            leadingIcon = { Icon(if (downloaded) Icons.Filled.DownloadDone else Icons.Filled.Download, contentDescription = null) },
+                            onClick = { menuOpen = false; onToggleDownload() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(tr("Lưu", "Save")) },
+                            leadingIcon = { Icon(Icons.Filled.BookmarkBorder, contentDescription = null) },
+                            onClick = { menuOpen = false; showSaveSheet = true }
+                        )
+                    }
+                }
+            }
             Text(
                 video.creator,
                 style = MaterialTheme.typography.bodySmall,
@@ -571,26 +770,20 @@ private fun VideoPostCard(
     }
 }
 
-/** One semi-transparent circle button of the inline transport row, like the floating window. */
+/** Transport button of the inline row — plain icon, no circle background (like the video detail). */
 @Composable
 private fun InlineVideoControl(
     icon: ImageVector,
     description: String,
-    modifier: Modifier = Modifier.size(40.dp),
+    modifier: Modifier = Modifier.size(32.dp),
     onClick: () -> Unit
 ) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = MaterialTheme.oneSpaceColors.mediaScrim,
-        modifier = modifier
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = description, tint = MaterialTheme.oneSpaceColors.onMedia)
-        }
+    IconButton(onClick = onClick, modifier = modifier) {
+        Icon(icon, contentDescription = description, tint = MaterialTheme.oneSpaceColors.onMedia)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MusicPostCard(
     track: Track,
@@ -601,10 +794,51 @@ private fun MusicPostCard(
     onPlayAtHome: () -> Unit,
     onToggle: () -> Unit,
     onSeekTo: (positionMs: Long) -> Unit,
-    onOpenDetail: () -> Unit
+    musicSpeed: Float,
+    onCycleSpeed: () -> Unit,
+    onOpenDetail: () -> Unit,
+    downloadedIds: Set<String> = emptySet(),
+    onToggleDownload: (String, String, String, String) -> Unit = { _, _, _, _ -> }
 ) {
+    // "Thêm vào Danh sách phát" opens a save sheet, like the Music tab.
+    var showSaveSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    if (showSaveSheet) {
+        androidx.compose.material3.ModalBottomSheet(onDismissRequest = { showSaveSheet = false }) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).fillMaxHeight(0.6f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item { SectionTitle(tr("Lưu", "Save")) }
+                com.example.onespace.core.designsystem.AppPlaylistStore.playlists.keys.forEach { name ->
+                    item(key = name) {
+                        ContentCard(
+                            title = name,
+                            subtitle = com.example.onespace.core.designsystem.AppPlaylistStore.playlists[name]?.let {
+                                it.videoIds.size.toString() + " video · " + it.trackIds.size + " bài hát"
+                            } ?: "",
+                            icon = Icons.Filled.LibraryMusic,
+                            onClick = {
+                                com.example.onespace.core.designsystem.AppPlaylistStore.addTrack(name, track.id)
+                                showSaveSheet = false
+                            }
+                        )
+                    }
+                }
+                item {
+                    ContentCard(
+                        title = tr("Danh sách phát mới", "New playlist"),
+                        subtitle = tr("Tạo từ bài hát này", "Create from this song"),
+                        icon = Icons.Filled.BookmarkBorder,
+                        onClick = {
+                            com.example.onespace.core.designsystem.AppPlaylistStore.addTrack(track.title.take(20), track.id)
+                            showSaveSheet = false
+                        }
+                    )
+                }
+            }
+        }
+    }
     AppCard(
-        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenDetail)
     ) {
         Row(
@@ -621,12 +855,61 @@ private fun MusicPostCard(
                     tint = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.95f), modifier = Modifier.size(32.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    track.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        track.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    // Speed: x1 -> x1.5 -> x2 -> x0.5 -> x1 — inline with the title.
+                    if (isCurrent) {
+                        Text(
+                            "x" + (if (musicSpeed % 1f == 0f) musicSpeed.toInt().toString() else musicSpeed.toString()),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable(onClick = onCycleSpeed)
+                                .padding(horizontal = 6.dp)
+                        )
+                    }
+                    // ⋮: Tải về, Lưu, Thêm vào hàng đợi, Danh sách phát — same as Music tab.
+                    var menuOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = tr("Thêm tùy chọn", "More options"),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (track.id in downloadedIds) tr("Bỏ tải", "Remove download") else tr("Tải về", "Download")) },
+                                leadingIcon = { Icon(if (track.id in downloadedIds) Icons.Filled.DownloadDone else Icons.Filled.Download, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onToggleDownload(track.id, "music", track.title, track.artist)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(tr("Lưu", "Save")) },
+                                leadingIcon = { Icon(Icons.Filled.BookmarkBorder, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    com.example.onespace.core.designsystem.AppPlaylistStore.addTrack("Nhạc đã lưu", track.id)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(tr("Lưu", "Save")) },
+                                leadingIcon = { Icon(Icons.Filled.BookmarkBorder, contentDescription = null) },
+                                onClick = { menuOpen = false; showSaveSheet = true }
+                            )
+                        }
+                    }
+                }
                 // While it plays the seek bar already shows the length: no duplicate here.
                 Text(
                     if (isCurrent) track.artist else track.artist + " · " + track.duration,
@@ -637,17 +920,12 @@ private fun MusicPostCard(
                     FeedSeekbar(positionMs, totalMs, onSeekTo)
                 }
             }
-            if (isCurrent) {
-                FilledIconButton(onClick = onToggle) {
-                    Icon(
-                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) tr("Tạm dừng", "Pause") else tr("Phát tiếp", "Resume")
-                    )
-                }
-            } else {
-                FilledIconButton(onClick = onPlayAtHome) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = tr("Phát ", "Play ") + track.title)
-                }
+            // Play/pause stays in the same rightmost position — never jumps.
+            FilledIconButton(onClick = if (isCurrent) onToggle else onPlayAtHome) {
+                Icon(
+                    if (isCurrent && isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (isCurrent && isPlaying) tr("Tạm dừng", "Pause") else tr("Phát ", "Play ") + track.title
+                )
             }
         }
     }
@@ -656,7 +934,6 @@ private fun MusicPostCard(
 @Composable
 private fun ArticlePostCard(article: Article, onOpen: () -> Unit) {
     AppCard(
-        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)
     ) {
         Column(

@@ -16,7 +16,8 @@ import com.example.onespace.feature.news.presentation.*
 fun NavGraphBuilder.newsGraph(
     getGraphEntry: () -> androidx.navigation.NavBackStackEntry,
     onOpenArticle: (String) -> Unit,
-    onListenTts: () -> Unit = {}
+    onListenTts: () -> Unit = {},
+    session: com.example.onespace.core.session.SessionCoordinator? = null
 ) {
     navigation<NewsRoute.Graph>(startDestination = NewsRoute.Feed) {
         composable<NewsRoute.Feed> { entry ->
@@ -41,13 +42,17 @@ fun NavGraphBuilder.newsGraph(
             val savedIds by vm.savedIds.collectAsStateWithLifecycle()
             val ttsState by vm.ttsState.collectAsStateWithLifecycle()
             // Leaving the app stops the reading voice, like the video (ADR-12).
-            val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
-            androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+            // The nav entry also stops on tab switches, but F-NEWS-12 keeps the
+            // voice running while the reading floats over other tabs — so the
+            // observer follows the activity, not this entry.
+            val activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
+            androidx.compose.runtime.DisposableEffect(activity) {
                 val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                     if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) vm.stopTts()
                 }
-                lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                val lifecycle = (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle
+                lifecycle?.addObserver(observer)
+                onDispose { lifecycle?.removeObserver(observer) }
             }
             val quizAnswers by vm.quizAnswers.collectAsStateWithLifecycle()
             val downloads by vm.downloads.collectAsStateWithLifecycle()
@@ -78,12 +83,23 @@ fun NavGraphBuilder.newsGraph(
                         article?.let { vm.listen(it) }
                     },
                     onTtsStop = vm::stopTts,
+                    onSeekTts = vm::seekTts,
+                    onSetTtsVolume = vm::setTtsVolume,
                     onBookmark = { vm.bookmark(id) },
                     quizAnswers = quizAnswers[id] ?: emptyMap(),
                     onQuizAnswer = { qIdx, optIdx -> vm.answerQuiz(id, qIdx, optIdx) },
-                    onOpenRelated = onOpenArticle
+                    onOpenRelated = onOpenArticle,
+                    musicPlaying = session?.music?.collectAsStateWithLifecycle()?.value?.trackId != null,
+                    onPlayMusic = { session?.playMusic("m1", "Nắng sớm") }
                 )
             }
         }
     }
+}
+
+/** The activity behind this context — its lifecycle, unlike a nav entry's, survives tab switches. */
+private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

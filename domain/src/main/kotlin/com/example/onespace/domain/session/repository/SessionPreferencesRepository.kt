@@ -34,7 +34,9 @@ data class SessionPreferences(
     val notificationsEnabled: Boolean = false,
     /** F-COM-12: per-reminder toggles, persisted so they survive restarts. */
     val streakReminder: Boolean = true,
-    val quietHours: Boolean = true
+    val quietHours: Boolean = true,
+    /** F-GAME-13: game SFX volume, 0 (off) to 1 (full); ducks itself under music. */
+    val gameSoundVolume: Float = 1f
 )
 
 /** Cross-launch session memory: restore point, remembered rules and user toggles. */
@@ -57,4 +59,5 @@ interface SessionPreferencesRepository {
     suspend fun setNotificationsEnabled(enabled: Boolean)
     suspend fun setStreakReminder(enabled: Boolean)
     suspend fun setQuietHours(enabled: Boolean)
+    suspend fun setGameSoundVolume(volume: Float)
 }

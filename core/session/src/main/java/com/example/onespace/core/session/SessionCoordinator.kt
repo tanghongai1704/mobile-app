@@ -3,6 +3,7 @@ package com.example.onespace.core.session
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.onespace.core.designsystem.AppPlaylistStore
 import com.example.onespace.domain.music.model.Track
 import com.example.onespace.domain.music.usecase.SelectNextTrack
 import com.example.onespace.domain.music.usecase.SelectPreviousTrack
@@ -12,6 +13,7 @@ import com.example.onespace.domain.session.MusicStartPlan
 import com.example.onespace.domain.session.Section
 import com.example.onespace.domain.session.SessionPolicy
 import com.example.onespace.domain.session.SessionState
+import com.example.onespace.domain.session.VideoAudioEffect
 import com.example.onespace.domain.session.model.MissionType
 import com.example.onespace.domain.session.port.PlaybackStatus
 import com.example.onespace.domain.session.port.MediaSessionPort
@@ -23,6 +25,7 @@ import com.example.onespace.domain.session.port.VideoPlayback
 import com.example.onespace.domain.session.repository.SessionPreferencesRepository
 import com.example.onespace.domain.session.usecase.TrackMissionAction
 import com.example.onespace.domain.session.usecase.UpdateStreak
+import com.example.onespace.domain.video.model.Video
 import com.example.onespace.domain.video.repository.ViewingSessionRepository
 import com.example.onespace.domain.video.usecase.GetVideo
 import java.time.LocalDate
@@ -34,6 +37,25 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+/** One slot of a mixed playlist session: exactly one of video / track is set. */
+data class PlaylistSessionItem(val video: Video? = null, val track: Track? = null) {
+    val id: String get() = video?.id ?: track?.id ?: ""
+    val isVideo: Boolean get() = video != null
+}
+
+/**
+ * F-VID-15 meta-playlist: ONE queue spanning videos and music tracks. The
+ * session plays [items] in order — a video can roll into a track and a
+ * track into a video — until it ends, repeats or the user plays something else.
+ */
+data class PlaylistSession(
+    val name: String,
+    val items: List<PlaylistSessionItem>,
+    val index: Int
+) {
+    val current: PlaylistSessionItem? get() = items.getOrNull(index)
+}
 
 /**
  * Activity-scoped presentation adapter (Section 4 ADR-07): the single place that wires user intents
@@ -75,12 +97,29 @@ class SessionCoordinator @Inject constructor(
     private var restoreAllowed = true
     private var requestVersion = 0L
 
+    /** The running meta-playlist, or null when no playlist is playing. */
+    private val _playlistSession = MutableStateFlow<PlaylistSession?>(null)
+    val playlistSession: StateFlow<PlaylistSession?> = _playlistSession.asStateFlow()
+
     init {
         viewModelScope.launch {
-            port.music.collect { playback -> updateMusic(playback) }
+            port.music.collect { playback ->
+                updateMusic(playback)
+                syncPlaylistIndexToTrack(playback.trackId)
+                val endedTrackId = playback.trackId
+                if (playback.status == PlaybackStatus.ENDED && endedTrackId != null) {
+                    advancePlaylist(endedTrackId, isVideo = false)
+                }
+            }
         }
         viewModelScope.launch {
-            port.video.collect { playback -> updateVideo(playback) }
+            port.video.collect { playback ->
+                updateVideo(playback)
+                val endedVideoId = playback.videoId
+                if (playback.status == PlaybackStatus.ENDED && endedVideoId != null) {
+                    advancePlaylist(endedVideoId, isVideo = true)
+                }
+            }
         }
         viewModelScope.launch { restoreColdStartSession() }
         // F-COM-06: opening the app is today's streak activity — the
@@ -98,6 +137,7 @@ class SessionCoordinator @Inject constructor(
     }
 
     fun playVideo(id: String, title: String = id) {
+        endPlaylistSession() // a deliberate single-video play replaces the playlist queue
         val version = newPlaybackRequest()
         viewModelScope.launch {
             val video = getVideo().firstOrNull()?.firstOrNull { it.id == id } ?: return@launch
@@ -134,6 +174,7 @@ class SessionCoordinator @Inject constructor(
     fun dismissVideoConflict() { _videoConflict.value = null }
 
     fun playMusic(id: String, title: String = id) {
+        endPlaylistSession() // a deliberate single-track play replaces the playlist queue
         val version = newPlaybackRequest()
         viewModelScope.launch {
             val queue = getMusic().firstOrNull().orEmpty()
@@ -144,8 +185,123 @@ class SessionCoordinator @Inject constructor(
 
     /** F-MUS-04: "Phát tất cả" / "Ngẫu nhiên" plays a playlist as the queue. */
     fun playMusicPlaylist(track: com.example.onespace.domain.music.model.Track, queue: List<com.example.onespace.domain.music.model.Track>) {
+        endPlaylistSession()
         val version = newPlaybackRequest()
         viewModelScope.launch { startMusic(track, queue, version) }
+    }
+
+    // ---- Meta-playlist session (F-VID-15) ----
+
+    /**
+     * Starts a playlist as ONE mixed session: the ordered ids interleave
+     * videos and tracks, and the session auto-advances through them whatever
+     * the type. Returns the session so the caller can navigate to the
+     * first item's screen.
+     */
+    suspend fun startPlaylistSession(name: String, startId: String? = null): PlaylistSession? {
+        val playlist = AppPlaylistStore.playlists[name] ?: return null
+        newPlaybackRequest()
+        val videos = getVideo().firstOrNull().orEmpty()
+        val tracks = getMusic().firstOrNull().orEmpty()
+        val settings = AppPlaylistStore.settingsOf(name)
+        val ids = playlist.orderedIds().let { if (settings.order == "shuffle") it.shuffled() else it }
+        val items = ids.mapNotNull { id ->
+            videos.firstOrNull { it.id == id }?.let { PlaylistSessionItem(video = it) }
+                ?: tracks.firstOrNull { it.id == id }?.let { PlaylistSessionItem(track = it) }
+        }
+        if (items.isEmpty()) return null
+        val index = startId?.let { id -> items.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: 0
+        val session = PlaylistSession(name, items, index)
+        _playlistSession.value = session
+        // Tracks must reach STATE_ENDED instead of looping, so the session owns every transition.
+        port.setMusicQueueLoop(false)
+        startSessionItem()
+        return session
+    }
+
+    /** Jumps to an item tapped in a session screen (queue view, playlist list). */
+    fun jumpToPlaylistItem(id: String) {
+        val session = _playlistSession.value ?: return
+        val index = session.items.indexOfFirst { it.id == id }
+        if (index < 0 || index == session.index) return
+        _playlistSession.value = session.copy(index = index)
+        startSessionItem()
+    }
+
+    /** Manual skip inside a session (the player's next/previous buttons): sequential, honouring repeat. */
+    fun skipPlaylistItem(forward: Boolean) {
+        val session = _playlistSession.value ?: return
+        val repeat = AppPlaylistStore.settingsOf(session.name).repeat
+        val nextIndex = if (forward) {
+            if (session.index < session.items.lastIndex) session.index + 1
+            else if (repeat) 0 else return
+        } else {
+            if (session.index > 0) session.index - 1
+            else if (repeat) session.items.lastIndex else return
+        }
+        _playlistSession.value = session.copy(index = nextIndex)
+        startSessionItem()
+    }
+
+    /** Ends the mixed session and restores the music engine's normal queue looping. */
+    fun endPlaylistSession() {
+        if (_playlistSession.value == null) return
+        _playlistSession.value = null
+        port.setMusicQueueLoop(true)
+    }
+
+    /** Plays the session's current item on the right engine, cleaning up the other one's leftovers. */
+    private fun startSessionItem() {
+        val session = _playlistSession.value ?: return
+        val item = session.current ?: return
+        if (item.video != null) {
+            // An ended run of music must not linger as the dock's mini player.
+            if (port.music.value.status == PlaybackStatus.ENDED) port.stopMusic()
+            viewModelScope.launch {
+                val resumeFrom = viewingSession.progressOf(item.video.id)
+                port.openVideo(item.video, resumeFrom, VideoStartPlan.Play(pauseMusic = true))
+            }
+        } else if (item.track != null) {
+            // An ended video must not linger as the floating window over the music screen.
+            if (port.video.value.status == PlaybackStatus.ENDED) port.dismissVideo(toWatchlist = false)
+            // Consecutive tracks share one queue so the player's "View queue"
+            // list stays meaningful; the queue ends where the next video takes over.
+            val run = session.items.drop(session.index).takeWhile { it.track != null }.mapNotNull { it.track }
+            if (run.isEmpty()) return
+            // A deliberate playlist play takes the voice: pause any video, no conflict dialog.
+            applyMusicPlan(MusicConflictRequest(item.track, run), MusicStartPlan.Start(VideoAudioEffect.PAUSE))
+        }
+    }
+
+    /**
+     * The session's heartbeat: a really-ended item (status ENDED) moves the
+     * queue to the next one — video to track, track to video, wrap on repeat.
+     */
+    private fun advancePlaylist(endedId: String, isVideo: Boolean) {
+        val session = _playlistSession.value ?: return
+        val current = session.current ?: return
+        // Stale ends: the engine that just ended is not the session's current item.
+        if (endedId != current.id || isVideo != current.isVideo) return
+        val settings = AppPlaylistStore.settingsOf(session.name)
+        val nextIndex = when {
+            settings.order == "shuffle" && session.items.size > 1 ->
+                session.items.indices.filter { it != session.index }.random()
+            session.index < session.items.lastIndex -> session.index + 1
+            settings.repeat -> 0
+            else -> { endPlaylistSession(); return }
+        }
+        _playlistSession.value = session.copy(index = nextIndex)
+        startSessionItem()
+    }
+
+    /** A run of consecutive tracks advances inside the music engine; the session follows it. */
+    private fun syncPlaylistIndexToTrack(trackId: String?) {
+        val session = _playlistSession.value ?: return
+        if (trackId == null) return
+        val current = session.current ?: return
+        if (current.isVideo) return // stale music state while a session video plays
+        val index = session.items.indexOfFirst { !it.isVideo && it.id == trackId }
+        if (index > session.index) _playlistSession.value = session.copy(index = index)
     }
 
     private fun newPlaybackRequest(): Long {
@@ -269,6 +425,8 @@ class SessionCoordinator @Inject constructor(
     fun moveQueueItem(fromIndex: Int, toIndex: Int) = port.moveTrackInQueue(fromIndex, toIndex)
 
     fun nextTrack() {
+        // Inside a playlist session "next" is the next session item, even when it is a video.
+        if (_playlistSession.value != null) { skipPlaylistItem(forward = true); return }
         val playback = port.music.value
         if (_musicRepeat.value) {
             playback.queue.firstOrNull { it.id == playback.trackId }
@@ -286,6 +444,7 @@ class SessionCoordinator @Inject constructor(
     }
 
     fun previousTrack() {
+        if (_playlistSession.value != null) { skipPlaylistItem(forward = false); return }
         val playback = port.music.value
         SelectPreviousTrack(playback.queue, playback.trackId)?.let { requestQueuedTrack(it, playback.queue) }
     }
@@ -304,12 +463,23 @@ class SessionCoordinator @Inject constructor(
         port.setVideoVolume(_videoVolume.value)
     }
 
+    /** User's music volume for this session; the Now Playing slider drives it. */
+    private val _musicVolume = MutableStateFlow(1f)
+    val musicVolume: StateFlow<Float> = _musicVolume.asStateFlow()
+
+    fun setMusicVolume(volume: Float) {
+        _musicVolume.value = volume.coerceIn(0f, 1f)
+        port.setMusicVolume(_musicVolume.value)
+    }
+
     /** Floating window dismissal (case C3): stop and keep the video for later. */
     fun closeVideo() {
+        endPlaylistSession()
         newPlaybackRequest()
         port.dismissVideo(toWatchlist = true)
     }
     fun closeMusic() {
+        endPlaylistSession()
         newPlaybackRequest()
         port.stopMusic()
         viewModelScope.launch { preferences.setLastTrackId(null) }

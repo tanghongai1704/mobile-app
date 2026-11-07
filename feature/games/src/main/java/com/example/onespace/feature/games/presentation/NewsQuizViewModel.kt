@@ -20,8 +20,14 @@ import kotlinx.coroutines.launch
 internal class KnowledgeQuizViewModel @Inject constructor(
     private val points: PointRepository,
     private val trackMissionAction: TrackMissionAction,
-    private val challenge: ChallengeReporter
+    private val challenge: ChallengeReporter,
+    private val sfx: com.example.onespace.core.media.GameSfx
 ) : ViewModel() {
+    /** F-GAME-13: answer feedback, fired by the option row before the reveal. */
+    fun answerSound(correct: Boolean) {
+        sfx.play(if (correct) com.example.onespace.core.media.GameSound.CORRECT else com.example.onespace.core.media.GameSound.WRONG)
+    }
+
     /** Called once when a run ends: [earned] points, [correct] right answers. */
     fun finish(earned: Int, correct: Int) {
         viewModelScope.launch {
@@ -42,7 +48,8 @@ internal class PlayAwardViewModel @Inject constructor(
     private val submitScore: com.example.onespace.domain.games.usecase.SubmitGameScore,
     private val challenge: ChallengeReporter,
     observeBests: com.example.onespace.domain.games.usecase.ObserveAllBestScores,
-    media: com.example.onespace.core.media.MediaPlaybackCoordinator
+    media: com.example.onespace.core.media.MediaPlaybackCoordinator,
+    val sfx: com.example.onespace.core.media.GameSfx
 ) : ViewModel() {
     /** F-GAME-08: the shared video player renders on top of the game board. */
     val player: androidx.media3.common.Player = media.videoPlayer

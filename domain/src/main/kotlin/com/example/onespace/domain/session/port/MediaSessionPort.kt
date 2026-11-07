@@ -64,6 +64,13 @@ interface MediaSessionPort {
     fun addTrackToQueue(track: Track) {}
     /** Playback speed of the music engine (1 = normal). */
     fun setMusicSpeed(speed: Float) {}
+    /**
+     * Whether the music engine loops its queue forever (the normal dock
+     * behaviour) or ends after the last item. A mixed playlist session turns
+     * looping OFF so each track can reach STATE_ENDED and hand over to the
+     * session, which may continue with a video.
+     */
+    fun setMusicQueueLoop(loop: Boolean) {}
 
     fun openVideo(video: Video, startPositionMs: Long, plan: com.example.onespace.domain.session.VideoStartPlan.Play)
     fun resumeVideo(plan: com.example.onespace.domain.session.VideoStartPlan.Play)
@@ -74,6 +81,9 @@ interface MediaSessionPort {
 
     /** User's video volume, 0 (mute) to 1 (full); session state, never persisted. */
     fun setVideoVolume(volume: Float)
+
+    /** User's music volume, 0 (mute) to 1 (full); session state, never persisted. */
+    fun setMusicVolume(volume: Float) {}
 
     /** Playback speed of the video engine (1 = normal). */
     fun setVideoSpeed(speed: Float) {}

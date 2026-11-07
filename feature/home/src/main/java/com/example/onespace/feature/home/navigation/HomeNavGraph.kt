@@ -32,14 +32,18 @@ fun NavGraphBuilder.homeGraph(
             val state by vm.uiState.collectAsStateWithLifecycle()
             val videoPlayback = session?.video?.collectAsStateWithLifecycle()?.value
             val musicPlayback = session?.music?.collectAsStateWithLifecycle()?.value
+            val musicSpeed = session?.musicSpeed?.collectAsStateWithLifecycle()?.value ?: 1f
             val gamification by vm.gamification.collectAsStateWithLifecycle()
             val offline by vm.offline.collectAsStateWithLifecycle()
             val watchLater by vm.watchLater.collectAsStateWithLifecycle()
+            val downloadedIds by vm.downloads.collectAsStateWithLifecycle()
             HomeScreen(
                 state = state,
                 gamification = gamification,
                 offline = offline,
                 watchLater = watchLater,
+                downloadedIds = downloadedIds,
+                onToggleDownload = { id, type, title, subtitle -> vm.toggleDownload(id, type, title, subtitle) },
                 onRemoveFromWatchLater = { videoId -> vm.removeFromWatchLater(videoId) },
                 onWatchedFromLater = { videoId -> vm.watchedFromLater(videoId) },
                 onOpenVideo = onOpenVideo,
@@ -49,6 +53,8 @@ fun NavGraphBuilder.homeGraph(
                 onOpenPlaylists = onOpenPlaylists,
                 onPlayVideoAtHome = onPlayVideoAtHome,
                 onPlayMusicAtHome = onPlayMusicAtHome,
+                musicSpeed = musicSpeed,
+                onCycleMusicSpeed = { session?.cycleMusicSpeed() },
                 videoPlayer = videoPlayer,
                 videoPlayback = videoPlayback,
                 musicPlayback = musicPlayback,

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,7 +51,11 @@ internal fun GuessSongScreen(
     onNext: () -> Unit,
     onStartPlaylist: (AppPlaylist) -> Unit = {}
 ) {
-    var choosing by remember { mutableStateOf(false) }
+    // Playlists that mix in videos are left out: only pure music playlists can play.
+    val usablePlaylists = AppPlaylistStore.playlists.values.filter { it.videoIds.isEmpty() && it.trackIds.isNotEmpty() }
+    // Playlist-first: opening the game lands straight on the user's playlists;
+    // random is the fallback when there is nothing to pick from.
+    var choosing by remember { mutableStateOf(usablePlaylists.isNotEmpty()) }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -72,32 +77,44 @@ internal fun GuessSongScreen(
 
         when {
             state.question == null -> {
-                // Start screen
-                Button(onClick = { choosing = false; onStart() }, modifier = Modifier.fillMaxWidth()) {
-                    Text(tr("Bắt đầu chơi", "Start playing"))
-                }
-                OutlinedButton(onClick = { choosing = !choosing }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Filled.LibraryMusic, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(tr("Chơi từ Playlist của bạn", "Play from your playlists"))
-                }
+                // Start screen: playlist-first. The user picks one of their
+                // playlists right away; random stays as a secondary choice and
+                // is the only mode when no playlist exists yet.
                 if (choosing) {
-                    // Playlists that mix in videos are left out: only pure music playlists can play.
-                    val usable = AppPlaylistStore.playlists.values.filter { it.videoIds.isEmpty() && it.trackIds.isNotEmpty() }
-                    if (usable.isEmpty()) {
+                    if (usablePlaylists.isEmpty()) {
+                        // Fallback: nothing to pick from, so random is the only mode.
                         Text(
-                            tr("Chưa có playlist nhạc nào. Lưu bài hát vào một playlist trước nhé.",
+                            tr("Chưa có danh sách phát nhạc nào. Lưu bài hát vào một danh sách phát trước nhé.",
                                 "No music playlists yet. Save songs to a playlist first."),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    } else usable.forEach { pl ->
-                        ContentCard(
-                            pl.name,
-                            tr("${pl.trackIds.size} bài hát", "${pl.trackIds.size} songs"),
-                            Icons.Filled.LibraryMusic,
-                            { choosing = false; onStartPlaylist(pl) }
-                        )
+                        Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+                            Text(tr("Chơi ngẫu nhiên", "Play random"))
+                        }
+                    } else {
+                        usablePlaylists.forEach { pl ->
+                            ContentCard(
+                                pl.name,
+                                tr("${pl.trackIds.size} bài hát", "${pl.trackIds.size} songs"),
+                                Icons.Filled.LibraryMusic,
+                                { choosing = false; onStartPlaylist(pl) }
+                            )
+                        }
+                        OutlinedButton(onClick = { choosing = false }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(tr("Chơi ngẫu nhiên", "Play random"))
+                        }
+                    }
+                } else {
+                    Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+                        Text(tr("Bắt đầu chơi", "Start playing"))
+                    }
+                    OutlinedButton(onClick = { choosing = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.LibraryMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(tr("Chơi từ danh sách phát của bạn", "Play from your playlists"))
                     }
                 }
             }

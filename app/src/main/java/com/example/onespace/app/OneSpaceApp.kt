@@ -10,15 +10,32 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import com.example.onespace.app.ui.RecordFlow
 import com.example.onespace.app.ui.RecordSource
 import androidx.compose.material3.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -32,6 +49,12 @@ import com.example.onespace.app.navigation.*
 import com.example.onespace.app.ui.*
 import com.example.onespace.core.designsystem.ReadingState
 import com.example.onespace.core.designsystem.FloatingArticleCard
+import com.example.onespace.core.designsystem.ScrubBar
+import com.example.onespace.core.designsystem.oneSpaceColors
+import com.example.onespace.core.media.VideoSurface
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Forward10
 import com.example.onespace.core.session.SessionCoordinator
 import com.example.onespace.domain.session.MediaConflictRule
 import com.example.onespace.domain.session.Section
@@ -57,13 +80,14 @@ fun OneSpaceApp() {
     val floatingPosition = rememberFloatingPosition()
     // The floating window's speaker button: mute at once, restore on the next tap.
     var lastVideoVolume by remember { mutableStateOf(1f) }
-
     val nav = rememberNavController()
     val appState = rememberOneSpaceAppState(nav)
     val entry by nav.currentBackStackEntryAsState()
     val selected = TopLevelDestination.entries.find { it.contains(entry?.destination) }
     val inMain = entry?.destination?.hierarchy?.any { it.hasRoute<AppRoute.Main>() } == true
     val screen = entry?.destination.contextScreen()
+    // A playlist detail owns its own title ("Danh sách phát: X"), not the section's.
+    val playlistName = entry.playlistName()
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     // Snackbar texts are used in callbacks, so they are resolved here in composition.
     val msgMusicStopped = tr("Đã dừng phát nhạc", "Music stopped")
@@ -109,9 +133,13 @@ fun OneSpaceApp() {
     // F-GAME-08: inside a game the video renders as a split top half, not the floating window.
     // Feed-in-place: on Home the feed card is the player surface, so the
     // floating window / music dock only take over on the other tabs.
-    val showFloat = inMain && videoId != null && screen != ContextScreen.VIDEO && screen != ContextScreen.GAMES && !onHome
+    val videoDocked = inMain && videoId != null && screen != ContextScreen.VIDEO && screen != ContextScreen.GAMES && !onHome
+    val showFloat = videoDocked
+    // Music dock stays in games (Beat Tiles plays along) but in read-only mode:
+    // progress + speed visible, no pause/close.
     val showMini = inMain && trackId != null && screen != ContextScreen.MUSIC && !onHome
-    val showArticleFloat = inMain && ReadingState.articleId != null && screen != ContextScreen.NEWS
+    val inGame = screen == ContextScreen.GAMES
+    val showArticleFloat = inMain && ReadingState.articleId != null && screen != ContextScreen.NEWS && screen != ContextScreen.GAMES
 
     Scaffold(
         snackbarHost = {
@@ -119,9 +147,14 @@ fun OneSpaceApp() {
         },
         topBar = {
             if (inMain) Column { TopAppBar(
-                title = { Text(screen?.title() ?: selected?.label() ?: "") },
+                title = { Text(playlistName?.let { tr("Danh sách phát: ", "Playlist: ") + it } ?: (screen?.title() ?: selected?.label() ?: "")) },
                 navigationIcon = {
-                    if (screen != null) IconButton(onClick = appState::navigateBack) {
+                    if (screen != null || playlistName != null) IconButton(onClick = {
+                        // Back from a playlist goes to the playlist list, not the section tab.
+                        if (playlistName != null) {
+                            if (!appState.backToPlaylists()) appState.navigateBack()
+                        } else appState.navigateBack()
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("Quay lại", "Back"))
                     }
                 },
@@ -141,24 +174,25 @@ fun OneSpaceApp() {
                         // Beat Tiles with this song; off when the song has no beat data.
                         val beat = musicState.queue.firstOrNull { it.id == trackId }?.bpm
                         IconButton(enabled = beat != null, onClick = { appState.openGame("g6", trackId) }) {
-                            Icon(Icons.Filled.SportsEsports, contentDescription = tr("Chơi Beat Tiles với bài này", "Play Beat Tiles with this song"))
+                            Icon(Icons.Filled.GridOn, contentDescription = tr("Chơi Beat Tiles với bài này", "Play Beat Tiles with this song"))
                         }
                     }
                     // Search is a magnifier on the section roots; the field opens under the bar.
+                    // Always shows the magnifier icon (no X) — tapping the icon toggles, tapping content closes.
                     if (screen == null && activeSearch != null) IconButton(onClick = activeSearch::toggle) {
                         Icon(
-                            if (activeSearch.open) Icons.Filled.Close else Icons.Filled.Search,
+                            Icons.Filled.Search,
                             contentDescription = tr("Tìm kiếm", "Search")
                         )
                     }
-                    // Guess-song shortcut: a small game icon next to the search magnifier, Music tab only.
+                    // Guess-song shortcut: a music-note icon next to the search magnifier, Music tab only.
                     if (screen == null && selected?.section == com.example.onespace.domain.session.Section.MUSIC) {
                         IconButton(onClick = {
                             coordinator.cancelPendingRestore()
                             appState.openGame("g3")
                         }) {
                             Icon(
-                                androidx.compose.material.icons.Icons.Filled.SportsEsports,
+                                androidx.compose.material.icons.Icons.Filled.MusicNote,
                                 contentDescription = tr("Chơi Đoán bài hát", "Play Guess the Song")
                             )
                         }
@@ -190,11 +224,22 @@ fun OneSpaceApp() {
                 if (showMini) MusicMiniPlayer(
                     title = musicState.title,
                     playback = musicState,
-                    onExpand = { trackId?.let { appState.openMusicPlayer(it) } },
+                    onExpand = {
+                        // The Beat Tiles backing track is not expandable mid-round.
+                        if (!com.example.onespace.core.designsystem.GameMusicState.active) {
+                            trackId?.let { appState.openMusicPlayer(it) }
+                        }
+                    },
                     onToggle = coordinator::toggleMusic,
                     speed = musicSpeed,
                     onCycleSpeed = coordinator::cycleMusicSpeed,
                     onSeekTo = coordinator::seekMusicTo,
+                    // A song picked for the Beat Tiles round (or sent from Now Playing)
+                    // is read-only: progress + speed visible, pause/close hidden.
+                    // Music the user was already listening to keeps full controls —
+                    // in every game, not just outside them.
+                    showProgress = true,
+                    interactive = !com.example.onespace.core.designsystem.GameMusicState.active,
                     onClose = {
                         // Undo pattern: the user can bring the music back within 4 seconds.
                         val lastId = trackId
@@ -212,18 +257,26 @@ fun OneSpaceApp() {
                         }
                     }
                 )
-                if (showArticleFloat) FloatingArticleCard(
-                    title = ReadingState.title,
-                    ttsActive = ttsState.totalSegments > 0,
-                    ttsPlaying = ttsState.isPlaying,
-                    ttsProgress = ttsState.progress,
-                    onToggleTts = {
-                        if (ttsState.isPlaying) scope.launch { tts.engine.pause() }
-                        else scope.launch { tts.engine.play() }
-                    },
-                    onExpand = { ReadingState.articleId?.let { appState.openArticle(it) } },
-                    onClose = ReadingState::close
-                )
+                if (showArticleFloat) {
+                    FloatingArticleCard(
+                        title = ReadingState.title,
+                        ttsActive = ttsState.totalSegments > 0,
+                        ttsPlaying = ttsState.isPlaying,
+                        ttsProgress = ttsState.progress,
+                        onToggleTts = {
+                            if (ttsState.isPlaying) scope.launch { tts.engine.pause() }
+                            else scope.launch { tts.engine.play() }
+                        },
+                        onSeekTts = { fraction -> scope.launch { tts.engine.seekTo(fraction) } },
+                        onExpand = { ReadingState.articleId?.let { appState.openArticle(it) } },
+                        // Closing the card also silences the voice — otherwise the
+                        // reading keeps playing with no way left to stop it.
+                        onClose = {
+                            scope.launch { tts.engine.stop() }
+                            ReadingState.close()
+                        }
+                    )
+                }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     TopLevelDestination.entries.forEach { tab ->
@@ -242,6 +295,14 @@ fun OneSpaceApp() {
             Modifier
                 .fillMaxSize()
                 .padding(padding)
+                // Tap anywhere in the content area closes an open search field.
+                .pointerInput(activeSearch?.open) {
+                    if (activeSearch?.open == true) {
+                        detectTapGestures {
+                            activeSearch?.close()
+                        }
+                    }
+                }
                 // Swipe left/right flips between the five sections —
                 // continuous browsing, even from a player screen where
                 // content keeps running. Games opt out: they own swipes.
@@ -271,15 +332,89 @@ fun OneSpaceApp() {
                     }
                 }
         ) {
-            androidx.compose.runtime.CompositionLocalProvider(
-                com.example.onespace.core.designsystem.LocalSearchState provides (activeSearch ?: com.example.onespace.core.designsystem.SearchState())
-            ) {
-                AppNavigation(appState, coordinator, ::select,
-                    Modifier.fillMaxSize(),
-                    downloadedContent = downloadedContent,
-                    videoPlayer = media.videoPlayer)
+            Column(Modifier.fillMaxSize()) {
+                // F-SPLIT: when active, the video docks at the top of the content column,
+                // pushing the NavHost down — not overlaying it.
+                if (com.example.onespace.core.designsystem.SplitVideoState.active && showFloat) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+                        VideoSurface(
+                            player = media.videoPlayer,
+                            modifier = Modifier.fillMaxSize(),
+                            onDoubleTap = coordinator::toggleVideo
+                        )
+                        // Tap shows controls that fade after 2s.
+                        var splitControls by remember { mutableStateOf(false) }
+                        val splitPlaying = videoState.playRequested
+                        LaunchedEffect(splitControls, splitPlaying) {
+                            if (splitControls && splitPlaying) { kotlinx.coroutines.delay(2000); splitControls = false }
+                        }
+                        Box(
+                            Modifier.fillMaxSize().clickable(
+                                indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                            ) { splitControls = !splitControls }
+                        )
+                        if (splitControls) {
+                            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.3f)))
+                            Row(
+                                Modifier.align(androidx.compose.ui.Alignment.Center),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                IconButton(onClick = { coordinator.seekVideoBy(-10_000) }) {
+                                    Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"),
+                                        tint = MaterialTheme.oneSpaceColors.onMedia, modifier = Modifier.size(30.dp))
+                                }
+                                IconButton(onClick = coordinator::toggleVideo, modifier = Modifier.size(46.dp)) {
+                                    Icon(
+                                        if (videoState.playRequested) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                        contentDescription = if (videoState.playRequested) tr("Tạm dừng", "Pause") else tr("Phát", "Play"),
+                                        tint = MaterialTheme.oneSpaceColors.onMedia, modifier = Modifier.size(30.dp)
+                                    )
+                                }
+                                IconButton(onClick = { coordinator.seekVideoBy(10_000) }) {
+                                    Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"),
+                                        tint = MaterialTheme.oneSpaceColors.onMedia, modifier = Modifier.size(30.dp))
+                                }
+                            }
+                            Row(
+                                Modifier.align(androidx.compose.ui.Alignment.TopEnd).padding(8.dp)
+                            ) {
+                                IconButton(onClick = { com.example.onespace.core.designsystem.SplitVideoState.set(false) }) {
+                                    Icon(Icons.Filled.PictureInPictureAlt, contentDescription = tr("Thu nhỏ video", "Minimize video"),
+                                        tint = MaterialTheme.oneSpaceColors.onMedia)
+                                }
+                                IconButton(onClick = {
+                                    coordinator.closeVideo()
+                                    scope.launch { snackbarHostState.showSnackbar(msgSavedWatchLater) }
+                                }) {
+                                    Icon(Icons.Filled.Close, contentDescription = tr("Đóng", "Close"),
+                                        tint = MaterialTheme.oneSpaceColors.onMedia)
+                                }
+                            }
+                        }
+                        // Progress bar at bottom edge.
+                        ScrubBar(
+                            videoState.positionMs, videoState.totalMs,
+                            onSeek = coordinator::seekVideoTo,
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+                            trackHeight = 3.dp, knobRadius = 5.dp,
+                            trackColor = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.3f),
+                            progressColor = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        com.example.onespace.core.designsystem.LocalSearchState provides (activeSearch ?: com.example.onespace.core.designsystem.SearchState())
+                    ) {
+                        AppNavigation(appState, coordinator, ::select,
+                            Modifier.fillMaxSize(),
+                            downloadedContent = downloadedContent,
+                            videoPlayer = media.videoPlayer)
+                    }
+                }
             }
-            if (showFloat) FloatingVideo(
+            if (showFloat && !com.example.onespace.core.designsystem.SplitVideoState.active) FloatingVideo(
                 player = media.videoPlayer,
                 title = videoState.title,
                 playback = videoState,
@@ -298,7 +433,7 @@ fun OneSpaceApp() {
                 onClose = {
                     coordinator.closeVideo()
                     scope.launch { snackbarHostState.showSnackbar(msgSavedWatchLater) }
-                }
+                },
             )
         }
     }

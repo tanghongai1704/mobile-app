@@ -141,16 +141,23 @@ fun AppNavigation(
                 onOpenVideo = appState::openVideo,
                 onBrowseNews = { onSection(Section.NEWS) },
                 onOpenArtist = appState::openVideoArtist,
-                onOpenFromPlaylist = appState::openVideoInPlaylist
+                onOpenFromPlaylist = appState::openVideoInPlaylist,
+                onOpenTrackPlayer = appState::openPlaylistTrackPlayer,
+                onFollowSessionTrack = appState::openPlaylistTrack,
+                onFollowSessionVideo = appState::openPlaylistVideo,
+                onBackToPlaylists = { if (!appState.backToPlaylists()) appState.navigateBack() }
             )
             musicGraph(
                 session = session,
                 getGraphEntry = { appState.graphEntry(MusicRoute.Graph) },
                 onOpenPlayer = appState::openMusicPlayer,
                 onOpenArtist = appState::openMusicArtist,
-                onOpenGuessSong = { appState.openGame("g3") }
+                onOpenGuessSong = { appState.openGame("g3") },
+                onFollowSessionVideo = appState::openPlaylistVideo,
+                onBackToPlaylists = { if (!appState.backToPlaylists()) appState.navigateBack() }
             )
             newsGraph(
+                session = session,
                 getGraphEntry = { appState.graphEntry(NewsRoute.Graph) },
                 onOpenArticle = appState::openArticle,
                 onListenTts = session::toggleMusicOff
@@ -158,7 +165,10 @@ fun AppNavigation(
             gamesGraph(
                 session = session,
                 getGraphEntry = { appState.graphEntry(GamesRoute.Graph) },
-                onOpenGame = appState::openGame
+                onOpenGame = appState::openGame,
+                // "Thu nhỏ" in the game split: leave the game, the shell's
+                // floating window takes the video back over.
+                onMinimizeVideo = appState::navigateBack
             )
             accountGraph(
                 getGraphEntry = { appState.graphEntry(AccountRoute.Graph) },

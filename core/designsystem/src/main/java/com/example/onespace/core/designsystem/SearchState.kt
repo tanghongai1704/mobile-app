@@ -2,7 +2,7 @@ package com.example.onespace.core.designsystem
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -46,7 +46,7 @@ class SearchState {
 /** The search of the section being shown; a detached default keeps previews working. */
 val LocalSearchState = compositionLocalOf { SearchState() }
 
-/** Pill field that drops down under the top bar while a section's search is open. */
+/** Square-cornered field that drops down under the top bar while a section's search is open. */
 @Composable
 fun AppSearchField(state: SearchState, placeholder: String, modifier: Modifier = Modifier) {
     val focus = remember { FocusRequester() }
@@ -55,7 +55,7 @@ fun AppSearchField(state: SearchState, placeholder: String, modifier: Modifier =
         value = state.query,
         onValueChange = { state.query = it },
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).focusRequester(focus),
-        shape = CircleShape,
+        shape = RectangleShape,
         colors = AppFieldDefaults.colors(),
         placeholder = { Text(placeholder) },
         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },

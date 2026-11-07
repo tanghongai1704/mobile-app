@@ -25,7 +25,15 @@ fun NavGraphBuilder.videoGraph(
     onOpenVideo: (String) -> Unit,
     onBrowseNews: () -> Unit,
     onOpenArtist: (String) -> Unit = {},
-    onOpenFromPlaylist: (String, String) -> Unit = { _, _ -> }
+    onOpenFromPlaylist: (String, String) -> Unit = { _, _ -> },
+    /** A track tapped in a mixed playlist list: push the music player. */
+    onOpenTrackPlayer: (String) -> Unit = {},
+    /** The session moved to a track (video → music): replace the player screen. */
+    onFollowSessionTrack: (String) -> Unit = {},
+    /** The session moved to the next video (video → video): replace the player screen. */
+    onFollowSessionVideo: (String, String) -> Unit = { _, _ -> },
+    /** Back from a playlist goes to the playlist list, not the Video tab. */
+    onBackToPlaylists: () -> Unit = {}
 ) {
     navigation<VideoRoute.Graph>(startDestination = VideoRoute.Feed) {
         composable<VideoRoute.Feed> { entry ->
@@ -117,24 +125,37 @@ fun NavGraphBuilder.videoGraph(
             val owner = remember(entry) { getGraphEntry() }
             val vm: VideoViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
+            val tracks by vm.tracks.collectAsStateWithLifecycle()
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            // System back also returns to the playlist list, like the top bar's arrow.
+            androidx.activity.compose.BackHandler { onBackToPlaylists() }
             CatalogContent(state) { videos ->
                 val historyEntries by vm.history.collectAsStateWithLifecycle()
                 val historyMap = remember(historyEntries) {
                     historyEntries.associate { it.videoId to it.positionMs }
                 }
                 VideoPlaylistScreen(
-                    name, videos,
+                    name, videos, tracks,
                     watchProgress = historyMap,
                     onOpen = { id ->
-                        videos.find { it.id == id }?.let { session.playVideo(it.id, it.title) }
-                        onOpenFromPlaylist(id, name)
+                        // Tapping an item starts the whole playlist AT that item.
+                        scope.launch {
+                            session.startPlaylistSession(name, startId = id) ?: return@launch
+                            onOpenFromPlaylist(id, name)
+                        }
                     },
-                    onPlay = { items ->
-                        val settings = com.example.onespace.core.designsystem.AppPlaylistStore.settingsOf(name)
-                        val start = if (settings.order == "shuffle") items.randomOrNull() else items.firstOrNull()
-                        start?.let {
-                            session.playVideo(it.id, it.title)
-                            onOpenFromPlaylist(it.id, name)
+                    onOpenTrack = { trackId ->
+                        scope.launch {
+                            session.startPlaylistSession(name, startId = trackId) ?: return@launch
+                            onOpenTrackPlayer(trackId)
+                        }
+                    },
+                    onPlay = {
+                        scope.launch {
+                            val started = session.startPlaylistSession(name) ?: return@launch
+                            val current = started.current ?: return@launch
+                            if (current.isVideo) onOpenFromPlaylist(current.id, name)
+                            else onOpenTrackPlayer(current.id)
                         }
                     }
                 )
@@ -165,43 +186,30 @@ fun NavGraphBuilder.videoGraph(
                     videos.filter { it.id in (com.example.onespace.core.designsystem.AppPlaylistStore.playlists[playlistName]?.videoIds ?: emptyList()) }
                 else videos
                 val relatedLabel = playlistName ?: tr("Liên quan", "Related")
-                // YouTube-style playlist autoplay: a finished video rolls
-                // into the next one; only real playback (status ENDED) counts,
-                // a restore parked at the end position must not trigger it.
-                val playlistEnded = active && playlistName != null &&
-                    playback.status == PlaybackStatus.ENDED
-                LaunchedEffect(playlistEnded, id) {
-                    if (playlistEnded && playlistName != null) {
-                        val store = com.example.onespace.core.designsystem.AppPlaylistStore
-                        val ids = store.playlists[playlistName]?.videoIds ?: emptyList()
-                        val index = ids.indexOf(id)
-                        val settings = store.settingsOf(playlistName)
-                        // Order decides HOW the next one is picked; repeat only
-                        // decides whether the end of the list wraps around.
-                        val nextId = when {
-                            settings.order == "shuffle" ->
-                                ids.filter { it != id }.randomOrNull()
-                            else -> ids.getOrNull(index + 1)
-                                ?: if (settings.repeat && ids.isNotEmpty()) ids.first() else null
-                        }
-                        if (nextId != null) {
-                            videos.find { it.id == nextId }?.let {
-                                session.playVideo(it.id, it.title)
-                                onOpenFromPlaylist(nextId, playlistName)
-                            }
-                        }
-                    }
+                // Mixed playlist session: when the session moves on (a video
+                // rolls into a track or the next video), follow it. Each index
+                // is handled once, so going back to an already-played video
+                // does not jump forward again.
+                val playlistSession by session.playlistSession.collectAsStateWithLifecycle()
+                var handledSessionIndex by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableIntStateOf(-1) }
+                LaunchedEffect(playlistSession, playlistName) {
+                    val active2 = playlistSession ?: return@LaunchedEffect
+                    if (active2.name != playlistName) return@LaunchedEffect
+                    val current = active2.current ?: return@LaunchedEffect
+                    if (current.id == id || active2.index == handledSessionIndex) return@LaunchedEffect
+                    handledSessionIndex = active2.index
+                    if (current.video != null && playlistName != null) onFollowSessionVideo(current.id, playlistName)
+                    else onFollowSessionTrack(current.id)
                 }
                 val audioOnly by vm.audioOnly.collectAsStateWithLifecycle()
                 val watchLater by vm.watchLaterIds.collectAsStateWithLifecycle()
                 val downloads by vm.downloads.collectAsStateWithLifecycle()
                 val speed by vm.speed.collectAsStateWithLifecycle()
                 val quality by vm.quality.collectAsStateWithLifecycle()
-                // Session volume lives on the coordinator, not per-video state.
+                // Video volume lives on the coordinator; the gear sheet exposes it.
                 val volume by session.videoVolume.collectAsStateWithLifecycle()
-                // The detail screen's speaker button: mute at once, restore on the next tap.
+                // The overlay speaker: mute at once, restore on the next tap.
                 var lastVolume by remember { mutableStateOf(1f) }
-                val systemVolume = rememberSystemVolume()
                 val quizCombo by vm.quizCombo.collectAsStateWithLifecycle()
                 val quizRound by vm.quizRound.collectAsStateWithLifecycle()
                 var mp3Offer by remember { mutableStateOf(false) }
@@ -245,7 +253,6 @@ fun NavGraphBuilder.videoGraph(
                         if (volume > 0f) { lastVolume = volume; session.setVideoVolume(0f) }
                         else session.setVideoVolume(lastVolume.coerceAtLeast(0.2f))
                     },
-                    systemVolume = systemVolume,
                     quality = quality,
                     onQuality = vm::setQuality,
                     onSeekTo = session::seekVideoTo,
@@ -296,19 +303,29 @@ fun NavGraphBuilder.videoGraph(
                         else video?.let { session.playVideo(it.id, it.title) }
                     },
                     onPrevVideo = {
-                        val idx = videos.indexOfFirst { it.id == video?.id }
-                        if (idx > 0) {
-                            val prev = videos[idx - 1]
-                            session.playVideo(prev.id, prev.title)
-                            onOpenVideo(prev.id)
+                        // Inside a playlist session the arrows skip through the
+                        // session's mixed queue, not the catalog order.
+                        if (playlistName != null && session.playlistSession.value?.name == playlistName) {
+                            session.skipPlaylistItem(forward = false)
+                        } else {
+                            val idx = videos.indexOfFirst { it.id == video?.id }
+                            if (idx > 0) {
+                                val prev = videos[idx - 1]
+                                session.playVideo(prev.id, prev.title)
+                                onOpenVideo(prev.id)
+                            }
                         }
                     },
                     onNextVideo = {
-                        val idx = videos.indexOfFirst { it.id == video?.id }
-                        if (idx >= 0 && idx < videos.size - 1) {
-                            val next = videos[idx + 1]
-                            session.playVideo(next.id, next.title)
-                            onOpenVideo(next.id)
+                        if (playlistName != null && session.playlistSession.value?.name == playlistName) {
+                            session.skipPlaylistItem(forward = true)
+                        } else {
+                            val idx = videos.indexOfFirst { it.id == video?.id }
+                            if (idx >= 0 && idx < videos.size - 1) {
+                                val next = videos[idx + 1]
+                                session.playVideo(next.id, next.title)
+                                onOpenVideo(next.id)
+                            }
                         }
                     },
                     onSeekBy = session::seekVideoBy,
@@ -323,7 +340,11 @@ fun NavGraphBuilder.videoGraph(
                     onTogglePlaylistOrder = { playlistName?.let { com.example.onespace.core.designsystem.AppPlaylistStore.toggleOrder(it) } },
                     onTogglePlaylistRepeat = { playlistName?.let { com.example.onespace.core.designsystem.AppPlaylistStore.toggleRepeat(it) } },
                     onOpenRelated = { relatedId ->
-                        videos.find { it.id == relatedId }?.let { session.playVideo(it.id, it.title) }
+                        // Related items inside a session playlist jump the session there.
+                        val inSession = session.playlistSession.value?.name == playlistName &&
+                            session.playlistSession.value?.items?.any { it.id == relatedId } == true
+                        if (inSession) session.jumpToPlaylistItem(relatedId)
+                        else videos.find { it.id == relatedId }?.let { session.playVideo(it.id, it.title) }
                         if (playlistName != null) onOpenFromPlaylist(relatedId, playlistName)
                         else onOpenVideo(relatedId)
                     }
@@ -354,32 +375,3 @@ fun NavGraphBuilder.videoGraph(
 
 
 
-/**
- * The phone's media volume as 0..1, emitted only after it changes (null until then), so the
- * Video list can flash a level bar next to its speaker when the hardware keys are used.
- */
-@androidx.compose.runtime.Composable
-private fun rememberSystemVolume(): Float? {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var level by remember { mutableStateOf<Float?>(null) }
-    androidx.compose.runtime.DisposableEffect(context) {
-        val audio = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
-        val receiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(c: android.content.Context?, intent: android.content.Intent?) {
-                val max = audio?.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC) ?: return
-                val now = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
-                if (max > 0) level = now.toFloat() / max
-            }
-        }
-        // VOLUME_CHANGED_ACTION is the long-standing broadcast for hardware key changes.
-        val filter = android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION")
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            context.registerReceiver(receiver, filter)
-        }
-        onDispose { context.unregisterReceiver(receiver) }
-    }
-    return level
-}

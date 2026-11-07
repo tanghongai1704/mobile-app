@@ -11,6 +11,8 @@ import com.example.onespace.domain.games.usecase.SubmitGameScore
 import com.example.onespace.domain.session.model.MissionType
 import com.example.onespace.domain.session.repository.PointRepository
 import com.example.onespace.domain.session.usecase.TrackMissionAction
+import com.example.onespace.core.media.GameSfx
+import com.example.onespace.core.media.GameSound
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.FlowPreview
@@ -42,6 +44,7 @@ internal class Game2048ViewModel @Inject constructor(
     private val trackMissionAction: TrackMissionAction,
     private val submitScore: SubmitGameScore,
     private val challenge: ChallengeReporter,
+    private val sfx: GameSfx,
     observeBest: ObserveBestScore
 ) : ViewModel() {
     private val _state = MutableStateFlow(Game2048.newGame())
@@ -78,6 +81,7 @@ internal class Game2048ViewModel @Inject constructor(
         if (next === _state.value) return
         _state.value = next
         _moves.value += 1
+        sfx.play(if (next.mergedAt.isNotEmpty()) GameSound.MERGE else GameSound.TAP)
         when {
             next.isOver -> finish(next, over = true)
             next.reachedTarget && !targetPaid -> finish(next, over = false)
@@ -99,6 +103,7 @@ internal class Game2048ViewModel @Inject constructor(
     private fun finish(state: Game2048State, over: Boolean) {
         if (over && overPaid) return
         if (over) overPaid = true else targetPaid = true
+        sfx.play(if (over) GameSound.GAMEOVER else GameSound.WIN)
         viewModelScope.launch {
             val reward = if (over) state.score / 20 else TARGET_BONUS
             val record = if (over) submitScore(GAME_2048_ID, state.score) else false

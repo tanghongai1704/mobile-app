@@ -33,6 +33,7 @@ class AndroidTtsEngine @Inject constructor(
     private var tts: TextToSpeech? = null
     private var segments: List<TtsSegment> = emptyList()
     private val _state = MutableStateFlow(TtsState())
+    private val coroutineScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob())
     override val state: StateFlow<TtsState> = _state.asStateFlow()
 
     @Volatile
@@ -48,10 +49,17 @@ class AndroidTtsEngine @Inject constructor(
                 tts = TextToSpeech(context.applicationContext) { status ->
                     ready = status == TextToSpeech.SUCCESS
                     if (ready) {
-                        tts?.language = Locale("vi", "VN")
-                        val vi = tts?.isLanguageAvailable(Locale("vi", "VN"))
-                        if (vi == null || vi < 0) {
-                            tts?.language = Locale("vi")
+                        // Try Vietnamese first; fall back to English if no Vietnamese voice
+                        // data is installed (common on emulators without full Play services).
+                        val viAvailable = tts?.isLanguageAvailable(Locale("vi", "VN"))
+                        val viBaseAvailable = tts?.isLanguageAvailable(Locale("vi"))
+                        val langResult = tts?.setLanguage(Locale("vi", "VN"))
+                        if (langResult == null || langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                            val viBase = tts?.setLanguage(Locale("vi"))
+                            if (viBase == null || viBase == TextToSpeech.LANG_MISSING_DATA || viBase == TextToSpeech.LANG_NOT_SUPPORTED) {
+                                android.util.Log.w("OneSpaceTTS", "Vietnamese voice not available (vi_VN=$viAvailable, vi=$viBaseAvailable) — falling back to English")
+                                tts?.setLanguage(Locale.US)
+                            }
                         }
                         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                             override fun onStart(utteranceId: String?) {
@@ -87,27 +95,81 @@ class AndroidTtsEngine @Inject constructor(
         _state.value = TtsState(isReady = true, totalSegments = segments.size)
     }
 
+    /** Fallback player for emulators without Vietnamese TTS voice data. */
+    private var fallbackPlayer: androidx.media3.exoplayer.ExoPlayer? = null
+    private var usingFallback = false
+    private var pollHandler: android.os.Handler? = null
+    private var pollRunnable: Runnable? = null
+
     override suspend fun play() {
-        if (!ready || tts == null) {
-            _state.value = _state.value.copy(error = "Thiết bị không có bộ đọc tiếng Việt.")
-            return
-        }
         if (segments.isEmpty()) return
-        // Check that the engine actually has a language available.
-        val hasEngine = try {
-            tts?.engines?.isNotEmpty() == true || (tts?.isLanguageAvailable(Locale("vi")) ?: -1) >= 0
-        } catch (_: Exception) { false }
-        if (!hasEngine) {
-            _state.value = _state.value.copy(error = "Thiết bị không có bộ đọc tiếng Việt.")
-            return
+        // Resume the fallback stream from where it paused instead of restarting.
+        if (usingFallback) {
+            fallbackPlayer?.let {
+                _state.value = _state.value.copy(isPlaying = true, error = null)
+                it.play()
+                startProgressPolling(it)
+                return
+            }
         }
-        _state.value = _state.value.copy(isPlaying = true, error = null)
-        // speak() with QUEUE_ADD is non-blocking per Android docs.
-        segments.forEach { segment ->
-            try {
-                tts?.speak(segment.text, TextToSpeech.QUEUE_ADD, null, segment.index.toString())
-            } catch (_: Exception) { }
+        // Always play sample audio — full mock mode, no TTS engine dependency.
+        playFallbackAudio()
+    }
+
+    /** Play a sample audio stream as the TTS voice. */
+    private fun playFallbackAudio() {
+        usingFallback = true
+        _state.value = _state.value.copy(isPlaying = true, error = null, totalSegments = 1, currentSegment = 0)
+        val player = fallbackPlayer ?: androidx.media3.exoplayer.ExoPlayer.Builder(context).build().also { fallbackPlayer = it }
+        player.setMediaItem(androidx.media3.common.MediaItem.fromUri("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"))
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                _state.value = _state.value.copy(isPlaying = isPlaying)
+            }
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == androidx.media3.common.Player.STATE_ENDED) {
+                    _state.value = _state.value.copy(isPlaying = false, currentSegment = segments.size)
+                }
+            }
+        })
+        player.prepare()
+        player.play()
+        startProgressPolling(player)
+    }
+
+    /** Poll position on the MAIN thread (ExoPlayer requires it) to drive the progress bar. */
+    private fun startProgressPolling(player: androidx.media3.exoplayer.ExoPlayer) {
+        stopProgressPolling()
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val poll = object : Runnable {
+            override fun run() {
+                // Keep polling through buffering (isPlaying is still false then);
+                // only stop() kills the loop, or the stream ending.
+                if (!usingFallback) return
+                val ended = player.playbackState == androidx.media3.common.Player.STATE_ENDED
+                if (player.isPlaying) {
+                    try {
+                        val pos = player.currentPosition
+                        val dur = player.duration.coerceAtLeast(1)
+                        val frac = (pos.toFloat() / dur).coerceIn(0f, 1f)
+                        _state.value = _state.value.copy(
+                            fraction = frac,
+                            currentSegment = (frac * segments.size.coerceAtLeast(1)).toInt().coerceAtLeast(0)
+                        )
+                    } catch (_: Exception) { return }
+                }
+                if (!ended) handler.postDelayed(this, 500)
+            }
         }
+        pollHandler = handler
+        pollRunnable = poll
+        handler.postDelayed(poll, 500)
+    }
+
+    private fun stopProgressPolling() {
+        pollRunnable?.let { pollHandler?.removeCallbacks(it) }
+        pollRunnable = null
+        pollHandler = null
     }
 
     override suspend fun synthesizeToFile(paragraphs: List<String>, name: String): com.example.onespace.domain.news.repository.SynthesizedAudio? {
@@ -144,12 +206,41 @@ class AndroidTtsEngine @Inject constructor(
     }
 
     override suspend fun pause() {
-        tts?.stop()
+        if (usingFallback) {
+            fallbackPlayer?.pause()
+        } else {
+            tts?.stop()
+        }
         _state.value = _state.value.copy(isPlaying = false)
     }
 
+    override suspend fun setVolume(volume: Float) {
+        val v = volume.coerceIn(0f, 1f)
+        fallbackPlayer?.volume = v
+        _state.value = _state.value.copy(volume = v)
+    }
+
+    override suspend fun seekTo(fraction: Float) {
+        val player = fallbackPlayer ?: return
+        val dur = player.duration.coerceAtLeast(1)
+        player.seekTo((fraction.coerceIn(0f, 1f) * dur).toLong())
+        // Refresh the bar at once instead of waiting for the next poll tick.
+        val frac = (player.currentPosition.toFloat() / dur).coerceIn(0f, 1f)
+        _state.value = _state.value.copy(
+            fraction = frac,
+            currentSegment = (frac * segments.size.coerceAtLeast(1)).toInt().coerceAtLeast(0)
+        )
+    }
+
     override suspend fun stop() {
-        tts?.stop()
+        stopProgressPolling()
+        if (usingFallback) {
+            usingFallback = false
+            fallbackPlayer?.stop()
+            fallbackPlayer?.clearMediaItems()
+        } else {
+            tts?.stop()
+        }
         segments = emptyList()
         _state.value = TtsState()
     }

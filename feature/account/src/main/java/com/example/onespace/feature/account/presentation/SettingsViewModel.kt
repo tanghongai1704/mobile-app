@@ -43,6 +43,11 @@ internal class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferences.setSimulateOffline(enabled) }
     }
 
+    /** F-GAME-13: game SFX volume, 0 (off) to 1 (full). */
+    fun setGameSoundVolume(volume: Float) {
+        viewModelScope.launch { preferences.setGameSoundVolume(volume) }
+    }
+
     /** C1 rules can be changed in Settings per the MVP decision list. */
     fun resetConflictRule() { viewModelScope.launch { preferences.setConflictRule(null) } }
 

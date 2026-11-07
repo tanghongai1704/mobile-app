@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -49,6 +50,7 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         val STREAK_REMINDER = booleanPreferencesKey("streak_reminder")
         val QUIET_HOURS = booleanPreferencesKey("quiet_hours")
+        val GAME_SOUND_VOLUME = floatPreferencesKey("game_sound_volume")
     }
 
     override val preferences: Flow<SessionPreferences> = context.sessionDataStore.data.map {
@@ -71,7 +73,8 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
             simulateOffline = it[Keys.SIM_OFFLINE] ?: false,
             notificationsEnabled = it[Keys.NOTIFICATIONS] ?: false,
             streakReminder = it[Keys.STREAK_REMINDER] ?: true,
-            quietHours = it[Keys.QUIET_HOURS] ?: true
+            quietHours = it[Keys.QUIET_HOURS] ?: true,
+            gameSoundVolume = (it[Keys.GAME_SOUND_VOLUME] ?: 1f).coerceIn(0f, 1f)
         )
     }
 
@@ -109,6 +112,8 @@ class SessionPreferencesStore @Inject constructor(@ApplicationContext private va
     override suspend fun setNotificationsEnabled(enabled: Boolean) = set { it[Keys.NOTIFICATIONS] = enabled }
     override suspend fun setStreakReminder(enabled: Boolean) = set { it[Keys.STREAK_REMINDER] = enabled }
     override suspend fun setQuietHours(enabled: Boolean) = set { it[Keys.QUIET_HOURS] = enabled }
+    override suspend fun setGameSoundVolume(volume: Float) =
+        set { it[Keys.GAME_SOUND_VOLUME] = volume.coerceIn(0f, 1f) }
 
     private suspend fun set(block: (MutablePreferences) -> Unit) {
         context.sessionDataStore.edit(block)

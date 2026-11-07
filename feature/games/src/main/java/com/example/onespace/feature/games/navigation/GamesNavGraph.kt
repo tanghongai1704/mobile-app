@@ -3,6 +3,7 @@ package com.example.onespace.feature.games.navigation
 import com.example.onespace.core.designsystem.t
 import com.example.onespace.core.designsystem.tr
 import com.example.onespace.core.designsystem.fadingEdgeEnd
+import com.example.onespace.core.designsystem.AppCard
 import androidx.compose.runtime.*
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -12,16 +13,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Grid3x3
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.LineStyle
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.SmartDisplay
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -46,7 +52,8 @@ import com.example.onespace.feature.games.presentation.*
 fun NavGraphBuilder.gamesGraph(
     session: SessionCoordinator,
     getGraphEntry: () -> NavBackStackEntry,
-    onOpenGame: (String) -> Unit
+    onOpenGame: (String) -> Unit,
+    onMinimizeVideo: () -> Unit
 ) {
     navigation<GamesRoute.Graph>(startDestination = GamesRoute.Feed) {
         composable<GamesRoute.Feed> { entry ->
@@ -111,13 +118,60 @@ fun NavGraphBuilder.gamesGraph(
                         else -> games.items
                     }
                     items(filtered, key = { it.id }) { game ->
-                        com.example.onespace.core.designsystem.ContentCard(
-                            title = game.title.t(),
-                            subtitle = game.description.t() +
-                                if (game.bestScore > 0) tr(" · Kỷ lục ", " · Record ") + game.bestScore else "",
-                            icon = gameIcon(game.id),
-                            onClick = { onOpenGame(game.id) }
-                        )
+                        // Game card with the best score as a trophy badge on the
+                        // title row (right side, before the chevron), not a
+                        // separate line below the card.
+                        com.example.onespace.core.designsystem.AppCard(
+                            onClick = { onOpenGame(game.id) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            androidx.compose.foundation.layout.Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp)
+                            ) {
+                                androidx.compose.foundation.layout.Box(
+                                    Modifier.size(44.dp).background(
+                                        gameTint(game.id).copy(alpha = 0.12f), MaterialTheme.shapes.medium
+                                    ),
+                                    contentAlignment = androidx.compose.ui.Alignment.Center
+                                ) {
+                                    Icon(gameIcon(game.id), contentDescription = null, tint = gameTint(game.id))
+                                }
+                                androidx.compose.foundation.layout.Column(
+                                    Modifier.weight(1f),
+                                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(game.title.t(), style = MaterialTheme.typography.titleMedium)
+                                    Text(game.description.t(), style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (game.bestScore > 0) {
+                                    androidx.compose.foundation.layout.Row(
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.EmojiEvents,
+                                            contentDescription = tr("Kỷ lục", "Best"),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            game.bestScore.toString(),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    Icons.Filled.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -192,9 +246,11 @@ fun NavGraphBuilder.gamesGraph(
                     // controls as the player; the board below keeps its full size and is never covered.
                     SplitVideo(
                         player = awardVm.player,
+                        title = playback.title,
                         onToggle = session::toggleVideo,
                         onSeekBy = session::seekVideoBy,
                         onSeekTo = session::seekVideoTo,
+                        onMinimize = onMinimizeVideo,
                         modifier = Modifier.fillMaxWidth().weight(0.34f)
                     )
                 }
@@ -241,10 +297,10 @@ fun NavGraphBuilder.gamesGraph(
                         }
                         "g4" -> {
                             val vm: KnowledgeQuizViewModel = hiltViewModel()
-                            KnowledgeQuizScreen(onFinish = vm::finish)
+                            KnowledgeQuizScreen(onAnswerSound = vm::answerSound, onFinish = vm::finish)
                         }
                         "g5" -> {
-                            SnakeScreen(onGameOver = { score ->
+                            SnakeScreen(sfx = awardVm.sfx, onGameOver = { score ->
                                 if (score > 0) awardVm.awardGame("ran_san_moi", score * 2)
                                 awardVm.recordScore("g5", score)
                             })
@@ -256,10 +312,17 @@ fun NavGraphBuilder.gamesGraph(
                             var pick by remember(route.track) {
                                 mutableStateOf<BeatTilesPick?>(null)
                             }
+                            // A song picked for this round (or sent over from Now Playing)
+                            // is the round's backing track; leaving the game releases the
+                            // dock back to the normal floating player.
+                            DisposableEffect(Unit) {
+                                onDispose { com.example.onespace.core.designsystem.GameMusicState.set(false) }
+                            }
                             LaunchedEffect(route.track, songs) {
                                 val wanted = route.track?.let { id -> songs.find { it.id == id } }
                                 if (wanted != null && pick == null) {
                                     session.playMusic(wanted.id, wanted.title)
+                                    com.example.onespace.core.designsystem.GameMusicState.set(true)
                                     pick = BeatTilesPick.Song(wanted)
                                 }
                             }
@@ -270,6 +333,7 @@ fun NavGraphBuilder.gamesGraph(
                                     onRandom = { pick = BeatTilesPick.Random },
                                     onSong = {
                                         session.playMusic(it.id, it.title)
+                                        com.example.onespace.core.designsystem.GameMusicState.set(true)
                                         pick = BeatTilesPick.Song(it)
                                     }
                                 )
@@ -277,6 +341,7 @@ fun NavGraphBuilder.gamesGraph(
                                 BeatTilesScreen(
                                     bpm = (chosen as? BeatTilesPick.Song)?.track?.bpm,
                                     songTitle = (chosen as? BeatTilesPick.Song)?.track?.title,
+                                    sfx = awardVm.sfx,
                                     onGameOver = { score ->
                                         if (score > 0) awardVm.awardGame("beat_tiles", score / 2)
                                         awardVm.recordScore("g6", score)
@@ -328,14 +393,18 @@ private fun FullScreenNotice(onPlayFullScreen: () -> Unit) {
 /**
  * Video on top of a game: tap shows back-10 / play-pause / forward-10 and the progress line, which fade
  * after 2 seconds, so the picture stays clean while you play. The position polls the shared player
- * directly; the session flow only updates on player events.
+ * directly; the session flow only updates on player events. Top-right, "Thu nhỏ" leaves the game and
+ * hands the video back to the floating window; "Chỉ nghe âm thanh" hides the surface, mirroring the
+ * floating window's F-VID-09 sound-only mode.
  */
 @Composable
 private fun SplitVideo(
     player: androidx.media3.common.Player?,
+    title: String,
     onToggle: () -> Unit,
     onSeekBy: (Long) -> Unit,
     onSeekTo: (Long) -> Unit,
+    onMinimize: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var pos by remember { mutableLongStateOf(0L) }
@@ -360,42 +429,101 @@ private fun SplitVideo(
         if (controls) 1f else 0f, androidx.compose.animation.core.tween(300), label = "split-controls"
     )
     val onMedia = MaterialTheme.oneSpaceColors.onMedia
+    val audioOnly = com.example.onespace.core.designsystem.AudioOnlyState.active
     Box(modifier) {
-        com.example.onespace.core.media.VideoSurface(
-            player, Modifier.fillMaxSize().background(MaterialTheme.oneSpaceColors.mediaBackdrop), { onSeekBy(10_000) }
-        )
-        Box(Modifier.matchParentSize().pointerInput(Unit) {
-            detectTapGestures(onTap = { controls = !controls; touches++ })
-        })
-        if (alpha > 0.01f) Box(Modifier.matchParentSize().alpha(alpha)) {
-            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.IconButton(onClick = { touches++; onSeekBy(-10_000) }) {
-                    Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"), tint = onMedia)
+        if (audioOnly) {
+            // Sound-only: the surface is gone, the audio keeps playing over a
+            // compact control row; SmartDisplay brings the picture back.
+            Row(
+                Modifier.fillMaxSize()
+                    .background(MaterialTheme.oneSpaceColors.mediaBackdrop)
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Filled.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        title, style = MaterialTheme.typography.labelLarge, color = onMedia,
+                        maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    Text(
+                        if (playing) tr("Đang phát âm thanh", "Playing audio") else tr("Đã tạm dừng", "Paused"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onMedia.copy(alpha = 0.7f)
+                    )
                 }
-                androidx.compose.material3.IconButton(onClick = { touches++; onToggle() }, modifier = Modifier.size(52.dp)) {
+                androidx.compose.material3.IconButton(onClick = { onToggle() }) {
                     Icon(
                         if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"),
-                        tint = onMedia, modifier = Modifier.size(34.dp)
+                        tint = onMedia
                     )
                 }
-                androidx.compose.material3.IconButton(onClick = { touches++; onSeekBy(10_000) }) {
-                    Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"), tint = onMedia)
+                androidx.compose.material3.IconButton(onClick = {
+                    com.example.onespace.core.designsystem.AudioOnlyState.set(false)
+                }) {
+                    Icon(Icons.Filled.SmartDisplay, contentDescription = tr("Quay lại video", "Back to video"), tint = onMedia)
                 }
             }
-            Text(
-                com.example.onespace.core.common.formatMsWhole(pos) + " / " + com.example.onespace.core.common.formatMsWhole(dur),
-                style = MaterialTheme.typography.labelSmall, color = onMedia,
-                modifier = Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 16.dp)
+        } else {
+            com.example.onespace.core.media.VideoSurface(
+                player, Modifier.fillMaxSize().background(MaterialTheme.oneSpaceColors.mediaBackdrop), { onSeekBy(10_000) }
             )
+            Box(Modifier.matchParentSize().pointerInput(Unit) {
+                detectTapGestures(onTap = { controls = !controls; touches++ })
+            })
+            if (alpha > 0.01f) Box(Modifier.matchParentSize().alpha(alpha)) {
+                Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.IconButton(onClick = { touches++; onSeekBy(-10_000) }) {
+                        Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"), tint = onMedia)
+                    }
+                    androidx.compose.material3.IconButton(onClick = { touches++; onToggle() }, modifier = Modifier.size(52.dp)) {
+                        Icon(
+                            if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"),
+                            tint = onMedia, modifier = Modifier.size(34.dp)
+                        )
+                    }
+                    androidx.compose.material3.IconButton(onClick = { touches++; onSeekBy(10_000) }) {
+                        Icon(Icons.Filled.Forward10, contentDescription = tr("Tới 10 giây", "Forward 10 seconds"), tint = onMedia)
+                    }
+                }
+                Text(
+                    com.example.onespace.core.common.formatMsWhole(pos) + " / " + com.example.onespace.core.common.formatMsWhole(dur),
+                    style = MaterialTheme.typography.labelSmall, color = onMedia,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 16.dp)
+                )
+                // Top-right: shrink the split back to the floating window, or keep only the sound.
+                Row(Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 4.dp)) {
+                    androidx.compose.material3.IconButton(onClick = { touches++; onMinimize() }) {
+                        Icon(
+                            Icons.Filled.PictureInPictureAlt,
+                            contentDescription = tr("Thu nhỏ video", "Minimize video"),
+                            tint = onMedia
+                        )
+                    }
+                    androidx.compose.material3.IconButton(onClick = {
+                        touches++
+                        com.example.onespace.core.designsystem.AudioOnlyState.set(true)
+                    }) {
+                        Icon(
+                            Icons.Filled.Headphones,
+                            contentDescription = tr("Chỉ nghe âm thanh", "Audio only"),
+                            tint = onMedia
+                        )
+                    }
+                }
+            }
         }
-        // The line lives on the bottom edge of the frame; draggable while the controls are up.
+        // The line lives on the bottom edge of the frame; draggable while the controls are up
+        // (always, in sound-only mode where there is nothing else to tap).
         com.example.onespace.core.designsystem.ScrubBar(
             pos, dur,
             modifier = Modifier.align(Alignment.BottomCenter),
             onSeek = { touches++; onSeekTo(it) },
-            interactive = alpha > 0.5f,
-            trackHeight = if (alpha > 0.5f) 3.dp else 2.dp,
+            interactive = audioOnly || alpha > 0.5f,
+            trackHeight = if (audioOnly || alpha > 0.5f) 3.dp else 2.dp,
             knobRadius = 6.dp,
             trackColor = onMedia.copy(alpha = 0.3f)
         )
@@ -404,13 +532,24 @@ private fun SplitVideo(
 
 /** Unique icon per game so the hub reads at a glance. */
 private fun gameIcon(id: String): androidx.compose.ui.graphics.vector.ImageVector = when (id) {
-    "g1" -> androidx.compose.material.icons.Icons.Filled.GridView
-    "g2" -> androidx.compose.material.icons.Icons.Filled.Apps
-    "g3" -> androidx.compose.material.icons.Icons.Filled.MusicNote
-    "g4" -> androidx.compose.material.icons.Icons.Filled.Quiz
-    "g5" -> androidx.compose.material.icons.Icons.Filled.Pets
-    "g6" -> androidx.compose.material.icons.Icons.Filled.MusicNote
-    else -> androidx.compose.material.icons.Icons.Filled.SportsEsports
+    "g1" -> Icons.Filled.Tag          // 2048: the number tile
+    "g2" -> Icons.Filled.Grid3x3      // Tic-Tac-Toe: the 3x3 board
+    "g3" -> Icons.Filled.MusicNote   // Đoán bài hát
+    "g4" -> Icons.Filled.Quiz         // Quiz kiến thức
+    "g5" -> Icons.Filled.LineStyle    // Rắn săn mồi: the snake line
+    "g6" -> Icons.Filled.GridOn       // Beat Tiles: the falling tile grid
+    else -> Icons.Filled.SportsEsports
+}
+
+/** One hue per game so the hub tiles stay distinguishable even before the icon is read. */
+private fun gameTint(id: String): androidx.compose.ui.graphics.Color = when (id) {
+    "g1" -> androidx.compose.ui.graphics.Color(0xFFFF9800) // orange
+    "g2" -> androidx.compose.ui.graphics.Color(0xFF2196F3) // blue
+    "g3" -> androidx.compose.ui.graphics.Color(0xFFE91E63) // pink
+    "g4" -> androidx.compose.ui.graphics.Color(0xFF9C27B0) // purple
+    "g5" -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // green
+    "g6" -> androidx.compose.ui.graphics.Color(0xFF00BCD4) // cyan
+    else -> androidx.compose.ui.graphics.Color.Unspecified
 }
 
 /** F-GAME-07: one leaderboard section with medals and a standing-out "Bạn". */

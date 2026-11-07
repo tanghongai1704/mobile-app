@@ -3,6 +3,7 @@ package com.example.onespace.feature.news.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onespace.core.common.ContentUiState
+import com.example.onespace.core.media.GameSound
 import com.example.onespace.domain.news.model.TtsState
 import com.example.onespace.domain.news.repository.NewsRepository
 import com.example.onespace.domain.news.repository.TtsEngine
@@ -39,7 +40,8 @@ internal class NewsViewModel @Inject constructor(
     private val pauseTts: PauseTts,
     private val stopTtsUseCase: StopTts,
     private val trackMissionAction: TrackMissionAction,
-    private val tts: TtsEngine
+    private val tts: TtsEngine,
+    private val sfx: com.example.onespace.core.media.GameSfx
 ) : ViewModel() {
     private val refresh = MutableStateFlow(0)
 
@@ -122,6 +124,8 @@ internal class NewsViewModel @Inject constructor(
                 val articles = uiState.value.items
                 val article = articles.find { it.id == articleId }
                 val isCorrect = article?.quiz?.getOrNull(questionIndex)?.correctIndex == optionIndex
+                // F-GAME-13: the news quiz shares the game sound layer, ducked under TTS.
+                sfx.play(if (isCorrect) GameSound.CORRECT else GameSound.WRONG)
                 if (isCorrect) pointRepository.add("quiz_answer", 15)
             }
         }
@@ -137,5 +141,13 @@ internal class NewsViewModel @Inject constructor(
 
     fun stopTts() {
         viewModelScope.launch { stopTtsUseCase() }
+    }
+
+    fun seekTts(fraction: Float) {
+        viewModelScope.launch { tts.seekTo(fraction) }
+    }
+
+    fun setTtsVolume(volume: Float) {
+        viewModelScope.launch { tts.setVolume(volume) }
     }
 }

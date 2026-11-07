@@ -98,7 +98,7 @@ abstract class ScreenshotBase(private val mode: String) {
         waitText("Dùng thử không cần tài khoản")
         compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
         compose.onNodeWithText("Tiếp tục dùng thử").performClick()
-        waitText("Playlist của tôi")
+        waitText("Danh sách phát của tôi")
         settle()
     }
 
@@ -123,7 +123,7 @@ abstract class ScreenshotBase(private val mode: String) {
         shot("02-login")
         compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
         compose.onNodeWithText("Tiếp tục dùng thử").performClick()
-        waitText("Playlist của tôi")
+        waitText("Danh sách phát của tôi")
         settle()
         shot("03-home")
         optional("home-feed") {
@@ -395,7 +395,7 @@ abstract class FeedbackShots(mode: String) : ScreenshotBase(mode) {
         }
         optional("guess") {
             open("Đoán bài hát")
-            compose.onNodeWithText("Chơi từ Playlist của bạn").performClick(); settle(); shot("k13-guess-playlist")
+            compose.onNodeWithText("Chơi từ danh sách phát của bạn").performClick(); settle(); shot("k13-guess-playlist")
             back()
         }
         optional("beat") {

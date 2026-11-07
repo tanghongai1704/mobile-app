@@ -125,6 +125,7 @@ class SessionCoordinatorTest {
         override suspend fun setNotificationsEnabled(enabled: Boolean) = Unit
         override suspend fun setStreakReminder(enabled: Boolean) = Unit
         override suspend fun setQuietHours(enabled: Boolean) = Unit
+        override suspend fun setGameSoundVolume(volume: Float) = Unit
     }
 
     private class FakeMissions : MissionRepository {

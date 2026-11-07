@@ -1,8 +1,11 @@
 package com.example.onespace.feature.video.presentation
 
 import com.example.onespace.core.designsystem.fadingEdgeEnd
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.background
@@ -20,6 +23,7 @@ import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.LocationCity
@@ -38,6 +42,8 @@ import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Schedule
@@ -54,7 +60,17 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.onespace.core.common.formatMsWhole
 import com.example.onespace.core.designsystem.*
 import com.example.onespace.domain.video.quiz.VideoQuizGenerator
@@ -256,39 +272,6 @@ internal fun VideoScreen(
     }
 }
 
-/** Speaker button (mute toggle) with a bar that appears while the phone volume is being changed. */
-@Composable
-private fun VolumeControl(
-    volume: Float,
-    onToggleMute: () -> Unit,
-    systemVolume: Float?,
-    tint: Color = MaterialTheme.oneSpaceColors.onMedia
-) {
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(systemVolume) {
-        if (systemVolume != null) {
-            shown = true
-            kotlinx.coroutines.delay(2000)
-            shown = false
-        }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onToggleMute) {
-            Icon(
-                if (volume <= 0f) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                contentDescription = if (volume <= 0f) tr("Bật tiếng", "Unmute") else tr("Tắt tiếng", "Mute"),
-                tint = tint
-            )
-        }
-        androidx.compose.animation.AnimatedVisibility(visible = shown && systemVolume != null) {
-            LinearProgressIndicator(
-                progress = { systemVolume ?: 0f },
-                modifier = Modifier.width(140.dp).height(4.dp).clip(androidx.compose.foundation.shape.CircleShape)
-            )
-        }
-    }
-}
-
 /** One titled list inside a bottom sheet. */
 @Composable
 private fun SheetList(
@@ -334,48 +317,36 @@ private fun FeedCard(
     AppCard(onClick = { onOpen(video.id) }, modifier = Modifier.fillMaxWidth()) {
         Column {
             VideoThumb(video, watchedAt)
-            Column(Modifier.padding(start = 12.dp, end = if (actions != null) 4.dp else 12.dp, top = 10.dp, bottom = 10.dp)) {
+            Column(Modifier.padding(start = 12.dp, end = if (actions != null) 4.dp else 12.dp, top = 2.dp, bottom = 4.dp)) {
               Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    video.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    modifier = Modifier.weight(1f).padding(top = if (actions != null) 8.dp else 0.dp)
-                )
-                if (actions != null) VideoCardMenu(video, actions)
+                  // Title + channel·duration in ONE Text with zero inter-line gap.
+                  Text(
+                      androidx.compose.ui.text.buildAnnotatedString {
+                          withStyle(androidx.compose.ui.text.SpanStyle(
+                              fontSize = MaterialTheme.typography.titleMedium.fontSize,
+                              fontWeight = FontWeight.SemiBold
+                          )) { append(video.title) }
+                          withStyle(androidx.compose.ui.text.SpanStyle(
+                              fontSize = 11.sp,
+                              color = MaterialTheme.colorScheme.onSurfaceVariant
+                          )) { append("\n" + video.creator + "  ·  " + video.duration) }
+                      },
+                      style = MaterialTheme.typography.titleMedium.copy(
+                          lineHeight = 16.sp,
+                          platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                      ),
+                      modifier = Modifier.weight(1f).padding(top = if (actions != null) 8.dp else 0.dp),
+                      maxLines = 3
+                  )
+                  if (actions != null) VideoCardMenu(video, actions)
               }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    // Channel and duration are visually distinct, not one
-                    // same-style line split by a dot.
-                    Text(
-                        video.creator,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Box(
-                        Modifier
-                            .size(3.dp)
-                            .background(
-                                MaterialTheme.colorScheme.outline,
-                                androidx.compose.foundation.shape.CircleShape
-                            )
-                    )
-                    Text(
-                        video.duration,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                if (showWatchedText && watchedAt != null && watchedAt > 0) {
-                    Text(
-                        tr("Đã xem đến ", "Watched up to ") + formatMsWhole(watchedAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
-                }
+            }
+            if (showWatchedText && watchedAt != null && watchedAt > 0) {
+                Text(
+                    tr("Đã xem đến ", "Watched up to ") + formatMsWhole(watchedAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
             }
         }
     }
@@ -411,8 +382,8 @@ private fun VideoCardMenu(video: Video, actions: VideoCardActions) {
                 onClick = { open = false; actions.onToggleDownload(video) }
             )
             DropdownMenuItem(
-                text = { Text(tr("Thêm vào Playlist", "Add to playlist")) },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
+                text = { Text(tr("Lưu", "Save")) },
+                leadingIcon = { Icon(Icons.Filled.BookmarkBorder, contentDescription = null) },
                 onClick = { open = false; actions.onAddToPlaylist(video) }
             )
         }
@@ -509,9 +480,10 @@ private fun topicLook(topic: String, topics: TopicGradients): Pair<androidx.comp
 /**
  * Video detail. Everything manipulates the player box itself: tap toggles,
  * double-tap seeks, long-press extracts MP3 (F-VID-10); speed (F-VID-17)
- * and quality (F-VID-06) live in the gear menu on the video; the minimize
- * button sits in the video corner. Only content-level actions (share,
- * download, watch later, playlist) form a separate action row.
+ * and quality (F-VID-06) live in the gear menu beside the minimise button
+ * above the bar; the top corner holds the fullscreen toggle. Only
+ * content-level actions (share, download, watch later, playlist) form a
+ * separate action row.
  */
 @Composable
 internal fun VideoDetailScreen(
@@ -528,12 +500,11 @@ internal fun VideoDetailScreen(
     audioOnly: Boolean = false,
     onAudioOnly: () -> Unit = {},
     onSoundOnly: () -> Unit = {},
+    speed: Float = 1f,
+    onSpeed: (Float) -> Unit = {},
     volume: Float = 1f,
     onVolume: (Float) -> Unit = {},
     onToggleMute: () -> Unit = {},
-    systemVolume: Float? = null,
-    speed: Float = 1f,
-    onSpeed: (Float) -> Unit = {},
     quality: String = "Auto",
     onQuality: (String) -> Unit = {},
     onSeekTo: (Long) -> Unit = {},
@@ -563,11 +534,33 @@ internal fun VideoDetailScreen(
     if (video == null) { Text(tr("Chưa có video này", "This video is not available")); return }
     var showGear by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
+    // Fullscreen: the system bars hide and the player takes the whole page;
+    // both come back when the toggle flips or the screen itself goes away.
+    var fullscreen by remember { mutableStateOf(false) }
+    val view = LocalView.current
+    val window = remember(view) { windowOf(view) }
+    LaunchedEffect(fullscreen, window) {
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+            ?: return@LaunchedEffect
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (fullscreen) controller.hide(WindowInsetsCompat.Type.systemBars())
+        else controller.show(WindowInsetsCompat.Type.systemBars())
+    }
+    DisposableEffect(window) {
+        onDispose {
+            window?.let {
+                WindowCompat.getInsetsController(it, view).show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
     val inAnyPlaylist = AppPlaylistStore.playlists.values.any { video.id in it.videoIds }
     val ended = totalMs > 0 && positionMs >= totalMs
     // F-VID-18: the end-of-video game must ask first, never auto-show.
     // Inside a playlist the video rolls into the next one instead.
     var showQuiz by rememberSaveable(video.id) { mutableStateOf(false) }
+    // Skip the quiz offer entirely (X button on the card).
+    var quizDismissed by rememberSaveable(video.id) { mutableStateOf(false) }
     // Controls appear on tap and fade out after 2s without touch; they stay up when paused.
     var controlsVisible by remember(video.id) { mutableStateOf(true) }
     var lastTouch by remember(video.id) { mutableStateOf(0) }
@@ -586,12 +579,25 @@ internal fun VideoDetailScreen(
 
     FeaturePage {
         item {
-            Box(Modifier.fillMaxWidth()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (fullscreen) Modifier.fillParentMaxHeight().background(Color.Black)
+                        else Modifier
+                    )
+            ) {
                 if (!audioOnly) {
-                    videoSurface(Modifier.fillMaxWidth().height(230.dp)) { onSeekBy(10_000) }
+                    videoSurface(
+                        Modifier
+                            .fillMaxWidth()
+                            .then(if (fullscreen) Modifier.fillMaxHeight() else Modifier.height(230.dp))
+                    ) { onSeekBy(10_000) }
                 } else {
                     Box(
-                        Modifier.fillMaxWidth().height(230.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .then(if (fullscreen) Modifier.fillMaxHeight() else Modifier.height(230.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -621,19 +627,22 @@ internal fun VideoDetailScreen(
                             )
                         }
                 )
-                // F-VID-17: speed and mute badges stay readable even when the controls are hidden.
-                // The speaker button sits with them: tap to mute at once; the bar shows the
-                // phone volume while it changes.
+                // F-VID-17: the speed badge stays readable even when the controls are
+                // hidden. The speaker stays outside the gear sheet too: one tap
+                // mutes, the next restores the volume the slider last had.
                 Row(
                     Modifier.align(Alignment.TopStart).padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    VolumeControl(
-                        volume, onToggleMute, systemVolume,
-                        tint = if (audioOnly) MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.oneSpaceColors.onMedia
-                    )
+                    IconButton(onClick = onToggleMute) {
+                        Icon(
+                            if (volume > 0f) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                            contentDescription = if (volume > 0f) tr("Tắt tiếng", "Mute") else tr("Bật tiếng", "Unmute"),
+                            tint = if (audioOnly) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.oneSpaceColors.onMedia
+                        )
+                    }
                     if (speed != 1f) Surface(
                         color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
                         shape = MaterialTheme.shapes.small
@@ -645,25 +654,20 @@ internal fun VideoDetailScreen(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
-                    if (muted) Surface(
-                        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        Text(
-                            tr("Tắt tiếng", "Muted"),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.oneSpaceColors.onMedia,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                        )
-                    }
+                    // Muted state is shown by the speaker icon alone, no text badge.
                 }
                 if (showControls) {
                     val onMedia = MaterialTheme.oneSpaceColors.onMedia
                     Box(Modifier.matchParentSize().alpha(controlsAlpha)) {
                         Box(Modifier.matchParentSize().background(MaterialTheme.oneSpaceColors.mediaScrim.copy(alpha = 0.35f)))
-                        // Playback settings: speed and quality only (volume lives on the system and the Video list).
-                        IconButton(onClick = { touch(); showGear = true }, modifier = Modifier.align(Alignment.TopEnd)) {
-                            Icon(Icons.Filled.Settings, contentDescription = tr("Cài đặt phát", "Playback settings"), tint = onMedia)
+                        // Fullscreen toggle: hides the system bars and expands the player over the page.
+                        IconButton(onClick = { touch(); fullscreen = !fullscreen }, modifier = Modifier.align(Alignment.TopEnd)) {
+                            Icon(
+                                if (fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                                contentDescription = if (fullscreen) tr("Thoát toàn màn hình", "Exit fullscreen")
+                                else tr("Toàn màn hình", "Fullscreen"),
+                                tint = onMedia
+                            )
                         }
                         // Previous - back 10s - play/pause - forward 10s - next, inside the frame.
                         Row(
@@ -679,17 +683,16 @@ internal fun VideoDetailScreen(
                                 Icon(Icons.Filled.Replay10, contentDescription = tr("Lùi 10 giây", "Back 10 seconds"),
                                     tint = onMedia, modifier = Modifier.size(30.dp))
                             }
-                            FilledIconButton(
+                            // Ghost pause: no filled container, just the white glyph on
+                            // the scrim — same style as the Home inline player's button.
+                            IconButton(
                                 onClick = { touch(); onToggle() },
-                                modifier = Modifier.size(56.dp),
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                )
+                                modifier = Modifier.size(56.dp)
                             ) {
                                 Icon(
                                     if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                     contentDescription = if (playing) tr("Tạm dừng", "Pause") else tr("Phát", "Play"),
+                                    tint = onMedia,
                                     modifier = Modifier.size(30.dp)
                                 )
                             }
@@ -702,7 +705,7 @@ internal fun VideoDetailScreen(
                                     tint = onMedia, modifier = Modifier.size(32.dp))
                             }
                         }
-                        // Elapsed time with sound-only and minimise, above the bar.
+                        // Elapsed time with sound-only, minimise and the gear menu, above the bar.
                         Row(
                             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, bottom = 22.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -712,11 +715,15 @@ internal fun VideoDetailScreen(
                                 style = MaterialTheme.typography.labelMedium, color = onMedia,
                                 modifier = Modifier.weight(1f)
                             )
-                            IconButton(onClick = { touch(); onSoundOnly() }) {
+                            // Ghost buttons: plain clickable icons, no IconButton ripple circle.
+                            Box(Modifier.clickable { touch(); onSoundOnly() }.padding(8.dp)) {
                                 Icon(Icons.Filled.Headphones, contentDescription = tr("Chỉ nghe âm thanh", "Audio only"), tint = onMedia)
                             }
-                            IconButton(onClick = { touch(); onMinimize() }) {
+                            Box(Modifier.clickable { touch(); onMinimize() }.padding(8.dp)) {
                                 Icon(Icons.Filled.PictureInPictureAlt, contentDescription = tr("Thu nhỏ", "Minimise"), tint = onMedia)
+                            }
+                            Box(Modifier.clickable { touch(); showGear = true }.padding(8.dp)) {
+                                Icon(Icons.Filled.Settings, contentDescription = tr("Cài đặt phát", "Playback settings"), tint = onMedia)
                             }
                         }
                     }
@@ -761,11 +768,13 @@ internal fun VideoDetailScreen(
             }
         }
         item {
-            // Title + channel + 3 icon-only actions inline on the right.
+            // Title above; channel · duration on the left of one row,
+            // the three actions (share/download/save) on its right.
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(video.title, style = MaterialTheme.typography.headlineSmall)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -787,45 +796,77 @@ internal fun VideoDetailScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                }
-                // Channel · length, then the three actions lined up on the right.
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onShare) {
-                        Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(tr("Chia sẻ", "Share"))
+                    IconButton(onClick = onShare) {
+                        Icon(
+                            Icons.Filled.Share,
+                            contentDescription = tr("Chia sẻ", "Share"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    TextButton(onClick = onToggleDownload) {
+                    IconButton(onClick = onToggleDownload) {
                         Icon(
                             if (downloaded) Icons.Filled.DownloadDone else Icons.Filled.Download,
-                            contentDescription = null, modifier = Modifier.size(20.dp)
+                            contentDescription = if (downloaded) tr("Đã tải", "Downloaded") else tr("Tải xuống", "Download"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (downloaded) tr("Đã tải", "Downloaded") else tr("Tải xuống", "Download"))
                     }
-                    TextButton(onClick = { showSave = true }) {
+                    IconButton(onClick = { showSave = true }) {
                         Icon(
                             if (watchLaterActive || inAnyPlaylist) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                            contentDescription = null, modifier = Modifier.size(20.dp)
+                            contentDescription = if (watchLaterActive || inAnyPlaylist) tr("Đã lưu", "Saved") else tr("Lưu", "Save"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (watchLaterActive || inAnyPlaylist) tr("Đã lưu", "Saved") else tr("Lưu", "Save"))
                     }
                 }
             }
         }
         // F-VID-15: the end-of-video game offer sits below the player,
         // on the viewer's terms — never on top of them.
-        if (ended && !inPlaylist && !showQuiz) {
+        if (ended && !inPlaylist && !showQuiz && !quizDismissed) {
             item(key = "quiz-offer") {
-                OutlinedButton(
+                androidx.compose.material3.Surface(
                     onClick = { showQuiz = true },
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                 ) {
-                    Icon(Icons.Filled.SportsEsports, contentDescription = null,
-                        modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(tr("Chơi nhanh: câu đố về video này, từ 20 điểm, đúng liên tiếp được thêm", "Quick play: a quiz about this video, from 20 points, more for streaks"))
+                    Row(
+                        Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            Modifier.size(44.dp).background(
+                                androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f),
+                                MaterialTheme.shapes.medium
+                            ),
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.SportsEsports, contentDescription = null,
+                                tint = androidx.compose.ui.graphics.Color.White,
+                                modifier = Modifier.size(24.dp))
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                tr("Chơi nhanh: Câu hỏi về video", "Quick play: Quiz about this video"),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = androidx.compose.ui.graphics.Color.White
+                            )
+                            Text(
+                                tr("Trả lời đúng nhận điểm thưởng, combo càng cao càng nhiều", "Correct answers earn points, higher combos earn more"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f)
+                            )
+                        }
+                        IconButton(onClick = { quizDismissed = true }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = tr("Đóng", "Close"),
+                                tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -858,6 +899,8 @@ internal fun VideoDetailScreen(
         PlaybackSettingsSheet(
             speed = speed,
             onSpeed = onSpeed,
+            volume = volume,
+            onVolume = onVolume,
             quality = quality,
             onQuality = { onQuality(it); showGear = false },
             onDismiss = { showGear = false }
@@ -876,6 +919,8 @@ internal fun VideoDetailScreen(
 private fun PlaybackSettingsSheet(
     speed: Float,
     onSpeed: (Float) -> Unit,
+    volume: Float,
+    onVolume: (Float) -> Unit,
     quality: String,
     onQuality: (String) -> Unit,
     onDismiss: () -> Unit
@@ -887,6 +932,26 @@ private fun PlaybackSettingsSheet(
         ) {
             SheetSectionLabel(tr("Tốc độ phát", "Playback speed"))
             SpeedPicker(speed, onSpeed)
+            HorizontalDivider()
+            // The engine's own loudness, independent of the phone volume.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SheetSectionLabel(tr("Âm lượng", "Volume"))
+                Text(
+                    (volume * 100).toInt().toString() + "%",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Slider(
+                value = volume,
+                onValueChange = onVolume,
+                valueRange = 0f..1f,
+                steps = 9,
+                modifier = Modifier.fillMaxWidth()
+            )
             HorizontalDivider()
             SheetSectionLabel(tr("Chất lượng", "Quality"))
             QualityPicker(quality, onQuality)
@@ -1063,7 +1128,7 @@ private fun SaveSheet(
                         Spacer(Modifier.width(12.dp))
                         Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Text(
-                            pl.videoIds.size.toString(),
+                            playlistCountsLabel(pl),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1080,7 +1145,7 @@ private fun SaveSheet(
             OutlinedTextField(
                 value = newName,
                 onValueChange = { newName = it },
-                label = { Text(tr("Playlist mới", "New playlist")) },
+                label = { Text(tr("Danh sách phát mới", "New playlist")) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1262,16 +1327,38 @@ internal fun ArtistProfileScreen(
     }
 }
 
-/** F-VID-15: the videos saved in one app-wide playlist. */
+/** One row of a mixed playlist list: a video card or a music row. */
+private sealed interface PlaylistRow {
+    val id: String
+    data class VideoRow(val video: Video) : PlaylistRow { override val id get() = video.id }
+    data class TrackRow(val track: com.example.onespace.domain.music.model.Track) : PlaylistRow { override val id get() = track.id }
+}
+
+/**
+ * F-VID-15: one app-wide playlist — videos AND music tracks in ONE list, in
+ * the order they were added. "Phát" plays the whole list as a single mixed
+ * queue: a video can roll into a track and a track into a video.
+ */
 @Composable
 internal fun VideoPlaylistScreen(
     name: String,
     videos: List<Video>,
+    tracks: List<com.example.onespace.domain.music.model.Track> = emptyList(),
     onOpen: (String) -> Unit,
-    onPlay: (List<Video>) -> Unit = { _ -> },
+    onOpenTrack: (String) -> Unit = {},
+    onPlay: () -> Unit = {},
     watchProgress: Map<String, Long> = emptyMap()
 ) {
-    val items = videos.filter { it.id in (AppPlaylistStore.playlists[name]?.videoIds ?: emptyList()) }
+    val playlist = AppPlaylistStore.playlists[name]
+    val rows = (playlist?.orderedIds() ?: emptyList()).mapNotNull { id ->
+        videos.find { it.id == id }?.let { PlaylistRow.VideoRow(it) }
+            ?: tracks.find { it.id == id }?.let { PlaylistRow.TrackRow(it) }
+    }
+    // Same onboarding hint as the Watch later sheet: teaches the left-swipe
+    // delete; the X hides it once the gesture is understood.
+    var showSwipeHint by remember { mutableStateOf(true) }
+    // Combined counts: "2 video · 3 bài hát", never just one type.
+    val counts = playlist?.let { playlistCountsLabel(it) }.orEmpty()
     // Order and repeat stay visible and toggleable, before and during playback.
     val settings = AppPlaylistStore.settingsOf(name)
     val orderLabel = if (settings.order == "shuffle") tr("Ngẫu nhiên", "Shuffle") else tr("Tuần tự", "In order")
@@ -1279,15 +1366,14 @@ internal fun VideoPlaylistScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    if (items.isEmpty()) "0 video"
-                    else items.size.toString() + " video · " + orderLabel +
+                    (if (counts.isBlank()) tr("Trống", "Empty") else counts) + " · " + orderLabel +
                         if (settings.repeat) tr(" · Lặp lại", " · Repeat") else "",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (items.isNotEmpty()) {
+                if (rows.isNotEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Button(onClick = { onPlay(items) }, modifier = Modifier.weight(1f)) {
+                        Button(onClick = onPlay, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.PlayCircle, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(tr("Phát", "Play"))
@@ -1306,8 +1392,89 @@ internal fun VideoPlaylistScreen(
                 }
             }
         }
-        items(items, key = { it.id }) { video ->
-            FeedCard(video, onOpen, watchedAt = watchProgress[video.id])
+        if (rows.isNotEmpty()) {
+            if (showSwipeHint) item(key = "playlist-swipe-hint") {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.SwipeLeft,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            tr("Quẹt trái để xoá khỏi danh sách", "Swipe left to remove"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { showSwipeHint = false }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = tr("Đóng", "Close"),
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        items(rows, key = { it.id }) { row ->
+            // Swipe left to remove from the playlist; tap to play it — same
+            // behaviour as the Watch later sheet.
+            var offsetX by remember { mutableFloatStateOf(0f) }
+            Box(
+                Modifier
+                    .offset { IntOffset(offsetX.roundToInt(), 0) }
+                    .pointerInput(row.id) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                if (offsetX < -120f) {
+                                    when (row) {
+                                        is PlaylistRow.VideoRow -> AppPlaylistStore.removeVideo(name, row.video.id)
+                                        is PlaylistRow.TrackRow -> AppPlaylistStore.removeTrack(name, row.track.id)
+                                    }
+                                }
+                                offsetX = 0f
+                            },
+                            onHorizontalDrag = { _, dragAmount ->
+                                if (dragAmount < 0) offsetX += dragAmount
+                            }
+                        )
+                    }
+            ) {
+                when (row) {
+                    is PlaylistRow.VideoRow -> FeedCard(row.video, onOpen, watchedAt = watchProgress[row.video.id])
+                    is PlaylistRow.TrackRow -> ContentCard(
+                        row.track.title,
+                        row.track.artist + " · " + row.track.duration,
+                        Icons.Filled.MusicNote
+                    ) { onOpenTrack(row.track.id) }
+                }
+            }
         }
     }
+}
+
+/**
+ * The Activity window behind a composable, if any — unwraps the theming
+ * wrappers Compose may put around the Activity context. Used by the video
+ * detail screen to hide and restore the system bars in fullscreen.
+ */
+private fun windowOf(view: android.view.View): android.view.Window? {
+    var context = view.context
+    while (context is android.content.ContextWrapper) {
+        if (context is android.app.Activity) return context.window
+        context = context.baseContext
+    }
+    return null
 }

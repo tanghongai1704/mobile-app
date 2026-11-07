@@ -37,8 +37,9 @@ private fun BrandMark(modifier: Modifier) {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val tertiary = MaterialTheme.colorScheme.tertiary
+    // Very light blue (near white) so the 4 coloured circles stand out.
     Surface(shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primaryContainer) {
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)) {
         Canvas(modifier) {
             val radius = size.minDimension * .22f
             drawCircle(primary, radius, Offset(size.width * .25f, size.height * .25f))

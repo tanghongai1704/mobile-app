@@ -11,6 +11,8 @@ import com.example.onespace.domain.games.usecase.SubmitGameScore
 import com.example.onespace.domain.session.model.MissionType
 import com.example.onespace.domain.session.repository.PointRepository
 import com.example.onespace.domain.session.usecase.TrackMissionAction
+import com.example.onespace.core.media.GameSfx
+import com.example.onespace.core.media.GameSound
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -50,6 +52,7 @@ internal class TicTacToeViewModel @Inject constructor(
     private val trackMissionAction: TrackMissionAction,
     private val submitScore: SubmitGameScore,
     private val challenge: ChallengeReporter,
+    private val sfx: GameSfx,
     observeBest: ObserveBestScore
 ) : ViewModel() {
     private val _ui = MutableStateFlow(TicTacToeUi())
@@ -76,6 +79,7 @@ internal class TicTacToeViewModel @Inject constructor(
         if (now.finished || now.thinking || now.board.cells[index] != null) return
         val next = now.board.place(index, now.turn)
         _ui.value = now.copy(board = next, turn = now.turn.other)
+        sfx.play(GameSound.TAP)
         if (next.isFinished) { settle(next); return }
         val opponent = now.opponent
         if (opponent is Opponent.Computer) {
@@ -94,6 +98,12 @@ internal class TicTacToeViewModel @Inject constructor(
     private fun settle(board: TicTacToeBoard) {
         val opponent = _ui.value.opponent
         viewModelScope.launch {
+            when {
+                board.winner == null -> Unit // a draw stays quiet
+                opponent is Opponent.Computer && board.winner == Mark.O ->
+                    sfx.play(GameSound.WRONG) // the computer won the round
+                else -> sfx.play(GameSound.WIN)
+            }
             when {
                 board.winner == null -> _ui.update { it.copy(draws = it.draws + 1) }
                 opponent is Opponent.Friend -> _ui.update {

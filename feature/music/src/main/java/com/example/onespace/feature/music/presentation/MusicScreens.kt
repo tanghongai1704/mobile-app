@@ -1,6 +1,10 @@
 package com.example.onespace.feature.music.presentation
 
 import com.example.onespace.core.designsystem.t
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material.icons.filled.SwipeLeft
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 
 import com.example.onespace.core.designsystem.fadingEdgeEnd
 import androidx.compose.animation.core.animateFloat
@@ -16,11 +20,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -28,6 +35,8 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Forward10
@@ -70,7 +79,6 @@ internal fun MusicScreen(
     onOpenArtist: (String) -> Unit = {},
     playingTrackId: String? = null,
     onAddToQueue: (Track) -> Unit = {},
-    onAddToPlaylist: (String) -> Unit = {},
     onOpenGuessSong: () -> Unit = {}
 ) {
     var saveTarget by remember { mutableStateOf<Track?>(null) }
@@ -211,7 +219,12 @@ internal fun MusicScreen(
         }
     }
     saveTarget?.let { t ->
-        MusicSaveSheet(track = t, onDismiss = { saveTarget = null }, onAddToPlaylist = onAddToPlaylist)
+        MusicSaveSheet(
+            track = t,
+            savedActive = t.id in favorites,
+            onToggleSaved = { onToggleFavorite(t.id) },
+            onDismiss = { saveTarget = null }
+        )
     }
 }
 
@@ -357,15 +370,24 @@ internal fun NowPlayingScreen(
     onOpenArtist: (String) -> Unit = {},
     onRemoveFromQueue: (String) -> Unit = {},
     onMoveQueueItem: (Int, Int) -> Unit = { _, _ -> },
-    onAddToPlaylist: (String) -> Unit = {}
+    speed: Float = 1f,
+    onCycleSpeed: () -> Unit = {},
+    volume: Float = 1f,
+    onVolumeChange: (Float) -> Unit = {}
 ) {
     if (track == null) { Text(tr("Chưa có bài này", "This song is not available")); return }
     var showQueue by remember { mutableStateOf(false) }
+    // The speaker toggle restores this after a mute, like the video player.
+    var lastVolume by remember { mutableFloatStateOf(1f) }
     var showSaveSheet by remember { mutableStateOf(false) }
+    // Same "Đã lưu" state as the video detail: saved to music or in any playlist.
+    val inAnyPlaylist = AppPlaylistStore.playlists.values.any { track.id in it.trackIds }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val artworkSize = minOf(maxWidth - 48.dp, (maxHeight * .3f).coerceIn(100.dp, 220.dp))
+        // Pinned to the top: lyrics + progress + transport stay visible above
+        // a floating video, which settles over the lower part of the screen.
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Top) {
             // Compact header: small artwork left, title/artist right.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -392,7 +414,10 @@ internal fun NowPlayingScreen(
                             tint = if (downloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { showSaveSheet = true }) {
-                        Icon(Icons.Filled.BookmarkBorder, contentDescription = tr("Lưu", "Save"))
+                        Icon(
+                            if (favorite || inAnyPlaylist) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                            contentDescription = if (favorite || inAnyPlaylist) tr("Đã lưu", "Saved") else tr("Lưu", "Save")
+                        )
                     }
                 }
             }
@@ -448,8 +473,49 @@ internal fun NowPlayingScreen(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            // F-MUS-05: the queue behind the player.
-            TextButton(onClick = { showQueue = !showQueue }) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Playback speed cycles x1 -> x1.5 -> x2 -> x0.5, like the dock's chip.
+                    TextButton(onClick = onCycleSpeed) {
+                        Text(
+                            "x" + (if (speed % 1f == 0f) speed.toInt().toString() else speed.toString()),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    // Session volume for music, like the video's speaker: tap mutes, bar adjusts.
+                    Icon(
+                        if (volume > 0f) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                        contentDescription = if (volume > 0f) tr("Tắt tiếng", "Mute") else tr("Bật tiếng", "Unmute"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable {
+                                if (volume > 0f) lastVolume = volume
+                                onVolumeChange(if (volume > 0f) 0f else lastVolume)
+                            }
+                    )
+                    // The same slim bar as the scrubber: ms 0..1000 is just volume 0..1.
+                    ScrubBar(
+                        positionMs = (volume * 1000f).toLong(),
+                        totalMs = 1000L,
+                        onSeek = {
+                            val v = it / 1000f
+                            if (v > 0f) lastVolume = v
+                            onVolumeChange(v)
+                        },
+                        trackHeight = 3.dp,
+                        knobRadius = 5.dp,
+                        modifier = Modifier.width(92.dp)
+                    )
+                }
+                // F-MUS-05: the queue behind the player.
+                TextButton(onClick = { showQueue = !showQueue }) {
                 Text(if (showQueue) tr("Ẩn hàng đợi", "Hide queue") else tr("Xem hàng đợi", "View queue"))
                 if (!showQueue) {
                     Spacer(Modifier.width(8.dp))
@@ -463,6 +529,7 @@ internal fun NowPlayingScreen(
                         )
                     }
                 }
+            }
             }
             if (showQueue) {
                 // F-MUS-05: one-time queue, not a playlist — flows top to
@@ -576,7 +643,12 @@ internal fun NowPlayingScreen(
         }
     }
     if (showSaveSheet) {
-        MusicSaveSheet(track = track, onDismiss = { showSaveSheet = false }, onAddToPlaylist = onAddToPlaylist)
+        MusicSaveSheet(
+            track = track,
+            savedActive = favorite,
+            onToggleSaved = onToggleFavorite,
+            onDismiss = { showSaveSheet = false }
+        )
     }
 }
 
@@ -606,20 +678,25 @@ private fun LyricsPanel(lines: List<String>) {
     }
 }
 
-/** F-MUS-04: the tracks saved in one music playlist. */
+/**
+ * F-MUS-04: the tracks saved in one music playlist, in playlist order.
+ * "Phát" plays the playlist as one session; order and repeat are the
+ * playlist's own settings, same toggles as the video playlist screen.
+ */
 @Composable
 internal fun MusicPlaylistScreen(
     name: String,
     tracks: List<Track>,
     onOpen: (String) -> Unit,
     onDelete: (String) -> Unit = {},
-    shuffle: Boolean = false,
-    repeat: Boolean = false,
-    onToggleShuffle: () -> Unit = {},
-    onToggleRepeat: () -> Unit = {},
-    onPlay: (List<Track>) -> Unit = { _ -> }
+    onPlay: () -> Unit = {}
 ) {
-    val items = tracks.filter { it.id in (AppPlaylistStore.playlists[name]?.trackIds ?: emptyList()) }
+    val items = (AppPlaylistStore.playlists[name]?.orderedIds() ?: emptyList())
+        .mapNotNull { id -> tracks.find { it.id == id } }
+    val settings = AppPlaylistStore.settingsOf(name)
+    // Same onboarding hint as the Watch later sheet: teaches the left-swipe
+    // delete; the X hides it once the gesture is understood.
+    var showSwipeHint by remember { mutableStateOf(true) }
     FeaturePage {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -633,33 +710,88 @@ internal fun MusicPlaylistScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    TextButton(onClick = { onDelete(name) }) { Text(tr("Xóa playlist", "Delete playlist")) }
+                    TextButton(onClick = { onDelete(name) }) { Text(tr("Xóa danh sách phát", "Delete playlist")) }
                 }
                 if (items.isNotEmpty()) {
-                    // Order and repeat are player-level toggles here; they stay
+                    // Order and repeat are playlist-level toggles here; they stay
                     // visible on the Now Playing screen while listening.
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Button(onClick = { onPlay(items) }, modifier = Modifier.weight(1f)) {
+                        Button(onClick = onPlay, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(tr("Phát", "Play"))
                         }
-                        IconButton(onClick = onToggleShuffle) {
+                        IconButton(onClick = { AppPlaylistStore.toggleOrder(name) }) {
                             Icon(Icons.Filled.Shuffle, contentDescription = tr("Phát ngẫu nhiên", "Shuffle play"),
-                                tint = if (shuffle) MaterialTheme.colorScheme.primary
+                                tint = if (settings.order == "shuffle") MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = onToggleRepeat) {
+                        IconButton(onClick = { AppPlaylistStore.toggleRepeat(name) }) {
                             Icon(Icons.Filled.Repeat, contentDescription = tr("Lặp lại", "Repeat"),
-                                tint = if (repeat) MaterialTheme.colorScheme.primary
+                                tint = if (settings.repeat) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
             }
         }
+        if (items.isNotEmpty()) {
+            if (showSwipeHint) item(key = "playlist-swipe-hint") {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.SwipeLeft,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            tr("Quẹt trái để xoá khỏi danh sách", "Swipe left to remove"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { showSwipeHint = false }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = tr("Đóng", "Close"),
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
         items(items, key = { it.id }) { track ->
-            ContentCard(track.title, track.artist + " · " + track.duration, Icons.Filled.MusicNote, { onOpen(track.id) })
+            // Swipe left to remove from the playlist; tap to play it — same
+            // behaviour as the Watch later sheet.
+            var offsetX by remember { mutableFloatStateOf(0f) }
+            Box(
+                Modifier
+                    .offset { IntOffset(offsetX.roundToInt(), 0) }
+                    .pointerInput(track.id) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                if (offsetX < -120f) AppPlaylistStore.removeTrack(name, track.id)
+                                offsetX = 0f
+                            },
+                            onHorizontalDrag = { _, dragAmount ->
+                                if (dragAmount < 0) offsetX += dragAmount
+                            }
+                        )
+                    }
+            ) {
+                ContentCard(track.title, track.artist + " · " + track.duration, Icons.Filled.MusicNote, { onOpen(track.id) })
+            }
         }
     }
 }
@@ -715,56 +847,100 @@ internal fun MusicArtistScreen(
 }
 
 
-/** Sheet Lưu cho bài nhạc: thêm vào playlist có sẵn hoặc tạo mới. */
+/**
+ * One "Lưu" entry point, identical in structure to the video save sheet:
+ * "Lưu Nhạc" with a tick at the top (the permanent saved-music list), then
+ * the existing playlists with their combined video + song counts, new ones
+ * inline. Playlists are the shared AppPlaylistStore ones (videos + tracks).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MusicSaveSheet(
     track: Track,
-    onDismiss: () -> Unit,
-    onAddToPlaylist: (String) -> Unit
+    savedActive: Boolean,
+    onToggleSaved: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     var newName by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SectionTitle(tr("Lưu bài hát", "Save song"))
-            com.example.onespace.core.designsystem.AppPlaylistStore.playlists.forEach { (name, pl) ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            onAddToPlaylist(track.id)
-                            onDismiss()
+            SectionTitle(tr("Lưu nhạc", "Save music"))
+            // F-MUS: identical layout to the Video save sheet — Schedule icon,
+            // "Xem sau" label, tick when active.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleSaved() }
+                    .padding(vertical = 8.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(tr("Xem sau", "Watch later"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                if (savedActive) {
+                    Icon(
+                        Icons.Filled.CheckCircle, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (AppPlaylistStore.playlists.isNotEmpty()) {
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                AppPlaylistStore.playlists.forEach { (name, pl) ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                AppPlaylistStore.addTrack(name, track.id)
+                            }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.LibraryMusic,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(
+                            playlistCountsLabel(pl),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (track.id in pl.trackIds) {
+                            Spacer(Modifier.width(8.dp))
+                            Icon(
+                                Icons.Filled.CheckCircle, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)
+                            )
                         }
-                        .padding(vertical = 8.dp)
-                ) {
-                    Icon(Icons.Filled.LibraryMusic, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(12.dp))
-                    Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    Text(pl.trackIds.size.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
             OutlinedTextField(
                 value = newName,
                 onValueChange = { newName = it },
-                label = { Text(tr("Playlist mới", "New playlist")) },
+                label = { Text(tr("Danh sách phát mới", "New playlist")) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
             Button(
                 onClick = {
-                    com.example.onespace.core.designsystem.AppPlaylistStore.addTrack(newName.trim(), track.id)
-                    onDismiss()
+                    AppPlaylistStore.addTrack(newName.trim(), track.id)
+                    newName = ""
                 },
                 enabled = newName.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
             ) { Text(tr("Tạo", "Create")) }
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

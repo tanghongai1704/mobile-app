@@ -124,7 +124,8 @@ fun NavGraphBuilder.accountGraph(
                 onSimulateOffline = vm::setSimulateOffline,
                 onResetConflictRule = vm::resetConflictRule,
                 onSetConflictRule = vm::setConflictRule,
-                onReplayOnboarding = vm::replayOnboarding
+                onReplayOnboarding = vm::replayOnboarding,
+                onGameSoundVolume = vm::setGameSoundVolume
             )
         }
     }

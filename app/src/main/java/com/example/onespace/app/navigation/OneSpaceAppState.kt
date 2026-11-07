@@ -91,13 +91,54 @@ class OneSpaceAppState(val navController: NavHostController) {
         openSmart(TopLevelDestination.VIDEO, VideoRoute.Graph, VideoRoute.Artist(creator))
     }
 
+    /**
+     * A playlist opens on top of the playlist hub (Profile → Playlists), so
+     * back from the playlist returns to the playlist LIST, never to the
+     * Video or Music tab feed.
+     */
     fun openVideoPlaylist(name: String) {
-        openInTab(TopLevelDestination.VIDEO, VideoRoute.Playlist(name))
+        navController.navigate(VideoRoute.Graph) { launchSingleTop = true }
+        navController.navigate(VideoRoute.Playlist(name)) { launchSingleTop = true }
     }
 
     fun openMusicPlaylist(name: String) {
-        openInTab(TopLevelDestination.MUSIC, MusicRoute.Playlist(name))
+        navController.navigate(MusicRoute.Graph) { launchSingleTop = true }
+        navController.navigate(MusicRoute.Playlist(name)) { launchSingleTop = true }
     }
+
+    /**
+     * A mixed playlist session moving to a video replaces the current player
+     * screen (music → video), so back still lands on the playlist list.
+     */
+    fun openPlaylistVideo(id: String, playlist: String) {
+        replaceTop(VideoRoute.Detail(id, playlist))
+    }
+
+    /** A mixed playlist session moving to a track replaces the current player screen (video → music). */
+    fun openPlaylistTrack(id: String) {
+        replaceTop(MusicRoute.NowPlaying(id))
+    }
+
+    /**
+     * A track tapped in a video playlist pushes the music player on top of
+     * the current stack; back returns to the playlist list.
+     */
+    fun openPlaylistTrackPlayer(id: String) {
+        navController.navigate(MusicRoute.NowPlaying(id)) { launchSingleTop = true }
+    }
+
+    /** Swaps the top screen for [route]; used by playlist session transitions. */
+    private fun replaceTop(route: Any) {
+        val current = navController.currentDestination ?: return
+        navController.navigate(route) {
+            popUpTo(current.id) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
+    /** Back from a playlist goes to the playlist list; false when the hub is not below. */
+    fun backToPlaylists(): Boolean =
+        navController.popBackStack(AccountRoute.Playlists, /* inclusive = */ false)
 
     fun openMusicPlayer(id: String) {
         openSmart(TopLevelDestination.MUSIC, MusicRoute.Graph, MusicRoute.NowPlaying(id))

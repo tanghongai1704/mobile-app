@@ -190,7 +190,7 @@ internal fun AccountScreen(
         }
         // "Continue" is gone: a video closed mid-way lands in Watch later on Home.
         item { ContentCard(tr("Đã tải", "Downloaded"), tr("Video, nhạc và bài báo đã lưu để xem offline", "Videos, music and articles saved for offline"), Icons.Filled.Download, onDownloads) }
-        item { ContentCard(tr("Playlist của tôi", "My playlists"), tr("Mọi playlist video và nhạc, quản lý một chỗ", "All video and music playlists in one place"), Icons.Filled.LibraryMusic, onPlaylists) }
+        item { ContentCard(tr("Danh sách phát của tôi", "My playlists"), tr("Mọi danh sách phát video và nhạc, quản lý một chỗ", "All video and music playlists in one place"), Icons.Filled.LibraryMusic, onPlaylists) }
         item { ContentCard(tr("Tổng kết tháng", "Monthly recap"), tr("Điểm, chuỗi ngày và huy hiệu của bạn", "Your points, streak and badges"), Icons.Filled.Insights, onWrapped) }
         item { ContentCard(tr("Nhắc nhở", "Reminders"), tr("Nhiệm vụ hằng ngày và giữ chuỗi ngày", "Daily missions and keeping your streak"), Icons.Filled.Notifications, onNotifications) }
         item { ContentCard("Tùy chỉnh", tr("Giao diện, dữ liệu, âm thanh", "Appearance, data, audio"), Icons.Filled.Settings, onSettings) }
@@ -386,7 +386,8 @@ internal fun SettingsScreen(
     onSimulateOffline: (Boolean) -> Unit,
     onResetConflictRule: () -> Unit,
     onSetConflictRule: (com.example.onespace.domain.session.MediaConflictRule) -> Unit = {},
-    onReplayOnboarding: () -> Unit = {}
+    onReplayOnboarding: () -> Unit = {},
+    onGameSoundVolume: (Float) -> Unit = {}
 ) {
     FeaturePage {
         item {
@@ -454,15 +455,6 @@ internal fun SettingsScreen(
             )
         }
         item {
-            ListItem(
-                modifier = Modifier.toggleable(
-                    value = prefs.simulateOffline, role = Role.Switch, onValueChange = onSimulateOffline),
-                headlineContent = { Text(tr("Mô phỏng mất mạng (demo)", "Simulate going offline (demo)")) },
-                supportingContent = { Text(tr("Bật để xem các trạng thái offline/retry của feed", "Turn on to see the feed offline and retry states")) },
-                trailingContent = { Switch(prefs.simulateOffline, onSimulateOffline) }
-            )
-        }
-        item {
             // F-COM-13/F-COM-14: the row itself is the picker — the tick
             // list always shows the current rule, "Luôn hỏi" included.
             var showConflictPicker by remember { mutableStateOf(false) }
@@ -507,6 +499,26 @@ internal fun SettingsScreen(
             }
         }
         item {
+            // F-GAME-13: game sound volume. 0 = off; effects duck themselves
+            // under music/video, so the slider only shapes their loudness.
+            ListItem(
+                headlineContent = { Text(tr("Âm thanh game", "Game sound")) },
+                supportingContent = { Text(tr("Âm hiệu phản hồi khi chơi; tự nhỏ khi nhạc hoặc video đang phát", "Feedback sounds while playing; they duck under music or video")) },
+                trailingContent = {
+                    Text("${(prefs.gameSoundVolume * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            )
+            Slider(
+                value = prefs.gameSoundVolume,
+                onValueChange = onGameSoundVolume,
+                valueRange = 0f..1f,
+                steps = 9,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
+            )
+        }
+        item {
             // Replay the first-launch flow: the persisted flag flips and the
             // root navigator returns to the onboarding graph.
             var showReplayConfirm by remember { mutableStateOf(false) }
@@ -530,6 +542,17 @@ internal fun SettingsScreen(
                     }
                 )
             }
+        }
+        item {
+            // Demo-only switch: simulate going offline to show feed offline/retry states.
+            // Kept at the very end so screenshots of the real settings stay clean.
+            ListItem(
+                modifier = Modifier.toggleable(
+                    value = prefs.simulateOffline, role = Role.Switch, onValueChange = onSimulateOffline),
+                headlineContent = { Text(tr("Mô phỏng mất mạng (demo)", "Simulate going offline (demo)")) },
+                supportingContent = { Text(tr("Bật để xem các trạng thái offline/retry của feed", "Turn on to see the feed offline and retry states")) },
+                trailingContent = { Switch(prefs.simulateOffline, onSimulateOffline) }
+            )
         }
     }
 }
@@ -771,15 +794,12 @@ internal fun PlaylistsScreen(
             item {
                 EmptyHint(
                     Icons.Filled.LibraryMusic,
-                    tr("Chưa có playlist nào. Mở một video hoặc bài hát và chọn \"Playlist\" để tạo.", "No playlists yet. Open a video or song and choose \"Playlist\" to create one.")
+                    tr("Chưa có danh sách phát nào. Mở một video hoặc bài hát và chọn \"Danh sách phát\" để tạo.", "No playlists yet. Open a video or song and choose \"Playlist\" to create one.")
                 )
             }
         }
         items(playlists.values.toList(), key = { it.name }) { pl ->
-            val subtitle = buildList {
-                if (pl.videoIds.isNotEmpty()) add(pl.videoIds.size.toString() + " video")
-                if (pl.trackIds.isNotEmpty()) add(pl.trackIds.size.toString() + tr(" bài hát", " songs"))
-            }.joinToString(" · ")
+            val subtitle = com.example.onespace.core.designsystem.playlistCountsLabel(pl)
             ContentCard(
                 title = pl.name,
                 subtitle = if (subtitle.isBlank()) tr("Trống", "Empty") else subtitle,

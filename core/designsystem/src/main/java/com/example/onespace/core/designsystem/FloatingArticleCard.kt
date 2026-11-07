@@ -30,7 +30,8 @@ fun FloatingArticleCard(
     ttsActive: Boolean = false,
     ttsPlaying: Boolean = false,
     ttsProgress: Float = 0f,
-    onToggleTts: () -> Unit = {}
+    onToggleTts: () -> Unit = {},
+    onSeekTts: (Float) -> Unit = {}
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -81,10 +82,14 @@ fun FloatingArticleCard(
                     Icon(Icons.Filled.Close, contentDescription = tr("Đóng", "Close"))
                 }
             }
-            // How far the spoken reading has got; only while audio is involved.
+            // How far the spoken reading has got; draggable like the reader's bar.
             if (ttsActive) {
-                LinearProgressIndicator(
-                    progress = { ttsProgress },
+                ScrubBar(
+                    positionMs = (ttsProgress * 1000f).toLong(),
+                    totalMs = 1000L,
+                    onSeek = { onSeekTts(it / 1000f) },
+                    trackHeight = 3.dp,
+                    knobRadius = 5.dp,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

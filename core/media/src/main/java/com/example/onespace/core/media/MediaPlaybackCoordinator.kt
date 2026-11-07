@@ -184,6 +184,19 @@ class MediaPlaybackCoordinator @Inject constructor(
         musicPlayer.playbackParameters = androidx.media3.common.PlaybackParameters(speed)
     }
 
+    // Tracks whether the music queue loops forever (dock default) or ends
+    // after the last item (mixed playlist session).
+    private var musicQueueLoop = true
+
+    override fun setMusicQueueLoop(loop: Boolean) {
+        musicQueueLoop = loop
+        // Restoring the loop on an ENDED player could restart it; playTrack
+        // re-applies the mode when the next queue loads.
+        if (!(loop && musicPlayer.playbackState == Player.STATE_ENDED)) {
+            musicPlayer.repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+        }
+    }
+
     override fun removeTrackFromQueue(trackId: String) {
         val old = _music.value.queue
         val newQueue = old.filterNot { it.id == trackId }
@@ -240,6 +253,8 @@ class MediaPlaybackCoordinator @Inject constructor(
                 musicPlayer.prepare()
             }
         }
+        // Re-apply the queue loop mode: it may have been deferred off an ENDED player.
+        musicPlayer.repeatMode = if (musicQueueLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
         musicPlayer.play()
         syncMusicState()
     }
@@ -325,6 +340,10 @@ class MediaPlaybackCoordinator @Inject constructor(
         // The C1 conflict mute stays until a new video starts.
         if (!videoMutedByConflict) videoEngine.volume = videoVolume
         if (videoEngine.currentMediaItem != null) syncVideoState()
+    }
+
+    override fun setMusicVolume(volume: Float) {
+        musicPlayer.volume = volume.coerceIn(0f, 1f)
     }
 
     override fun setVideoSpeed(speed: Float) {

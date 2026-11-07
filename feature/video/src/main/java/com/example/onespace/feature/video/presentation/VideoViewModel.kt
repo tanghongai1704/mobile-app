@@ -23,6 +23,7 @@ internal const val QUIZ_COMBO_RECORD_ID = "video_quiz_combo"
 @HiltViewModel
 internal class VideoViewModel @Inject constructor(
     getVideo: GetVideo,
+    getMusic: com.example.onespace.domain.music.usecase.GetMusic,
     observeContinue: ObserveContinueWatching,
     private val engine: MediaPlaybackCoordinator,
     preferences: SessionPreferencesRepository,
@@ -37,6 +38,11 @@ internal class VideoViewModel @Inject constructor(
     val uiState = combine(getVideo(), refresh) { items, _ -> ContentUiState(items = items) }
         .catch { emit(ContentUiState(error = "Không tải được danh sách video.")) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ContentUiState(isLoading = true))
+
+    /** F-VID-15: a mixed playlist lists music tracks too; the playlist screen reads this. */
+    val tracks = getMusic()
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<com.example.onespace.domain.music.model.Track>())
 
     val continueWatching = observeContinue()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<ContinueEntry>())

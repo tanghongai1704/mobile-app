@@ -11,7 +11,15 @@ data class TtsState(
     val isReady: Boolean = false,
     val currentSegment: Int = 0,
     val totalSegments: Int = 0,
+    /** Exact position inside the fallback audio stream, 0f..1f, when one is used. */
+    val fraction: Float = 0f,
+    /** The spoken volume, 0..1. */
+    val volume: Float = 1f,
     val error: String? = null
 ) {
-    val progress: Float get() = if (totalSegments == 0) 0f else currentSegment.toFloat() / totalSegments
+    val progress: Float get() = when {
+        totalSegments == 0 -> 0f
+        fraction > 0f -> fraction.coerceIn(0f, 1f)
+        else -> currentSegment.toFloat() / totalSegments
+    }
 }

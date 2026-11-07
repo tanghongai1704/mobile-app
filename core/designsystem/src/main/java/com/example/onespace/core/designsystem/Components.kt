@@ -18,7 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -53,15 +55,27 @@ fun SectionTitle(title: String) {
  * brand-tinted icon tile (no solid coral block), title/subtitle and a decorative chevron.
  */
 @Composable
-fun ContentCard(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
+fun ContentCard(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) =
+    ContentCard(title, subtitle, icon, onClick, Color.Unspecified)
+
+/** Same card with a custom icon-tile tint; [Color.Unspecified] keeps the brand primary. */
+@Composable
+fun ContentCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    tint: Color
+) {
+    val iconTint = if (tint == Color.Unspecified) MaterialTheme.colorScheme.primary else tint
     AppCard(onClick = onClick) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.size(44.dp).background(
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), MaterialTheme.shapes.medium),
+                iconTint.copy(alpha = 0.12f), MaterialTheme.shapes.medium),
                 contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(icon, contentDescription = null, tint = iconTint)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
@@ -83,7 +97,7 @@ object AppCardDefaults {
     fun border(): BorderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 }
 
-/** Static card with the app look; same shape of API as Material's [Card]. */
+/** Static card with the app look; same shape of API as Material's [Card]. Cards are square-cornered. */
 @Composable
 fun AppCard(
     modifier: Modifier = Modifier,
@@ -93,7 +107,7 @@ fun AppCard(
     content: @Composable ColumnScope.() -> Unit
 ) = Card(modifier = modifier, shape = shape, colors = colors, border = border, content = content)
 
-/** Clickable card with the app look. */
+/** Clickable card with the app look — uniform 12dp corners via theme shapes. */
 @Composable
 fun AppCard(
     onClick: () -> Unit,

@@ -16,6 +16,7 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":core:designsystem"))
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.savedstate)
     implementation(libs.kotlinx.coroutines.core)

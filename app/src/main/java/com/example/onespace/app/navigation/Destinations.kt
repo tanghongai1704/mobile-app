@@ -42,6 +42,7 @@ enum class ContextScreen(private val titleVi: String, private val titleEn: Strin
     GAMES("Trò chơi", "Games"),
     ACCOUNT("Tài khoản", "Account"),
     SETTINGS("Tùy chỉnh", "Settings"),
+    PLAYLISTS("Danh sách phát", "Playlists"),
     PROFILE("Hồ sơ", "Profile");
 
     @Composable
@@ -56,14 +57,27 @@ internal fun NavDestination?.contextScreen(): ContextScreen? = when {
     hasRoute<VideoRoute.Playlist>() -> ContextScreen.VIDEO
     hasRoute<MusicRoute.NowPlaying>() -> ContextScreen.MUSIC
     hasRoute<MusicRoute.Playlist>() -> ContextScreen.MUSIC
+    hasRoute<MusicRoute.Artist>() -> ContextScreen.MUSIC
     hasRoute<NewsRoute.Article>() -> ContextScreen.NEWS
     hasRoute<GamesRoute.Game>() -> ContextScreen.GAMES
     hasRoute<AccountRoute.Profile>() -> ContextScreen.ACCOUNT
     hasRoute<AccountRoute.Settings>() -> ContextScreen.SETTINGS
     hasRoute<AccountRoute.Wrapped>() -> ContextScreen.PROFILE
     hasRoute<AccountRoute.Notifications>() -> ContextScreen.PROFILE
-    hasRoute<AccountRoute.Playlists>() -> ContextScreen.PROFILE
+    hasRoute<AccountRoute.Playlists>() -> ContextScreen.PLAYLISTS
     hasRoute<AccountRoute.Downloads>() -> ContextScreen.PROFILE
     hasRoute<AccountRoute.Badges>() -> ContextScreen.PROFILE
     else -> null
+}
+
+/**
+ * The playlist's name when the current screen is a playlist detail, so the
+ * top bar can say "Danh sách phát: Mobile" instead of the section label.
+ */
+internal fun androidx.navigation.NavBackStackEntry?.playlistName(): String? {
+    val destination = this?.destination ?: return null
+    val isPlaylist = destination.hasRoute<VideoRoute.Playlist>() ||
+        destination.hasRoute<MusicRoute.Playlist>()
+    if (!isPlaylist) return null
+    return arguments?.getString("name")
 }

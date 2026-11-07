@@ -12,6 +12,12 @@ interface TtsEngine {
     suspend fun stop()
     suspend fun release()
 
+    /** The spoken volume, 0 (mute) to 1 (full); the reading card and reader expose it. */
+    suspend fun setVolume(volume: Float) {}
+
+    /** Jumps the reading to a [fraction] (0..1) of the whole stream. */
+    suspend fun seekTo(fraction: Float) {}
+
     /**
      * Reads [paragraphs] into one audio file named after [name]. Returns where it is stored and
      * how long it is, or null when the device cannot do it (no engine or no Vietnamese voice).

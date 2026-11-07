@@ -1,6 +1,8 @@
 package com.example.onespace.feature.games.presentation
 
 import com.example.onespace.core.designsystem.tr
+import com.example.onespace.core.media.GameSfx
+import com.example.onespace.core.media.GameSound
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,10 +27,10 @@ import kotlinx.coroutines.delay
 private data class Pt(val x: Int, val y: Int)
 
 /**
- * F-GAME-13: Snake — swipe to steer, eat to grow, game over on collision.
+ * F-GAME-05: Snake — swipe to steer, eat to grow, game over on collision.
  */
 @Composable
-internal fun SnakeScreen(onGameOver: (Int) -> Unit = {}) {
+internal fun SnakeScreen(sfx: GameSfx? = null, onGameOver: (Int) -> Unit = {}) {
     var snake by remember { mutableStateOf(listOf(Pt(5, 8), Pt(4, 8), Pt(3, 8))) }
     var food by remember { mutableStateOf(Pt(8, 4)) }
     var dir by remember { mutableStateOf(Pt(1, 0)) }
@@ -44,10 +46,12 @@ internal fun SnakeScreen(onGameOver: (Int) -> Unit = {}) {
             val next = Pt((head.x + dir.x + 12) % 12, (head.y + dir.y + 12) % 12)
             if (snake.dropLast(1).contains(next)) {
                 alive = false
+                sfx?.play(GameSound.GAMEOVER)
                 if (!reported) { reported = true; onGameOver(score) }
             } else {
                 snake = listOf(next) + if (next == food) {
                     score += 1
+                    sfx?.play(GameSound.TAP)
                     food = Pt((0..11).random(), (0..11).random())
                     snake
                 } else snake.dropLast(1)
@@ -119,7 +123,10 @@ private fun abs(v: Float) = if (v < 0) -v else v
  * walk away with what has been earned.
  */
 @Composable
-internal fun KnowledgeQuizScreen(onFinish: (earned: Int, correct: Int) -> Unit = { _, _ -> }) {
+internal fun KnowledgeQuizScreen(
+    onAnswerSound: (correct: Boolean) -> Unit = {},
+    onFinish: (earned: Int, correct: Int) -> Unit = { _, _ -> }
+) {
     var run by remember { mutableStateOf(com.example.onespace.domain.games.engine.KnowledgeQuizRun.start()) }
     var version by remember { mutableIntStateOf(0) }
     var picked by remember { mutableStateOf<Int?>(null) }
@@ -160,7 +167,9 @@ internal fun KnowledgeQuizScreen(onFinish: (earned: Int, correct: Int) -> Unit =
                     onClick = {
                         if (picked == null) {
                             picked = oi
-                            if (oi == showing.correctIndex) correct += 1
+                            val right = oi == showing.correctIndex
+                            if (right) correct += 1
+                            onAnswerSound(right)
                         }
                     },
                     colors = when {
@@ -296,12 +305,17 @@ internal fun LeaderboardScreen(
 private data class TileNote(val lane: Int, val y: Float, val id: Int)
 
 /**
- * F-GAME-13: Beat Tiles — four lanes of falling notes tapped on the beat.
+ * F-GAME-06: Beat Tiles — four lanes of falling notes tapped on the beat.
  * Music from the dock keeps playing alongside (case C9); the notes give
  * the rhythm visually so the game is playable with or without a song.
  */
 @Composable
-internal fun BeatTilesScreen(bpm: Int? = null, songTitle: String? = null, onGameOver: (Int) -> Unit = {}) {
+internal fun BeatTilesScreen(
+    bpm: Int? = null,
+    songTitle: String? = null,
+    sfx: GameSfx? = null,
+    onGameOver: (Int) -> Unit = {}
+) {
     var notes by remember { mutableStateOf(listOf<TileNote>()) }
     var running by remember { mutableStateOf(false) }
     var score by remember { mutableIntStateOf(0) }
@@ -337,7 +351,10 @@ internal fun BeatTilesScreen(bpm: Int? = null, songTitle: String? = null, onGame
                 combo = 0
                 notes = notes.filter { it.y < 1f }
             }
-            if (misses >= 3) running = false
+            if (misses >= 3) {
+                sfx?.play(GameSound.GAMEOVER)
+                running = false
+            }
             if (tick >= 30 * 90) running = false
         }
     }
@@ -358,8 +375,10 @@ internal fun BeatTilesScreen(bpm: Int? = null, songTitle: String? = null, onGame
             bestCombo = maxOf(bestCombo, combo)
             score += 10 + minOf(combo, 20)
             notes = notes.filter { it.id != hit.id }
+            sfx?.play(GameSound.TAP)
         } else {
             combo = 0
+            sfx?.play(GameSound.WRONG)
         }
     }
 

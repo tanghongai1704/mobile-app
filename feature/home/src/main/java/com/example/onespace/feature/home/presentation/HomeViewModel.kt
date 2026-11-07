@@ -30,8 +30,20 @@ internal class HomeViewModel @Inject constructor(
     observeDailyMissions: ObserveDailyMissions,
     ensureTodayMissions: EnsureTodayMissions,
     preferences: com.example.onespace.domain.session.repository.SessionPreferencesRepository,
-    private val viewingSession: com.example.onespace.domain.video.repository.ViewingSessionRepository
+    private val viewingSession: com.example.onespace.domain.video.repository.ViewingSessionRepository,
+    private val downloadedContent: com.example.onespace.domain.session.repository.DownloadedContentRepository
 ) : ViewModel() {
+    /** Downloaded content ids (video + music), persisted in Room. */
+    val downloads = downloadedContent.observeAll()
+        .map { list -> list.map { it.contentId }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    fun toggleDownload(id: String, type: String, title: String = "", subtitle: String = "") {
+        viewModelScope.launch {
+            if (id in downloads.value) downloadedContent.remove(id)
+            else downloadedContent.add(id, type, title, subtitle)
+        }
+    }
     /** F-VID-02 flavor on the Home feed: topic picks first when topics exist. */
     private val topics = preferences.preferences.map { it.selectedTopics }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())

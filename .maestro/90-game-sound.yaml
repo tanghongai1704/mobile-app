@@ -1,0 +1,40 @@
+# 90 - Game sound (F-GAME-13: Settings slider, ducked SFX)
+# Route: Home -> Profile ("Tài khoản") -> "Tùy chỉnh" -> scroll to "Âm thanh game"
+appId: com.example.onespace
+name: 90 Game sound
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: "Trò chơi"
+    timeout: 30000
+- tapOn: "Trang chủ"
+- extendedWaitUntil:
+    visible:
+      text: "Trang chủ"
+    timeout: 15000
+- tapOn: "Tài khoản"
+- scrollUntilVisible:
+    element:
+      text: "Tùy chỉnh"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Tùy chỉnh"
+- extendedWaitUntil:
+    visible:
+      text: "Giao diện"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Âm thanh game"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    text: "50%"
+- takeScreenshot: F-GAME-13-settings
+- scrollUntilVisible:
+    element:
+      text: "Mô phỏng mất mạng (demo)"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: F-GAME-13-settings-full
