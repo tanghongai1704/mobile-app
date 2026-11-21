@@ -6,6 +6,8 @@ import com.example.onespace.domain.games.badge.RecordKeys
 import com.example.onespace.domain.games.engine.Direction
 import com.example.onespace.domain.games.engine.Game2048
 import com.example.onespace.domain.games.engine.Game2048State
+import com.example.onespace.domain.games.repository.GameSnapshot
+import com.example.onespace.domain.games.repository.GameSnapshotRepository
 import com.example.onespace.domain.games.usecase.ObserveBestScore
 import com.example.onespace.domain.games.usecase.SubmitGameScore
 import com.example.onespace.domain.session.model.MissionType
@@ -45,6 +47,7 @@ internal class Game2048ViewModel @Inject constructor(
     private val submitScore: SubmitGameScore,
     private val challenge: ChallengeReporter,
     private val sfx: GameSfx,
+    private val snapshots: GameSnapshotRepository,
     observeBest: ObserveBestScore
 ) : ViewModel() {
     private val _state = MutableStateFlow(Game2048.newGame())
@@ -57,10 +60,37 @@ internal class Game2048ViewModel @Inject constructor(
     private val _outcome = MutableStateFlow<Game2048Outcome?>(null)
     val outcome = _outcome.asStateFlow()
 
+    private var targetPaid = false
+    private var overPaid = false
+    @Volatile private var restoreChecked = false
+
     val best = observeBest(GAME_2048_ID)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     init {
+        // Continue the round left unfinished last time (app closed or killed by the system).
+        viewModelScope.launch {
+            val saved = snapshots.load(GAME_2048_ID)
+            val size = Game2048.SIZE
+            if (saved != null && saved.version == SNAPSHOT_VERSION && saved.board.size == size * size) {
+                val restored = Game2048State(saved.board, saved.score, size, reachedTarget = saved.reachedTarget)
+                if (!restored.isOver && _moves.value == 0) {
+                    _state.value = restored
+                    targetPaid = saved.reachedTarget
+                }
+            }
+            restoreChecked = true
+        }
+        // Save after every move so a killed process loses at most the last swipe.
+        viewModelScope.launch {
+            _state.collect { current ->
+                if (!restoreChecked) return@collect
+                if (current.isOver || current.score == 0 && _moves.value == 0) snapshots.clear(GAME_2048_ID)
+                else snapshots.save(
+                    GameSnapshot(GAME_2048_ID, SNAPSHOT_VERSION, current.tiles, current.score, current.reachedTarget)
+                )
+            }
+        }
         // Report the round's best score shortly after the player stops moving, so the daily
         // challenge fills up while playing instead of only when the round ends.
         viewModelScope.launch {
@@ -72,8 +102,6 @@ internal class Game2048ViewModel @Inject constructor(
         }
     }
 
-    private var targetPaid = false
-    private var overPaid = false
 
     fun move(direction: Direction) {
         if (_state.value.isOver || _outcome.value?.isOver == true) return
@@ -122,5 +150,7 @@ internal class Game2048ViewModel @Inject constructor(
     private companion object {
         const val TARGET_BONUS = 100
         const val SCORE_REPORT_DELAY_MS = 800L
+        /** Bump when the board encoding or rules change; older snapshots are then ignored. */
+        const val SNAPSHOT_VERSION = 1
     }
 }

@@ -2,23 +2,12 @@ package com.example.onespace.data.news.repository
 
 import com.example.onespace.domain.news.model.Article
 import com.example.onespace.domain.news.model.QuizQuestion
-import com.example.onespace.domain.news.repository.NewsRepository
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flow
 
-/** Catalog is bundled demo data; the bookmarks themselves are real and survive restarts. */
-internal class MockNewsRepository(private val saved: SavedArticlesStore) : NewsRepository {
-    override fun observeSavedIds(): Flow<Set<String>> = saved.ids
-
-    override suspend fun toggleBookmark(id: String) = saved.toggle(id)
-
-    override fun observeCatalog() = flow {
-        delay(400)
-        emit(catalog)
-    }
-
+/**
+ * Editorial catalogue served by the fake backend (`GET /news/articles`). In production this data
+ * lives on the server (RSS ingest + editors); the app only ever sees it through [NewsApi].
+ */
+internal object NewsSeed {
     private val rawCatalog = listOf(
             Article(
                 "n1", "Thành phố xanh bắt đầu từ ý nhỏ", "Đời sống", "4 phút đọc",
@@ -222,7 +211,7 @@ internal class MockNewsRepository(private val saved: SavedArticlesStore) : NewsR
     )
 
     /** Handwritten quizzes win; every other article gets a generated pair. */
-    private val catalog: List<Article> = rawCatalog.mapIndexed { index, article ->
+    val catalog: List<Article> = rawCatalog.mapIndexed { index, article ->
         if (article.quiz.isNotEmpty()) article
         else article.copy(quiz = fallbackQuiz(article, index))
     }

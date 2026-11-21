@@ -57,6 +57,7 @@ dependencies {
     implementation(project(":core:session"))
     implementation(project(":core:media"))
     implementation(project(":core:database"))
+    implementation(project(":core:network"))
     implementation(project(":core:datastore"))
     implementation(project(":feature:home"))
     implementation(project(":feature:onboarding"))

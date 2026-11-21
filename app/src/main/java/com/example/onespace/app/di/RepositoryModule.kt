@@ -1,6 +1,22 @@
 package com.example.onespace.app.di
 
 import com.example.onespace.data.auth.createAuthRepository
+import com.example.onespace.data.auth.createAuthFakeRoute
+import com.example.onespace.data.auth.createSecureTokenStore
+import com.example.onespace.data.auth.SecureTokenStore
+import com.example.onespace.data.news.createNewsFakeRoute
+import com.example.onespace.core.database.NewsArticleDao
+import com.example.onespace.core.network.AccessTokenProvider
+import com.example.onespace.core.network.api.AuthApi
+import com.example.onespace.core.network.api.NewsApi
+import com.example.onespace.core.network.di.OfflineSimulation
+import com.example.onespace.core.network.fake.FakeRoute
+import dagger.multibindings.IntoSet
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.example.onespace.domain.auth.repository.AuthRepository
 import com.example.onespace.domain.auth.usecase.*
 import com.example.onespace.domain.session.repository.SessionPreferencesRepository
@@ -62,11 +78,38 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+/**
+ * Network wiring: token storage, the demo offline switch and the fake backend slices. Replacing the
+ * fake routes with the real base URL is the only change needed to talk to a server.
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkBindings {
+    @Provides @Singleton
+    fun tokens(@ApplicationContext context: android.content.Context): SecureTokenStore = createSecureTokenStore(context)
+
+    @Provides fun accessTokens(tokens: SecureTokenStore): AccessTokenProvider = tokens
+
+    @Provides @Singleton
+    fun offlineSimulation(preferences: SessionPreferencesRepository): OfflineSimulation {
+        val simulating = AtomicBoolean(false)
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            preferences.preferences.collect { simulating.set(it.simulateOffline) }
+        }
+        return OfflineSimulation { simulating.get() }
+    }
+
+    @Provides @IntoSet fun newsRoute(): FakeRoute = createNewsFakeRoute()
+    @Provides @IntoSet fun authRoute(): FakeRoute = createAuthFakeRoute()
+}
+
 /** Composition root: the only place that chooses mock versus production repositories. */
 @Module
 @InstallIn(SingletonComponent::class)
 object RepositoryModule {
-    @Provides @Singleton fun auth(preferences: SessionPreferencesRepository): AuthRepository = createAuthRepository(preferences)
+    @Provides @Singleton
+    fun auth(api: AuthApi, preferences: SessionPreferencesRepository, tokens: SecureTokenStore): AuthRepository =
+        createAuthRepository(api, preferences, tokens)
     @Provides fun requestCode(repository: AuthRepository) = RequestSignInCode(repository)
     @Provides fun verifyCode(repository: AuthRepository) = VerifySignInCode(repository)
     @Provides fun passwordSignIn(repository: AuthRepository) = SignInWithPassword(repository)
@@ -75,7 +118,8 @@ object RepositoryModule {
     @Provides @Singleton fun videos(): VideoRepository = createVideoRepository()
     @Provides @Singleton fun music(): MusicRepository = createMusicRepository()
     @Provides @Singleton
-    fun news(@ApplicationContext context: android.content.Context): NewsRepository = createNewsRepository(context)
+    fun news(@ApplicationContext context: android.content.Context, dao: NewsArticleDao, api: NewsApi): NewsRepository =
+        createNewsRepository(context, dao, api)
     @Provides @Singleton fun games(): GamesRepository = createGamesRepository()
 
     @Provides @Singleton
@@ -145,6 +189,10 @@ object RepositoryModule {
     // Guess Song use case
     @Provides fun startGuessSong(points: PointRepository) =
         com.example.onespace.domain.games.usecase.StartGuessSong(points)
+
+    @Provides @Singleton
+    fun gameSnapshots(database: ContentDatabase): com.example.onespace.domain.games.repository.GameSnapshotRepository =
+        com.example.onespace.data.games.repository.createGameSnapshotRepository(database)
 
     @Provides @Singleton
     fun viewingSession(database: ContentDatabase): ViewingSessionRepository =

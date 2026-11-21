@@ -15,7 +15,9 @@ object DatabaseModule {
     @Provides @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ContentDatabase =
         Room.databaseBuilder(context, ContentDatabase::class.java, "onespace.db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(MIGRATION_5_6)
+            // Only versions older than the first shipped schema (v5) may be rebuilt from scratch.
+            .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2, 3, 4)
             .build()
 
     @Provides fun provideProgressDao(database: ContentDatabase): VideoProgressDao = database.videoProgressDao()
@@ -26,4 +28,6 @@ object DatabaseModule {
     @Provides fun provideDownloadedContentDao(database: ContentDatabase): DownloadedContentDao = database.downloadedContentDao()
     @Provides fun providePointDao(database: ContentDatabase): PointDao = database.pointDao()
     @Provides fun provideDailyMissionDao(database: ContentDatabase): DailyMissionDao = database.dailyMissionDao()
+    @Provides fun provideNewsArticleDao(database: ContentDatabase): NewsArticleDao = database.newsArticleDao()
+    @Provides fun provideGameSnapshotDao(database: ContentDatabase): GameSnapshotDao = database.gameSnapshotDao()
 }

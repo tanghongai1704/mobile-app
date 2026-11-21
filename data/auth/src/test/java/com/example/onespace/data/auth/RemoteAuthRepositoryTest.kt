@@ -10,11 +10,47 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
+import com.example.onespace.core.network.api.AuthApi
+import com.example.onespace.core.network.fake.FakeApiInterceptor
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
-class DemoAuthRepositoryTest {
+/** Client + fake server together: Retrofit -> OkHttp -> FakeApiInterceptor -> AuthFakeRoute. */
+class RemoteAuthRepositoryTest {
     private val prefs = MemoryPreferences()
     private var time = 1_000L
-    private val auth = DemoAuthRepository(prefs) { time }
+    private val server = AuthFakeRoute { time }
+    private var online = true
+    private val api: AuthApi = Retrofit.Builder()
+        .baseUrl("https://api.test/v1/")
+        .client(OkHttpClient.Builder().addInterceptor(FakeApiInterceptor(setOf(server), { online }, 0)).build())
+        .addConverterFactory(Json { ignoreUnknownKeys = true }.asConverterFactory("application/json".toMediaType()))
+        .build()
+        .create(AuthApi::class.java)
+    private val blobs = MemoryBlobs()
+    private val tokens = SecureTokenStore(blobs, ReversingCipher)
+    private val auth = RemoteAuthRepository(api, prefs, tokens)
+
+    @Test fun tokensArePersistedOnlyAsCiphertext() = runBlocking {
+        assertTrue(auth.signInWithPassword("a@example.com", "secret1").isSuccess)
+        val stored = blobs.values.values.joinToString()
+        val access = tokens.accessToken()!!
+        assertFalse(stored.contains(access))
+        assertEquals(access, SecureTokenStore(blobs, ReversingCipher).accessToken())
+        auth.signOut()
+        assertNull(tokens.accessToken())
+        assertTrue(blobs.values.isEmpty())
+    }
+
+    @Test fun shortPasswordIsWeakAndOfflineIsUnavailable() = runBlocking {
+        assertEquals(AuthError.WEAK_PASSWORD, error(auth.signInWithPassword("a@example.com", "123")))
+        online = false
+        assertEquals(AuthError.UNAVAILABLE, error(auth.signInWithPassword("a@example.com", "secret1")))
+        assertFalse(auth.session.first().hasAccess)
+    }
 
     @Test fun correctCodeCreatesPersistedSessionAndCannotBeReused() = runBlocking {
         auth.requestCode("a@example.com")
@@ -49,7 +85,7 @@ class DemoAuthRepositoryTest {
 
     @Test fun guestRestoresAcrossRepositoryInstancesAndSignOutRemovesAccess() = runBlocking {
         auth.continueAsGuest()
-        val restored = DemoAuthRepository(prefs)
+        val restored = RemoteAuthRepository(api, prefs, tokens)
         assertTrue(restored.session.first().isGuest)
         assertTrue(restored.session.first().hasAccess)
         restored.signOut()
@@ -59,6 +95,20 @@ class DemoAuthRepositoryTest {
     }
 
     private fun error(result: Result<Unit>) = (result.exceptionOrNull() as AuthException).reason
+
+    private class MemoryBlobs : BlobStore {
+        val values = mutableMapOf<String, String>()
+        override fun read(key: String) = values[key]
+        override fun write(key: String, value: String?) {
+            if (value == null) values.remove(key) else values[key] = value
+        }
+    }
+
+    /** Stand-in for the Keystore cipher (unavailable on the JVM): reversible but never plain text. */
+    private object ReversingCipher : TokenCipher {
+        override fun encrypt(plain: String) = "enc:" + plain.reversed()
+        override fun decrypt(blob: String) = blob.removePrefix("enc:").reversed()
+    }
 
     private class MemoryPreferences : SessionPreferencesRepository {
         override val preferences = MutableStateFlow(

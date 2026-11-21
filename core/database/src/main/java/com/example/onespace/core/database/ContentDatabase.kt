@@ -153,6 +153,61 @@ interface DailyMissionDao {
     suspend fun updateProgress(id: String, date: String, progress: Int, completed: Boolean)
 }
 
+/** Offline-first cache of the news feed: the UI reads this table, the network only refreshes it. */
+@Entity(tableName = "news_articles")
+data class NewsArticleEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val category: String,
+    val readTime: String,
+    val body: String,
+    /** Quiz questions serialised as JSON by the news data module. */
+    val quizJson: String,
+    val publishedAt: Long,
+    /** Position in the server feed so the cached order matches the last refresh. */
+    val sortOrder: Int,
+    val cachedAt: Long
+)
+
+@Dao
+interface NewsArticleDao {
+    @Query("SELECT * FROM news_articles ORDER BY sortOrder ASC")
+    fun observeAll(): Flow<List<NewsArticleEntity>>
+
+    @Query("SELECT COUNT(*) FROM news_articles")
+    suspend fun count(): Int
+
+    @Upsert
+    suspend fun upsertAll(articles: List<NewsArticleEntity>)
+
+    @Query("DELETE FROM news_articles WHERE id NOT IN (:keepIds)")
+    suspend fun deleteAllExcept(keepIds: List<String>)
+}
+
+/** Unfinished game rounds (board, score, rules version) restored after process death. */
+@Entity(tableName = "game_snapshots")
+data class GameSnapshotEntity(
+    @PrimaryKey val gameId: String,
+    val version: Int,
+    /** Board cells joined with commas, row-major. */
+    val board: String,
+    val score: Int,
+    val reachedTarget: Boolean,
+    val savedAt: Long
+)
+
+@Dao
+interface GameSnapshotDao {
+    @Query("SELECT * FROM game_snapshots WHERE gameId = :gameId")
+    suspend fun find(gameId: String): GameSnapshotEntity?
+
+    @Upsert
+    suspend fun upsert(snapshot: GameSnapshotEntity)
+
+    @Query("DELETE FROM game_snapshots WHERE gameId = :gameId")
+    suspend fun delete(gameId: String)
+}
+
 @Database(
     entities = [
         VideoProgressEntity::class,
@@ -160,9 +215,11 @@ interface DailyMissionDao {
         PointEntryEntity::class,
         DailyMissionEntity::class,
         ExtractedAudioEntity::class,
-        DownloadedContentEntity::class
+        DownloadedContentEntity::class,
+        NewsArticleEntity::class,
+        GameSnapshotEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class ContentDatabase : RoomDatabase() {
@@ -172,4 +229,6 @@ abstract class ContentDatabase : RoomDatabase() {
     abstract fun downloadedContentDao(): DownloadedContentDao
     abstract fun pointDao(): PointDao
     abstract fun dailyMissionDao(): DailyMissionDao
+    abstract fun newsArticleDao(): NewsArticleDao
+    abstract fun gameSnapshotDao(): GameSnapshotDao
 }

@@ -39,13 +39,14 @@ import kotlinx.coroutines.launch
 
 /**
  * Shared video/audio engines: in-app floating, dock and detail screens reuse them.
- * Music currently delegates audio focus to Media3; complete video focus/noisy handling
- * and service-owned background playback are follow-up work in Section 4.
+ * Music delegates audio focus and "becoming noisy" (headphones unplugged) to Media3 and is
+ * published to the system by [MusicPlaybackService], so it keeps playing in the background
+ * with notification, lock-screen and Bluetooth controls.
  * Internal conflict policy allows one audible primary source at a time.
  */
 @Singleton
 class MediaPlaybackCoordinator @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val viewingSession: ViewingSessionRepository,
     preferences: SessionPreferencesRepository
 ) : MediaSessionPort {
@@ -76,7 +77,13 @@ class MediaPlaybackCoordinator @Inject constructor(
     private val musicPlayer: ExoPlayer = ExoPlayer.Builder(context, renderersFactory)
         // Dock music yields to any other audible source (calls, other apps, video).
         .setAudioAttributes(mediaAudioAttributes, /* handleAudioFocus = */ true)
+        // Pause when headphones are unplugged instead of blasting through the speaker.
+        .setHandleAudioBecomingNoisy(true)
+        .setWakeMode(C.WAKE_MODE_NETWORK)
         .build()
+
+    /** The music engine as seen by [MusicPlaybackService]'s MediaSession (notification, lock screen). */
+    internal val musicSessionPlayer: Player get() = musicPlayer
 
     /** Platform surface handle; audio engine and playlist are private implementation details. */
     val videoPlayer: Player get() = videoEngine
@@ -256,6 +263,7 @@ class MediaPlaybackCoordinator @Inject constructor(
         // Re-apply the queue loop mode: it may have been deferred off an ENDED player.
         musicPlayer.repeatMode = if (musicQueueLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
         musicPlayer.play()
+        MusicPlaybackService.ensureStarted(context)
         syncMusicState()
     }
 

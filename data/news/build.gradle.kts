@@ -14,7 +14,10 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":core:database"))
+    implementation(project(":core:network"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

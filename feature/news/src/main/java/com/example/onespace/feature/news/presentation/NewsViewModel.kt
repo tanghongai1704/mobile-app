@@ -16,12 +16,13 @@ import com.example.onespace.domain.news.usecase.ObserveSavedArticles
 import com.example.onespace.domain.news.usecase.ToggleBookmark
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -45,10 +46,17 @@ internal class NewsViewModel @Inject constructor(
 ) : ViewModel() {
     private val refresh = MutableStateFlow(0)
 
-    val uiState = combine(getNews.observeCatalog(), observeSaved(), refresh) { articles, saved, _ ->
-        ContentUiState(items = articles)
-    }.catch { emit(ContentUiState(error = "Không tải được tin.")) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ContentUiState(isLoading = true))
+    /**
+     * Offline-first feed: the repository shows the Room cache at once and refreshes in the
+     * background. "Thử lại" re-subscribes, which starts a new refresh.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val uiState = refresh.flatMapLatest {
+        getNews.observeCatalog()
+            .map { articles -> ContentUiState(items = articles) }
+            .onStart { emit(ContentUiState(isLoading = true)) }
+            .catch { emit(ContentUiState(error = "Không tải được tin. Kiểm tra kết nối rồi thử lại.")) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ContentUiState(isLoading = true))
 
     /** F-NEWS-01: onboarding topics put matching categories first. */
     val selectedTopics = preferences.preferences.map { it.selectedTopics }

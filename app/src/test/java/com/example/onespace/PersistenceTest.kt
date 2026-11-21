@@ -23,12 +23,24 @@ import org.robolectric.annotation.Config
 class PersistenceTest {
     private val context: Context get() = ApplicationProvider.getApplicationContext()
 
+    private val unusedNewsApi = object : com.example.onespace.core.network.api.NewsApi {
+        override suspend fun articles(page: Int, limit: Int) = error("not used")
+        override suspend fun article(id: String) = error("not used")
+    }
+
+    private fun newsRepository() = createNewsRepository(
+        context,
+        androidx.room.Room.inMemoryDatabaseBuilder(context, com.example.onespace.core.database.ContentDatabase::class.java)
+            .allowMainThreadQueries().build().newsArticleDao(),
+        unusedNewsApi
+    )
+
     @Test fun newsBookmarksSurviveANewRepositoryInstance() = runBlocking {
-        val first = createNewsRepository(context)
+        val first = newsRepository()
         first.toggleBookmark("a1")
         first.toggleBookmark("a2")
         first.toggleBookmark("a1") // toggled off again
-        val second = createNewsRepository(context)
+        val second = newsRepository()
         assertEquals(setOf("a2"), second.observeSavedIds().first())
     }
 

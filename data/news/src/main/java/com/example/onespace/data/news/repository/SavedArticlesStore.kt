@@ -9,13 +9,19 @@ import kotlinx.coroutines.flow.map
 
 private val Context.savedArticlesDataStore by preferencesDataStore(name = "onespace_saved_articles")
 
+/** Bookmarked article ids; kept on the device (not part of the cached feed). */
+internal interface BookmarkStore {
+    val ids: Flow<Set<String>>
+    suspend fun toggle(id: String)
+}
+
 /** Bookmarked article ids, persisted so the reading list survives restarts. */
-internal class SavedArticlesStore(private val context: Context) {
+internal class SavedArticlesStore(private val context: Context) : BookmarkStore {
     private val key = stringSetPreferencesKey("saved_ids")
 
-    val ids: Flow<Set<String>> = context.savedArticlesDataStore.data.map { it[key] ?: emptySet() }
+    override val ids: Flow<Set<String>> = context.savedArticlesDataStore.data.map { it[key] ?: emptySet() }
 
-    suspend fun toggle(id: String) {
+    override suspend fun toggle(id: String) {
         context.savedArticlesDataStore.edit { prefs ->
             val current = prefs[key] ?: emptySet()
             prefs[key] = if (id in current) current - id else current + id
