@@ -297,7 +297,8 @@ class NavigationSmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val directory = File(checkNotNull(instrumentation.targetContext.getExternalFilesDir(null)), "screenshots")
         check(directory.isDirectory || directory.mkdirs())
-        val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return
+        // Screenshots are diagnostics only: if another tool holds UiAutomation, skip them.
+        val bitmap = runCatching { instrumentation.uiAutomation.takeScreenshot() }.getOrNull() ?: return
         try {
             File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         } finally {
