@@ -80,8 +80,12 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         /** Idempotent: safe to call on every app start. */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<ReminderWorker>(1, TimeUnit.HOURS).build()
-            WorkManager.getInstance(context)
-                .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+            // WorkManager is not initialised in every host (e.g. JVM screenshot tests); reminders
+            // are optional, so a missing scheduler must never stop the app from starting.
+            runCatching {
+                WorkManager.getInstance(context)
+                    .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+            }
         }
 
         /** Returns false when the user has not granted the notification permission (Android 13+). */

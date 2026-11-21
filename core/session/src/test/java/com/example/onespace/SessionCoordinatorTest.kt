@@ -165,6 +165,10 @@ class SessionCoordinatorTest {
     private val tracks = listOf(Track("m1", "A track", "Artist", "3:00", "https://example.com/m1.mp3"))
     private val videos = listOf(Video("v1", "A video", "Studio", "9:00", "https://example.com/v1.mp4"))
 
+    private val articles = listOf(
+        com.example.onespace.domain.news.model.Article("a1", "Tin một", "Đời sống", "1 phút đọc", "Đoạn một.\n\nĐoạn hai.")
+    )
+    private val tts = FakeTts()
     private val fakeMissions = FakeMissions()
     private val fakeStreak = FakeStreak()
 
@@ -183,11 +187,38 @@ class SessionCoordinatorTest {
         return SessionCoordinator(
             handle, port, prefs, GetMusic(musicRepository), GetVideo(videoRepository), viewing,
             TrackMissionAction(fakeMissions, FakePoints(), FakePet()), UpdateStreak(fakeStreak),
-            com.example.onespace.domain.news.usecase.GetNews(FakeNews), FakeTts
+            com.example.onespace.domain.news.usecase.GetNews(FakeNews(articles)), tts
         )
     }
 
     @Before fun setUp() { Dispatchers.setMain(dispatcher) }
+
+    @Test fun articleInMixedPlaylistIsReadAloudThenSessionMovesOn() = runTest(dispatcher) {
+        com.example.onespace.core.designsystem.AppPlaylistStore.restore("{}")
+        com.example.onespace.core.designsystem.AppPlaylistStore.addArticle("Mix", "a1")
+        com.example.onespace.core.designsystem.AppPlaylistStore.addVideo("Mix", "v1")
+        val port = FakePort()
+        port.musicState.value = MusicPlayback("m1", "A track", "Artist", playing = true)
+        val session = coordinator(SavedStateHandle(), port)
+        advanceUntilIdle()
+
+        val started = session.startPlaylistSession("Mix")!!
+        advanceUntilIdle()
+        assertTrue(started.current!!.isArticle)
+        // One voice: the article takes it from music, and is read title first.
+        assertFalse(port.musicState.value.playing)
+        assertEquals(listOf("Tin một", "Đoạn một.", "Đoạn hai."), tts.prepared.map { it.text })
+        assertEquals(1, tts.plays)
+
+        // The reader plays to the last segment and stops: the session moves to the video.
+        tts.state.value = com.example.onespace.domain.news.model.TtsState(isPlaying = true, totalSegments = 3)
+        advanceUntilIdle()
+        tts.state.value = com.example.onespace.domain.news.model.TtsState(isPlaying = false, currentSegment = 2, totalSegments = 3)
+        advanceUntilIdle()
+        assertEquals("v1", session.playlistSession.value!!.current!!.id)
+        assertEquals("v1", port.videoState.value.videoId)
+        assertTrue(MissionType.READ in fakeMissions.actions)
+    }
     @After fun tearDown() { Dispatchers.resetMain() }
 
     @Test fun restoredSessionKeepsMediaIdentityAndTitlesWithoutAutoplay() = runTest(dispatcher) {
@@ -406,16 +437,18 @@ class SessionCoordinatorTest {
     }
 }
 
-private object FakeNews : com.example.onespace.domain.news.repository.NewsRepository {
-    override fun observeCatalog() = kotlinx.coroutines.flow.flowOf(emptyList<com.example.onespace.domain.news.model.Article>())
+private class FakeNews(private val articles: List<com.example.onespace.domain.news.model.Article>) : com.example.onespace.domain.news.repository.NewsRepository {
+    override fun observeCatalog() = kotlinx.coroutines.flow.flowOf(articles)
     override fun observeSavedIds() = kotlinx.coroutines.flow.flowOf(emptySet<String>())
     override suspend fun toggleBookmark(id: String) = Unit
 }
 
-private object FakeTts : com.example.onespace.domain.news.repository.TtsEngine {
+private class FakeTts : com.example.onespace.domain.news.repository.TtsEngine {
     override val state = kotlinx.coroutines.flow.MutableStateFlow(com.example.onespace.domain.news.model.TtsState())
-    override suspend fun prepare(segments: List<com.example.onespace.domain.news.model.TtsSegment>) = Unit
-    override suspend fun play() = Unit
+    var prepared: List<com.example.onespace.domain.news.model.TtsSegment> = emptyList()
+    var plays = 0
+    override suspend fun prepare(segments: List<com.example.onespace.domain.news.model.TtsSegment>) { prepared = segments }
+    override suspend fun play() { plays++ }
     override suspend fun pause() = Unit
     override suspend fun stop() = Unit
     override suspend fun release() = Unit

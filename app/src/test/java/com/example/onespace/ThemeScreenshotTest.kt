@@ -98,7 +98,8 @@ abstract class ScreenshotBase(private val mode: String) {
         waitText("Dùng thử không cần tài khoản")
         compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
         compose.onNodeWithText("Tiếp tục dùng thử").performClick()
-        waitText("Danh sách phát của tôi")
+        // Home after the guest sign-in: the feed title is always shown on a fresh install.
+        waitText("Đề xuất cho bạn")
         settle()
     }
 
@@ -123,7 +124,8 @@ abstract class ScreenshotBase(private val mode: String) {
         shot("02-login")
         compose.onNodeWithText("Dùng thử không cần tài khoản").performScrollTo().performClick()
         compose.onNodeWithText("Tiếp tục dùng thử").performClick()
-        waitText("Danh sách phát của tôi")
+        // Home after the guest sign-in: the feed title is always shown on a fresh install.
+        waitText("Đề xuất cho bạn")
         settle()
         shot("03-home")
         optional("home-feed") {
@@ -297,7 +299,10 @@ abstract class FloatingShots(mode: String) : ScreenshotBase(mode) {
     fun dragAndRemember() {
         firstRunToHome()
         tab("Video"); settle()
-        compose.onAllNodesWithText("Gần với thiên nhiên thêm chút").onFirst().performSemanticsAction(SemanticsActions.OnClick); settle()
+        // The feed card merges duration and title into one node, so match the title as a substring.
+        val firstVideo = "Gần với thiên nhiên thêm chút"
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(firstVideo, substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText(firstVideo, substring = true).onFirst().performSemanticsAction(SemanticsActions.OnClick); settle()
         back()
         tab("Tin tức"); settle()
         shot("f01-floating-default")
