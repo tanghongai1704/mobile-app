@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
         splash.setKeepOnScreenCondition { startup.uiState.value is StartupUiState.Loading }
         // Default scrims: system bar contrast adapts automatically to light/dark theme.
         enableEdgeToEdge()
+        LaunchRequests.accept(intent)
         setContent {
             val media: MediaViewModel = hiltViewModel()
             val prefs by media.preferences.collectAsStateWithLifecycle()
@@ -46,5 +47,23 @@ class MainActivity : ComponentActivity() {
             }
             OneSpaceTheme(darkTheme = darkTheme, english = prefs?.language == Language.EN) { OneSpaceApp() }
         }
+    }
+
+    /** A reminder tapped while the app is open arrives here instead of onCreate. */
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        LaunchRequests.accept(intent)
+    }
+}
+
+/** Sections requested by outside entry points (reminder notifications); the shell consumes them once. */
+object LaunchRequests {
+    val section = kotlinx.coroutines.flow.MutableStateFlow<com.example.onespace.domain.session.Section?>(null)
+
+    fun accept(intent: android.content.Intent?) {
+        val name = intent?.getStringExtra(com.example.onespace.core.sync.ReminderWorker.EXTRA_OPEN_SECTION) ?: return
+        intent.removeExtra(com.example.onespace.core.sync.ReminderWorker.EXTRA_OPEN_SECTION)
+        section.value = runCatching { com.example.onespace.domain.session.Section.valueOf(name) }.getOrNull()
     }
 }

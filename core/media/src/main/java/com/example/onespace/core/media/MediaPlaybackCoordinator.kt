@@ -48,7 +48,8 @@ import kotlinx.coroutines.launch
 class MediaPlaybackCoordinator @Inject constructor(
     @ApplicationContext private val context: Context,
     private val viewingSession: ViewingSessionRepository,
-    preferences: SessionPreferencesRepository
+    preferences: SessionPreferencesRepository,
+    private val offline: FileOfflineMediaStore
 ) : MediaSessionPort {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -267,8 +268,9 @@ class MediaPlaybackCoordinator @Inject constructor(
         syncMusicState()
     }
 
+    // F-MUS-12: a downloaded track plays from the device, so it works offline.
     private fun mediaItem(track: Track): MediaItem = MediaItem.Builder()
-        .setUri(track.url)
+        .setUri(offline.localUri(track.id) ?: track.url)
         .setMediaId(track.id)
         .setMediaMetadata(
             MediaMetadata.Builder().setTitle(track.title).setArtist(track.artist).build()
@@ -299,7 +301,8 @@ class MediaPlaybackCoordinator @Inject constructor(
         if (plan.pauseMusic) musicPlayer.pause()
         videoEngine.setMediaItem(
             MediaItem.Builder()
-                .setUri(video.url)
+                // F-VID-07: a downloaded video plays from the device.
+                .setUri(offline.localUri(video.id) ?: video.url)
                 .setMediaId(video.id)
                 .setMediaMetadata(
                     MediaMetadata.Builder().setTitle(video.title).setArtist(video.creator).build()
@@ -423,6 +426,8 @@ class MediaPlaybackCoordinator @Inject constructor(
 object MediaModule {
     @Provides @Singleton
     fun provideMediaSessionPort(coordinator: MediaPlaybackCoordinator): MediaSessionPort = coordinator
+    @Provides @Singleton
+    fun provideOfflineMediaStore(store: FileOfflineMediaStore): com.example.onespace.domain.session.port.OfflineMediaStore = store
     @Provides @Singleton
     fun provideTtsEngine(engine: AndroidTtsEngine): com.example.onespace.domain.news.repository.TtsEngine = engine
 }

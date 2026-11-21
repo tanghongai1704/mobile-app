@@ -737,7 +737,7 @@ internal fun NotificationsScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(tr("Nhắc nhiệm vụ hằng ngày", "Daily mission reminder"), style = MaterialTheme.typography.bodyLarge)
-                    Text(tr("9:00 · nhắc nhiệm vụ hôm nay chưa làm", "9:00 · reminds you of today's missions"),
+                    Text(tr("Từ 9:00 · nhắc nhiệm vụ hôm nay chưa làm, tối đa 1 lần/ngày", "From 9:00 · reminds you of today's open missions, once a day"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -752,7 +752,7 @@ internal fun NotificationsScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(tr("Nhắc giữ chuỗi ngày", "Streak reminder"), style = MaterialTheme.typography.bodyLarge)
-                    Text(tr("20:00 · chỉ nhắc khi chưa hoạt động hôm nay", "20:00 · only if you haven't been active today"),
+                    Text(tr("Từ 20:00 · chỉ nhắc khi hôm nay chưa làm nhiệm vụ nào", "From 20:00 · only if you haven't done any mission today"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -774,7 +774,6 @@ internal fun NotificationsScreen(
                 Switch(checked = quietHours, onCheckedChange = onToggleQuietHours)
             }
         }
-        item { PrototypeNote(tr("Bản demo hiển thị nhắc trong ứng dụng; thông báo đẩy nằm trong bản phát hành.", "The demo shows reminders inside the app; push notifications ship with the release.")) }
     }
 }
 

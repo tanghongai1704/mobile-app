@@ -108,6 +108,14 @@ fun OneSpaceApp() {
         coordinator.enter(section)
         appState.navigateToSection(section)
     }
+    // A tapped reminder asks for Home (today's missions); handled once the main shell is showing.
+    val requestedSection by com.example.onespace.LaunchRequests.section.collectAsStateWithLifecycle()
+    LaunchedEffect(requestedSection, inMain) {
+        val target = requestedSection ?: return@LaunchedEffect
+        if (!inMain) return@LaunchedEffect
+        com.example.onespace.LaunchRequests.section.value = null
+        select(target)
+    }
 
     LaunchedEffect(inMain) {
         if (inMain) coordinator.restoredSection.collect { restored ->

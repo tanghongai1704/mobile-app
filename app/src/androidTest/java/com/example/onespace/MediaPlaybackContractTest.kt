@@ -35,13 +35,15 @@ class MediaPlaybackContractTest {
         activity = ActivityScenario.launch(MainActivity::class.java)
         val viewing = object : ViewingSessionRepository {
             override fun observeContinue(): Flow<List<ContinueEntry>> = flowOf(emptyList())
+            override fun observeWatchlist(): Flow<List<ContinueEntry>> = flowOf(emptyList())
+            override fun observeHistory(): Flow<List<ContinueEntry>> = flowOf(emptyList())
             override suspend fun addToWatchlist(videoId: String, title: String) = Unit
             override suspend fun removeFromWatchlist(videoId: String) = Unit
             override suspend fun progressOf(videoId: String): Long = 0
             override suspend fun saveProgress(videoId: String, positionMs: Long) = Unit
         }
         instrumentation.runOnMainSync {
-            engine = MediaPlaybackCoordinator(context, viewing, SessionPreferencesStore(context))
+            engine = MediaPlaybackCoordinator(context, viewing, SessionPreferencesStore(context), com.example.onespace.core.media.FileOfflineMediaStore(context))
         }
         await {
             var focused = false

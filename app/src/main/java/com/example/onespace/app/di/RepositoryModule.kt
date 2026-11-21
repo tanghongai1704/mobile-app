@@ -203,8 +203,15 @@ object RepositoryModule {
         com.example.onespace.data.music.createExtractedAudioRepository(database)
 
     @Provides @Singleton
-    fun downloadedContent(database: ContentDatabase): com.example.onespace.domain.session.repository.DownloadedContentRepository =
-        com.example.onespace.data.games.repository.createDownloadedContentRepository(database)
+    fun downloadedContent(
+        database: ContentDatabase,
+        files: com.example.onespace.domain.session.port.OfflineMediaStore,
+        videos: VideoRepository,
+        music: MusicRepository
+    ): com.example.onespace.domain.session.repository.DownloadedContentRepository =
+        com.example.onespace.data.games.repository.createOfflineDownloadsRepository(
+            com.example.onespace.data.games.repository.createDownloadedContentRepository(database), files, videos, music
+        )
 
     @Provides fun getVideo(repository: VideoRepository) = GetVideo(repository)
     @Provides fun getMusic(repository: MusicRepository) = GetMusic(repository)

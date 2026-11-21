@@ -107,7 +107,7 @@ fun NavGraphBuilder.accountGraph(
                 notificationsEnabled = prefs.notificationsEnabled,
                 streakReminder = prefs.streakReminder,
                 quietHours = prefs.quietHours,
-                onToggle = vm::setNotificationsEnabled,
+                onToggle = com.example.onespace.feature.account.presentation.rememberNotificationToggle(vm::setNotificationsEnabled),
                 onToggleStreakReminder = vm::setStreakReminder,
                 onToggleQuietHours = vm::setQuietHours
             )
@@ -120,7 +120,7 @@ fun NavGraphBuilder.accountGraph(
                 onThemeMode = vm::setThemeMode,
                 onDataSaver = vm::setDataSaver,
                 onLanguage = vm::setLanguage,
-                onNotifications = vm::setNotificationsEnabled,
+                onNotifications = com.example.onespace.feature.account.presentation.rememberNotificationToggle(vm::setNotificationsEnabled),
                 onSimulateOffline = vm::setSimulateOffline,
                 onResetConflictRule = vm::resetConflictRule,
                 onSetConflictRule = vm::setConflictRule,

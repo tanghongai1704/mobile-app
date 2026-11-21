@@ -23,6 +23,7 @@ dependencies {
     api(libs.media3.exoplayer)
     api(libs.media3.ui)
     implementation(libs.media3.session)
+    implementation(libs.androidx.core.ktx)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
