@@ -59,6 +59,8 @@ Video/nhạc dùng ExoPlayer phát sample stream thật, có controls, music doc
 
 **Nhắc nhiệm vụ** (Tài khoản → Nhắc nhở): WorkManager kiểm tra mỗi giờ; từ 9:00 nhắc nhiệm vụ còn thiếu, từ 20:00 nhắc giữ chuỗi nếu hôm nay chưa làm gì; mỗi loại tối đa 1 lần/ngày, tôn trọng giờ yên tĩnh 22:00–7:00. Quyền thông báo chỉ được xin khi bật nhắc lần đầu. Bấm thông báo mở Trang chủ (nơi có nhiệm vụ hôm nay).
 
+**Nghe tin (TTS)**: máy có giọng tiếng Việt (Google TTS trên điện thoại thật) thì app đọc chính nội dung bài theo từng đoạn; máy không có giọng Việt (đa số emulator) thì phát một bản âm thanh mẫu để minh hoạ luồng. Bản đọc không phát được thì báo lỗi, và trong siêu playlist mục đó được bỏ qua.
+
 **Gián đoạn**: rút tai nghe hoặc có cuộc gọi thì video và giọng đọc TTS tạm dừng (bấm Phát để tiếp tục); nhạc tự nhường và tự phát lại theo audio focus.
 
 **Chưa có**: server thật (backend đang giả lập trong app), đồng bộ dữ liệu lên server, danh mục video/nhạc từ API, đăng nhập Google, khôi phục vị trí đọc tin sau khi tiến trình bị huỷ.

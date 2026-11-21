@@ -804,7 +804,9 @@ internal fun PlaylistsScreen(
                 subtitle = if (subtitle.isBlank()) tr("Trống", "Empty") else subtitle,
                 icon = Icons.Filled.LibraryMusic,
                 onClick = {
-                    if (pl.videoIds.isNotEmpty()) onOpenVideoPlaylist(pl.name)
+                    // The mixed playlist screen lists videos, songs and articles; a songs-only
+                    // playlist keeps the music screen.
+                    if (pl.videoIds.isNotEmpty() || pl.articleIds.isNotEmpty()) onOpenVideoPlaylist(pl.name)
                     else onOpenMusicPlaylist(pl.name)
                 }
             )

@@ -193,6 +193,21 @@ class SessionCoordinatorTest {
 
     @Before fun setUp() { Dispatchers.setMain(dispatcher) }
 
+    @Test fun unplayableArticleIsSkippedInsteadOfStallingThePlaylist() = runTest(dispatcher) {
+        com.example.onespace.core.designsystem.AppPlaylistStore.restore("{}")
+        com.example.onespace.core.designsystem.AppPlaylistStore.addArticle("Skip", "a1")
+        com.example.onespace.core.designsystem.AppPlaylistStore.addVideo("Skip", "v1")
+        val port = FakePort()
+        val session = coordinator(SavedStateHandle(), port)
+        advanceUntilIdle()
+        session.startPlaylistSession("Skip")
+        advanceUntilIdle()
+        // No voice and no network: the reader reports an error without ever playing.
+        tts.state.value = com.example.onespace.domain.news.model.TtsState(isPlaying = false, totalSegments = 3, error = "offline")
+        advanceUntilIdle()
+        assertEquals("v1", session.playlistSession.value!!.current!!.id)
+    }
+
     @Test fun articleInMixedPlaylistIsReadAloudThenSessionMovesOn() = runTest(dispatcher) {
         com.example.onespace.core.designsystem.AppPlaylistStore.restore("{}")
         com.example.onespace.core.designsystem.AppPlaylistStore.addArticle("Mix", "a1")

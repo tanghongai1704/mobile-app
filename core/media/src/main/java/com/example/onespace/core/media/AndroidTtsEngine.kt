@@ -112,17 +112,41 @@ class AndroidTtsEngine @Inject constructor(
                 return
             }
         }
-        // Always play sample audio — full mock mode, no TTS engine dependency.
+        // C13: read the article itself when the device has a Vietnamese voice; otherwise (common on
+        // emulators) play the sample stream so the feature still demonstrates the flow.
+        val engine = tts
+        if (ready && engine != null && hasVietnameseVoice(engine)) {
+            val current = _state.value.currentSegment
+            speakFrom(if (current in segments.indices) current else 0)
+            return
+        }
         playFallbackAudio()
+    }
+
+    private fun hasVietnameseVoice(engine: TextToSpeech): Boolean =
+        engine.isLanguageAvailable(Locale("vi", "VN")) >= TextToSpeech.LANG_AVAILABLE ||
+            engine.isLanguageAvailable(Locale("vi")) >= TextToSpeech.LANG_AVAILABLE
+
+    /** Queues the paragraphs from [start]; utterance ids are segment indexes for progress tracking. */
+    private fun speakFrom(start: Int) {
+        val engine = tts ?: return
+        usingFallback = false
+        _state.value = _state.value.copy(isPlaying = true, error = null, currentSegment = start, fraction = 0f)
+        segments.drop(start).forEachIndexed { offset, segment ->
+            val params = android.os.Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, _state.value.volume) }
+            val mode = if (offset == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            engine.speak(segment.text, mode, params, (start + offset).toString())
+        }
     }
 
     /** Play a sample audio stream as the TTS voice. */
     private fun playFallbackAudio() {
         usingFallback = true
         _state.value = _state.value.copy(isPlaying = true, error = null, totalSegments = 1, currentSegment = 0)
-        val player = fallbackPlayer ?: androidx.media3.exoplayer.ExoPlayer.Builder(context).build().also { fallbackPlayer = it }
+        val existing = fallbackPlayer
+        val player = existing ?: androidx.media3.exoplayer.ExoPlayer.Builder(context).build().also { fallbackPlayer = it }
         player.setMediaItem(androidx.media3.common.MediaItem.fromUri("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"))
-        player.addListener(object : androidx.media3.common.Player.Listener {
+        if (existing == null) player.addListener(object : androidx.media3.common.Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _state.value = _state.value.copy(isPlaying = isPlaying)
             }
@@ -130,6 +154,9 @@ class AndroidTtsEngine @Inject constructor(
                 if (state == androidx.media3.common.Player.STATE_ENDED) {
                     _state.value = _state.value.copy(isPlaying = false, currentSegment = segments.size)
                 }
+            }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                _state.value = _state.value.copy(isPlaying = false, error = "Không phát được bản đọc. Kiểm tra kết nối rồi thử lại.")
             }
         })
         player.prepare()
@@ -221,6 +248,12 @@ class AndroidTtsEngine @Inject constructor(
     }
 
     override suspend fun seekTo(fraction: Float) {
+        if (!usingFallback) {
+            if (segments.isEmpty()) return
+            val target = (fraction.coerceIn(0f, 1f) * segments.size).toInt().coerceIn(0, segments.lastIndex)
+            if (_state.value.isPlaying) speakFrom(target) else _state.value = _state.value.copy(currentSegment = target)
+            return
+        }
         val player = fallbackPlayer ?: return
         val dur = player.duration.coerceAtLeast(1)
         player.seekTo((fraction.coerceIn(0f, 1f) * dur).toLong())

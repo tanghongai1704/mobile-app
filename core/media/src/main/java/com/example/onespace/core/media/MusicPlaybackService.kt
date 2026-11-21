@@ -39,6 +39,10 @@ class MusicPlaybackService : MediaSessionService() {
                 }
             }
             .build()
+            // Register the session right away: Media3 only posts the media notification (and
+            // promotes the service to the foreground) for sessions the service knows about. Without
+            // this the notification would only appear once an external controller connected.
+            .also { addSession(it) }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

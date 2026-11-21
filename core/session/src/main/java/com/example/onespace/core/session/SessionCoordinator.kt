@@ -137,6 +137,12 @@ class SessionCoordinator @Inject constructor(
                 if (current?.isArticle != true) { wasReading = false; return@collect }
                 if (state.isPlaying) wasReading = true
                 val finished = state.totalSegments > 0 && state.currentSegment >= state.totalSegments - 1
+                // A reading that cannot play (no voice, no network) is skipped instead of stalling the queue.
+                if (state.error != null && !state.isPlaying) {
+                    wasReading = false
+                    advancePlaylist(current.id, isVideo = false)
+                    return@collect
+                }
                 if (wasReading && !state.isPlaying && (finished || state.progress >= 0.99f)) {
                     wasReading = false
                     advancePlaylist(current.id, isVideo = false)
