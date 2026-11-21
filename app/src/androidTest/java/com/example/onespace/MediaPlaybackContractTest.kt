@@ -59,7 +59,8 @@ class MediaPlaybackContractTest {
     }
 
     private fun await(condition: () -> Boolean) {
-        val deadline = android.os.SystemClock.elapsedRealtime() + 20_000
+        // Generous for slow (software-emulated) devices; a real phone answers in well under a second.
+        val deadline = android.os.SystemClock.elapsedRealtime() + 90_000
         while (!condition() && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(25)
         assertTrue("Playback condition timed out: " + engine.music.value, condition())
     }

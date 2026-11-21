@@ -212,6 +212,9 @@ class NavigationSmokeTest {
     private fun openSettings() {
         compose.tapTab("Trang chủ")
         compose.onNodeWithContentDescription("Tài khoản").performClick()
+        // The settings card sits below the profile, pet and badges: scroll it into view first.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Tùy chỉnh"))
         compose.onNodeWithText("Tùy chỉnh").performClick()
         awaitText("Tiết kiệm dữ liệu")
     }
