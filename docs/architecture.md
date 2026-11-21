@@ -11,7 +11,7 @@ Ba layer Presentation–Domain–Data dùng MVVM/UDF; có 23 Gradle module leaf 
 - **domain:** Kotlin/JVM thuần; package theo auth/video/music/news/games/session. Models, contracts, policies và use cases cần thiết.
 - **data:video/music/news/games/auth:** repository implementations, mapping và source orchestration. Chỉ app chọn factory trả domain interface.
 - **core:common/designsystem/session:** shared presentation types, design tokens/components và coordinator cho phiên nội dung.
-- **core:media/database/datastore/network/sync:** Android/media/storage adapters; network/sync vẫn là extension point. VideoSurface là phần hiển thị platform trong media adapter.
+- **core:media/database/datastore/network/sync:** Android/media/storage adapters; network chứa Retrofit/OkHttp và backend giả (`FakeApiInterceptor`); sync vẫn là extension point. VideoSurface là phần hiển thị platform trong media adapter.
 
 Core là nhóm module theo vai trò, không phải layer thứ tư. Feature không import feature khác hoặc data implementation; Domain không phụ thuộc Android/framework/implementation. Xem matrix dependency đầy đủ ở Section 4.3.2.
 
@@ -48,19 +48,20 @@ Screens → UI callback/ViewModel → Domain use case/policy → Domain contract
 
 SessionCoordinator là Activity-scoped ViewModel adapter trong core:session, khác authentication session. Nó không điều hướng và không gọi feature ViewModel khác. SessionPolicy là luật Kotlin thuần. MediaSessionPort là contract. MediaPlaybackCoordinator thực thi engine và phát playback truth. Floating/dock trong app nhận state; không tự tạo player.
 
-AuthRepository có demo implementation ở data:auth; request/verify/guest/sign-out đi qua use cases. DataStore ghi email/guest mode atomically. Email null khác với signed-out nhờ guestMode. Auth thật/provider chưa chọn; mã 123456 không gửi email thật và không xác minh danh tính server.
+AuthRepository (`RemoteAuthRepository` ở data:auth) gọi `AuthApi`; request/verify/password/guest/sign-out đi qua use cases. Token lưu trong `SecureTokenStore` (AES-GCM, khoá Android Keystore); DataStore ghi email/guest mode atomically. Email null khác với signed-out nhờ guestMode. Phía server hiện là `AuthFakeRoute` (mã 123456, không gửi SMS/email thật).
 
 ## Runtime đã có và giới hạn
 
-- Metadata mock; video/MP3 sample streams phát thật bằng Media3.
+- Danh mục video/nhạc là dữ liệu mẫu; tin tức đi qua `NewsApi` với backend giả. Video/MP3 sample streams phát thật bằng Media3.
 - Hai engine dùng chung: video và audio, không tạo lại theo screen.
-- Room lưu video progress/watchlist; checkpoint video định kỳ hiện là 3 giây.
+- Room schema v6 (8 bảng, migration 5→6 giữ dữ liệu) lưu video progress/watchlist, điểm, nhiệm vụ, thư viện, cache tin (`news_articles`) và ván game dở (`game_snapshots`); checkpoint video định kỳ là 3 giây.
 - DataStore lưu settings, interests, last section/track ID và phiên demo.
 - C1 có ba lựa chọn, nhớ global trên thiết bị, reset ở Settings.
 - Native splash, themed shell, auth/onboarding và graph navigation có baseline.
-- News bookmark, playlist, avatar và khung avatar được lưu bền (DataStore) và còn sau khi khởi động lại; ReadingState và vị trí cuộn vẫn là trạng thái tạm của phiên. Catalog vẫn là dữ liệu mock nên chưa phải offline-first.
-- Game chơi được: luật 2048 và Tic-Tac-Toe (cùng AI) là Kotlin thuần trong `domain/games/engine` có unit test; kỷ lục, thử thách hằng ngày và huy hiệu đi qua `GameRecordsRepository`/`ChallengeRepository`. Chưa có snapshot/khôi phục ván dở khi tiến trình bị hệ điều hành thu hồi.
-- Chưa có MediaSessionService, notification/lock-screen controls, đầy đủ audio focus/noisy cho video, real network sync, TTS/conversion/mixed queue.
+- News bookmark, playlist, avatar và khung avatar được lưu bền (DataStore) và còn sau khi khởi động lại; ReadingState và vị trí cuộn vẫn là trạng thái tạm của phiên. Feed tin là offline-first: Room là nguồn đọc của UI, refresh qua API ghi vào Room.
+- Game chơi được: luật 2048 và Tic-Tac-Toe (cùng AI) là Kotlin thuần trong `domain/games/engine` có unit test; kỷ lục, thử thách hằng ngày và huy hiệu đi qua `GameRecordsRepository`/`ChallengeRepository`. Ván 2048 dở được lưu sau mỗi nước đi (`GameSnapshotRepository`) và khôi phục khi mở lại.
+- `MusicPlaybackService` (MediaSessionService) cho nhạc nền, thông báo và màn hình khoá; nhạc xử lý audio focus và rút tai nghe. Mixed playlist chạy video, bài hát và bài báo (TTS) trong một phiên.
+- Chưa có: audio focus/noisy đầy đủ cho video, đồng bộ lên server thật, danh mục video/nhạc qua API.
 - Chọn tab không đổi playback; floating còn trên Music, dock còn trên Games. Floating video là cửa sổ nhỏ kéo được; vị trí do shell giữ nên không đổi khi chuyển tab, và nội dung không chừa chỗ cố định vì người dùng tự đặt cửa sổ.
 - Playback snapshot tách playing thực tế, playRequested, status, suppressed và error. SessionState không giữ cờ playing trùng lặp.
 - Domain tạo audio plans; adapter thực thi. Video mute không tạo C1 conflict.
