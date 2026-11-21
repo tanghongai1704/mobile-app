@@ -22,11 +22,11 @@ core/
   designsystem/         Material 3 colors, bundled fonts, shapes, components
   common/               Shared UI types and formatting
   session/              Cross-feature playback coordinator, mixed playlist session (video/nhạc/bài báo)
-  media/                Media3 engines, video surface, MusicPlaybackService (phát nền), TTS
+  media/                Media3 engines, video surface, MusicPlaybackService (phát nền), TTS, tệp offline, xử lý tai nghe/cuộc gọi
   datastore/            Settings and session preferences
   database/             Room schema v6 (8 bảng) + migration 5→6
   network/              Retrofit APIs, error envelope, FakeApiInterceptor (backend giả)
-  sync/                 Reserved extension point
+  sync/                 ReminderWorker (WorkManager) cho nhắc nhiệm vụ/chuỗi ngày
 ```
 
 Không có dependency feature → feature/data. Screens nhận state/callback, graph sở hữu route/ViewModel; app chọn repository qua Hilt. [Bản đồ implementation](docs/architecture.md). **Nguồn chốt kiến trúc cho bài:** [LaTeX Section 4](https://github.com/nhinguyen140809/mobile-report/blob/duy_1.2_1.5_parts/sections/4-technical-architecture/main.tex).
@@ -55,7 +55,13 @@ Video/nhạc dùng ExoPlayer phát sample stream thật, có controls, music doc
 
 **Ngôn ngữ**: Tùy chỉnh → Ngôn ngữ đổi Tiếng Việt/English ngay, không cần khởi động lại (mặc định tiếng Việt). Chữ giao diện dùng `tr(vi, en)`; chữ đến từ domain/ViewModel/media core nằm trong `Translations` (hiển thị bằng `String.t()`). Nội dung mẫu (tên video, bài hát, bài báo) là dữ liệu nên giữ tiếng Việt. Nhãn tab theo ngôn ngữ: Trang chủ/Nhạc/Tin tức/Trò chơi hoặc Home/Music/News/Games.
 
-**Chưa có**: server thật (backend đang giả lập trong app), đồng bộ dữ liệu lên server, danh mục video/nhạc từ API, tải tệp offline thật, đăng nhập Google, nhắc nhiệm vụ bằng thông báo hệ thống, khôi phục vị trí đọc tin sau khi tiến trình bị huỷ.
+**Tải về offline**: nút "Tải về" ở video và bài hát lưu tệp thật vào bộ nhớ riêng của app (`files/offline/`, không cần quyền bộ nhớ); trình phát ưu tiên tệp trên máy nên xem/nghe được khi mất mạng; xoá khỏi mục Tải về thì xoá luôn tệp.
+
+**Nhắc nhiệm vụ** (Tài khoản → Nhắc nhở): WorkManager kiểm tra mỗi giờ; từ 9:00 nhắc nhiệm vụ còn thiếu, từ 20:00 nhắc giữ chuỗi nếu hôm nay chưa làm gì; mỗi loại tối đa 1 lần/ngày, tôn trọng giờ yên tĩnh 22:00–7:00. Quyền thông báo chỉ được xin khi bật nhắc lần đầu. Bấm thông báo mở Trang chủ (nơi có nhiệm vụ hôm nay).
+
+**Gián đoạn**: rút tai nghe hoặc có cuộc gọi thì video và giọng đọc TTS tạm dừng (bấm Phát để tiếp tục); nhạc tự nhường và tự phát lại theo audio focus.
+
+**Chưa có**: server thật (backend đang giả lập trong app), đồng bộ dữ liệu lên server, danh mục video/nhạc từ API, đăng nhập Google, khôi phục vị trí đọc tin sau khi tiến trình bị huỷ.
 
 ## Build
 
@@ -83,5 +89,7 @@ NavigationSmokeTest kiểm tra các tab, media, player overlay, settings/offline
 3. **Đăng nhập**: OTP 123456 hoặc mật khẩu ≥ 6 ký tự; thử mã sai, đăng xuất.
 4. **2048**: chơi vài nước → tắt hẳn app → mở lại: ván cũ còn nguyên.
 5. **Siêu playlist**: thêm một bài báo vào playlist có video và bài hát → Phát: bài báo được đọc rồi tự chuyển mục.
+6. **Tải về**: tải một bài hát → bật chế độ máy bay → phát bài đó: vẫn nghe được.
+7. **Nhắc nhở**: bật nhắc trong Tài khoản → Nhắc nhở (cho phép thông báo); để thử ngay, đổi giờ máy sang sau 20:00 khi chưa làm nhiệm vụ nào rồi chờ WorkManager chạy (hoặc dùng App Inspection → Background Task Inspector để chạy worker).
 
 Font theo SIL OFL; giấy phép trong [core/designsystem/licenses](core/designsystem/licenses). Tham khảo: [Android architecture](https://developer.android.com/topic/architecture/recommendations), [typed navigation](https://developer.android.com/guide/navigation/design/type-safety), [Material 3](https://m3.material.io/).

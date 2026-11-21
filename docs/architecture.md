@@ -11,7 +11,7 @@ Ba layer Presentation–Domain–Data dùng MVVM/UDF; có 23 Gradle module leaf 
 - **domain:** Kotlin/JVM thuần; package theo auth/video/music/news/games/session. Models, contracts, policies và use cases cần thiết.
 - **data:video/music/news/games/auth:** repository implementations, mapping và source orchestration. Chỉ app chọn factory trả domain interface.
 - **core:common/designsystem/session:** shared presentation types, design tokens/components và coordinator cho phiên nội dung.
-- **core:media/database/datastore/network/sync:** Android/media/storage adapters; network chứa Retrofit/OkHttp và backend giả (`FakeApiInterceptor`); sync vẫn là extension point. VideoSurface là phần hiển thị platform trong media adapter.
+- **core:media/database/datastore/network/sync:** Android/media/storage adapters; network chứa Retrofit/OkHttp và backend giả (`FakeApiInterceptor`); sync chạy `ReminderWorker` (WorkManager) cho nhắc nhiệm vụ. VideoSurface là phần hiển thị platform trong media adapter.
 
 Core là nhóm module theo vai trò, không phải layer thứ tư. Feature không import feature khác hoặc data implementation; Domain không phụ thuộc Android/framework/implementation. Xem matrix dependency đầy đủ ở Section 4.3.2.
 
@@ -61,7 +61,8 @@ AuthRepository (`RemoteAuthRepository` ở data:auth) gọi `AuthApi`; request/v
 - News bookmark, playlist, avatar và khung avatar được lưu bền (DataStore) và còn sau khi khởi động lại; ReadingState và vị trí cuộn vẫn là trạng thái tạm của phiên. Feed tin là offline-first: Room là nguồn đọc của UI, refresh qua API ghi vào Room.
 - Game chơi được: luật 2048 và Tic-Tac-Toe (cùng AI) là Kotlin thuần trong `domain/games/engine` có unit test; kỷ lục, thử thách hằng ngày và huy hiệu đi qua `GameRecordsRepository`/`ChallengeRepository`. Ván 2048 dở được lưu sau mỗi nước đi (`GameSnapshotRepository`) và khôi phục khi mở lại.
 - `MusicPlaybackService` (MediaSessionService) cho nhạc nền, thông báo và màn hình khoá; nhạc xử lý audio focus và rút tai nghe. Mixed playlist chạy video, bài hát và bài báo (TTS) trong một phiên.
-- Chưa có: audio focus/noisy đầy đủ cho video, đồng bộ lên server thật, danh mục video/nhạc qua API.
+- Rút tai nghe/cuộc gọi tạm dừng video và TTS (`AudioInterruptions`); tải về lưu tệp thật (`FileOfflineMediaStore`), trình phát ưu tiên tệp trên máy.
+- Chưa có: đồng bộ lên server thật, danh mục video/nhạc qua API.
 - Chọn tab không đổi playback; floating còn trên Music, dock còn trên Games. Floating video là cửa sổ nhỏ kéo được; vị trí do shell giữ nên không đổi khi chuyển tab, và nội dung không chừa chỗ cố định vì người dùng tự đặt cửa sổ.
 - Playback snapshot tách playing thực tế, playRequested, status, suppressed và error. SessionState không giữ cờ playing trùng lặp.
 - Domain tạo audio plans; adapter thực thi. Video mute không tạo C1 conflict.
