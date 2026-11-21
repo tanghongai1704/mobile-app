@@ -215,8 +215,10 @@ class NavigationSmokeTest {
         awaitText("Nắng sớm")
         clickDesc("Quay lại")
         tab("Tin tức")
-        // The dock follows the user to other tabs and reopens the full player.
-        clickText("Nắng sớm")
+        // The dock follows the user to other tabs and reopens the full player. Tap whatever is
+        // playing now: on a slow device the queue may already have moved to the next song.
+        val playing = session().music.value.title
+        clickText(playing)
         awaitDesc("Tiếp theo")
         saveScreenshot("now-playing")
     }
@@ -225,7 +227,16 @@ class NavigationSmokeTest {
         val media = preferences()
         val interests = checkNotNull(media.preferences.value).selectedTopics
         clickDesc("Tài khoản")
-        clickText("Đăng nhập để giữ tiến độ")
+        // A guest sees "sign in"; an account left signed in by an earlier run signs out first.
+        compose.waitUntil(wait) { exists(hasText("Đăng nhập để giữ tiến độ")) || exists(hasText("Đăng xuất")) ||
+            runCatching { compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Đăng xuất")); true }.getOrDefault(false) ||
+            runCatching { compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Đăng nhập để giữ tiến độ")); true }.getOrDefault(false) }
+        if (exists(hasText("Đăng nhập để giữ tiến độ"))) {
+            clickText("Đăng nhập để giữ tiến độ")
+        } else {
+            clickText("Đăng xuất")
+            compose.onAllNodesWithText("Đăng xuất").onLast().performClick()
+        }
         awaitText("Đăng nhập / Đăng ký")
         clickText("Dùng mã OTP")
         compose.onAllNodesWithText("Email").onFirst().performClick()
