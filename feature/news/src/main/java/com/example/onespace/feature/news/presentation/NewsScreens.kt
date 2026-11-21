@@ -2,6 +2,8 @@ package com.example.onespace.feature.news.presentation
 
 import com.example.onespace.core.designsystem.fadingEdgeEnd
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -200,6 +202,7 @@ internal fun ArticleScreen(
     // Skip the quiz offer entirely (X button on the card), like the video quiz card.
     var quizDismissed by rememberSaveable(article.id) { mutableStateOf(false) }
     var showExtract by remember { mutableStateOf(false) }
+    var showAddToPlaylist by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val msgExtracted = tr("Đã đọc bài báo thành MP3 và lưu vào thư viện Nhạc (Từ video của bạn)", "Article read aloud and saved to your Music library (From your videos)")
     val msgExtractedDemo = tr("Máy chưa có giọng đọc tiếng Việt nên đã lưu âm thanh mẫu vào thư viện Nhạc", "No Vietnamese voice on this device, so a sample audio was saved to your Music library")
@@ -287,6 +290,15 @@ internal fun ArticleScreen(
                             if (ttsState.isPlaying) Icons.Filled.Pause else Icons.Filled.Headphones,
                             contentDescription = if (ttsState.isPlaying) tr("Dừng đọc", "Stop reading") else tr("Nghe bài này", "Listen to this article"),
                             tint = if (ttsState.isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // F-MUS-09: put this article into a mixed playlist (read aloud in turn).
+                    IconButton(onClick = { showAddToPlaylist = true }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.PlaylistAdd,
+                            contentDescription = tr("Thêm vào danh sách phát", "Add to playlist"),
+                            tint = if (AppPlaylistStore.playlists.values.any { article.id in it.articleIds })
+                                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     // F-NEWS-05 / F-VID-10: visible button to extract as MP3 (asks first).
@@ -397,32 +409,32 @@ internal fun ArticleScreen(
                         ) {
                             Box(
                                 Modifier.size(44.dp).background(
-                                    androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f),
+                                    MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.2f),
                                     MaterialTheme.shapes.medium
                                 ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Filled.SportsEsports, contentDescription = null,
-                                    tint = androidx.compose.ui.graphics.Color.White,
+                                    tint = MaterialTheme.oneSpaceColors.onMedia,
                                     modifier = Modifier.size(24.dp))
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(
                                     tr("Chơi nhanh: Kiểm tra hiểu bài", "Quick play: check your understanding"),
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = androidx.compose.ui.graphics.Color.White
+                                    color = MaterialTheme.oneSpaceColors.onMedia
                                 )
                                 Text(
                                     tr("Trả lời đúng nhận điểm thưởng", "Correct answers earn points"),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f)
+                                    color = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.8f)
                                 )
                             }
                             IconButton(onClick = { quizDismissed = true }) {
                                 Icon(
                                     Icons.Filled.Close,
                                     contentDescription = tr("Đóng", "Close"),
-                                    tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                                    tint = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.7f),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -463,6 +475,9 @@ internal fun ArticleScreen(
         }
         // The save confirmation floats above the reader's bottom edge.
         SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
+    }
+    if (showAddToPlaylist) {
+        AddArticleToPlaylistDialog(article.id) { showAddToPlaylist = false }
     }
     if (showExtract) {
         AlertDialog(
@@ -533,3 +548,62 @@ private fun QuizQuestionCard(
 /** Minutes in strings like "5 phút đọc"; 0 when the article has no reading time. */
 private fun com.example.onespace.domain.news.model.Article.readMinutes(): Int =
     Regex("\\d+").find(readTime)?.value?.toIntOrNull() ?: 0
+
+/**
+ * F-MUS-09 "siêu playlist": the same playlists that hold videos and songs also take articles;
+ * playing the playlist reads each article aloud when its turn comes.
+ */
+@Composable
+private fun AddArticleToPlaylistDialog(articleId: String, onDismiss: () -> Unit) {
+    var newName by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("Thêm vào danh sách phát", "Add to playlist")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                AppPlaylistStore.playlists.forEach { (name, pl) ->
+                    val added = articleId in pl.articleIds
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .clickable {
+                                if (added) AppPlaylistStore.removeArticle(name, articleId)
+                                else AppPlaylistStore.addArticle(name, articleId)
+                            }
+                    ) {
+                        Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(
+                            playlistCountsLabel(pl),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (added) {
+                            Spacer(Modifier.width(8.dp))
+                            Icon(Icons.Filled.CheckCircle, contentDescription = tr("Đã thêm", "Added"),
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text(tr("Danh sách phát mới", "New playlist")) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    AppPlaylistStore.addArticle(newName.trim(), articleId)
+                    newName = ""
+                },
+                enabled = newName.isNotBlank()
+            ) { Text(tr("Tạo", "Create")) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Xong", "Done")) } }
+    )
+}

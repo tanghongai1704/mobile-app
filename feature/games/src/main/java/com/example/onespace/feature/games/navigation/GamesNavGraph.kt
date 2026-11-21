@@ -541,15 +541,22 @@ private fun gameIcon(id: String): androidx.compose.ui.graphics.vector.ImageVecto
     else -> Icons.Filled.SportsEsports
 }
 
-/** One hue per game so the hub tiles stay distinguishable even before the icon is read. */
-private fun gameTint(id: String): androidx.compose.ui.graphics.Color = when (id) {
-    "g1" -> androidx.compose.ui.graphics.Color(0xFFFF9800) // orange
-    "g2" -> androidx.compose.ui.graphics.Color(0xFF2196F3) // blue
-    "g3" -> androidx.compose.ui.graphics.Color(0xFFE91E63) // pink
-    "g4" -> androidx.compose.ui.graphics.Color(0xFF9C27B0) // purple
-    "g5" -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // green
-    "g6" -> androidx.compose.ui.graphics.Color(0xFF00BCD4) // cyan
-    else -> androidx.compose.ui.graphics.Color.Unspecified
+/**
+ * One hue per game so the hub tiles stay distinguishable even before the icon is read. Hues come
+ * from the theme's topic palette, so they adapt to light and dark mode.
+ */
+@Composable
+private fun gameTint(id: String): androidx.compose.ui.graphics.Color {
+    val palette = MaterialTheme.oneSpaceColors.topics
+    return when (id) {
+        "g1" -> palette.travel.end   // orange
+        "g2" -> palette.tech.end     // blue
+        "g3" -> palette.calm.end     // purple
+        "g4" -> palette.food.end     // amber
+        "g5" -> palette.nature.end   // green
+        "g6" -> palette.sport.end    // teal
+        else -> MaterialTheme.colorScheme.primary
+    }
 }
 
 /** F-GAME-07: one leaderboard section with medals and a standing-out "Bạn". */

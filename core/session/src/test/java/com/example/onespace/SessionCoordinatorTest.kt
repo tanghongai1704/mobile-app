@@ -182,7 +182,8 @@ class SessionCoordinatorTest {
         }
         return SessionCoordinator(
             handle, port, prefs, GetMusic(musicRepository), GetVideo(videoRepository), viewing,
-            TrackMissionAction(fakeMissions, FakePoints(), FakePet()), UpdateStreak(fakeStreak)
+            TrackMissionAction(fakeMissions, FakePoints(), FakePet()), UpdateStreak(fakeStreak),
+            com.example.onespace.domain.news.usecase.GetNews(FakeNews), FakeTts
         )
     }
 
@@ -403,4 +404,19 @@ class SessionCoordinatorTest {
         assertEquals(0.4f, coordinator.videoVolume.value)
         assertEquals(listOf(0.4f), port.volumeRequests)
     }
+}
+
+private object FakeNews : com.example.onespace.domain.news.repository.NewsRepository {
+    override fun observeCatalog() = kotlinx.coroutines.flow.flowOf(emptyList<com.example.onespace.domain.news.model.Article>())
+    override fun observeSavedIds() = kotlinx.coroutines.flow.flowOf(emptySet<String>())
+    override suspend fun toggleBookmark(id: String) = Unit
+}
+
+private object FakeTts : com.example.onespace.domain.news.repository.TtsEngine {
+    override val state = kotlinx.coroutines.flow.MutableStateFlow(com.example.onespace.domain.news.model.TtsState())
+    override suspend fun prepare(segments: List<com.example.onespace.domain.news.model.TtsSegment>) = Unit
+    override suspend fun play() = Unit
+    override suspend fun pause() = Unit
+    override suspend fun stop() = Unit
+    override suspend fun release() = Unit
 }

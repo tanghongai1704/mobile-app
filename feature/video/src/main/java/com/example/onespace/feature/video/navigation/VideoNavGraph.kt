@@ -126,6 +126,7 @@ fun NavGraphBuilder.videoGraph(
             val vm: VideoViewModel = hiltViewModel(owner)
             val state by vm.uiState.collectAsStateWithLifecycle()
             val tracks by vm.tracks.collectAsStateWithLifecycle()
+            val articles by vm.articles.collectAsStateWithLifecycle()
             val scope = androidx.compose.runtime.rememberCoroutineScope()
             // System back also returns to the playlist list, like the top bar's arrow.
             androidx.activity.compose.BackHandler { onBackToPlaylists() }
@@ -150,12 +151,20 @@ fun NavGraphBuilder.videoGraph(
                             onOpenTrackPlayer(trackId)
                         }
                     },
+                    articles = articles,
+                    // An article is read aloud by TTS; the playlist screen stays open with the reading card.
+                    onListenArticle = { articleId ->
+                        scope.launch { session.startPlaylistSession(name, startId = articleId) }
+                    },
                     onPlay = {
                         scope.launch {
                             val started = session.startPlaylistSession(name) ?: return@launch
                             val current = started.current ?: return@launch
-                            if (current.isVideo) onOpenFromPlaylist(current.id, name)
-                            else onOpenTrackPlayer(current.id)
+                            when {
+                                current.isVideo -> onOpenFromPlaylist(current.id, name)
+                                current.isArticle -> Unit
+                                else -> onOpenTrackPlayer(current.id)
+                            }
                         }
                     }
                 )
@@ -199,7 +208,8 @@ fun NavGraphBuilder.videoGraph(
                     if (current.id == id || active2.index == handledSessionIndex) return@LaunchedEffect
                     handledSessionIndex = active2.index
                     if (current.video != null && playlistName != null) onFollowSessionVideo(current.id, playlistName)
-                    else onFollowSessionTrack(current.id)
+                    else if (current.track != null) onFollowSessionTrack(current.id)
+                    // An article item is read aloud in place; the video screen stays.
                 }
                 val audioOnly by vm.audioOnly.collectAsStateWithLifecycle()
                 val watchLater by vm.watchLaterIds.collectAsStateWithLifecycle()

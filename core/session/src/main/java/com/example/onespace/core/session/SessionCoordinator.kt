@@ -39,9 +39,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** One slot of a mixed playlist session: exactly one of video / track is set. */
-data class PlaylistSessionItem(val video: Video? = null, val track: Track? = null) {
-    val id: String get() = video?.id ?: track?.id ?: ""
+data class PlaylistSessionItem(
+    val video: Video? = null,
+    val track: Track? = null,
+    /** F-MUS-09: a news article in the mixed queue, read aloud by the TTS engine. */
+    val article: com.example.onespace.domain.news.model.Article? = null
+) {
+    val id: String get() = video?.id ?: track?.id ?: article?.id ?: ""
     val isVideo: Boolean get() = video != null
+    val isArticle: Boolean get() = article != null
 }
 
 /**
@@ -73,7 +79,9 @@ class SessionCoordinator @Inject constructor(
     private val getVideo: GetVideo,
     private val viewingSession: ViewingSessionRepository,
     private val trackMissionAction: TrackMissionAction,
-    updateStreak: UpdateStreak
+    updateStreak: UpdateStreak,
+    private val getNews: com.example.onespace.domain.news.usecase.GetNews,
+    private val tts: com.example.onespace.domain.news.repository.TtsEngine
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(restoreFromSavedState())
@@ -118,6 +126,20 @@ class SessionCoordinator @Inject constructor(
                 val endedVideoId = playback.videoId
                 if (playback.status == PlaybackStatus.ENDED && endedVideoId != null) {
                     advancePlaylist(endedVideoId, isVideo = true)
+                }
+            }
+        }
+        viewModelScope.launch {
+            // An article item ends when the reader has played and stopped at the last segment.
+            var wasReading = false
+            tts.state.collect { state ->
+                val current = _playlistSession.value?.current
+                if (current?.isArticle != true) { wasReading = false; return@collect }
+                if (state.isPlaying) wasReading = true
+                val finished = state.totalSegments > 0 && state.currentSegment >= state.totalSegments - 1
+                if (wasReading && !state.isPlaying && (finished || state.progress >= 0.99f)) {
+                    wasReading = false
+                    advancePlaylist(current.id, isVideo = false)
                 }
             }
         }
@@ -203,11 +225,14 @@ class SessionCoordinator @Inject constructor(
         newPlaybackRequest()
         val videos = getVideo().firstOrNull().orEmpty()
         val tracks = getMusic().firstOrNull().orEmpty()
+        val articles = if (playlist.articleIds.isEmpty()) emptyList()
+            else runCatching { getNews().firstOrNull().orEmpty() }.getOrDefault(emptyList())
         val settings = AppPlaylistStore.settingsOf(name)
         val ids = playlist.orderedIds().let { if (settings.order == "shuffle") it.shuffled() else it }
         val items = ids.mapNotNull { id ->
             videos.firstOrNull { it.id == id }?.let { PlaylistSessionItem(video = it) }
                 ?: tracks.firstOrNull { it.id == id }?.let { PlaylistSessionItem(track = it) }
+                ?: articles.firstOrNull { it.id == id }?.let { PlaylistSessionItem(article = it) }
         }
         if (items.isEmpty()) return null
         val index = startId?.let { id -> items.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: 0
@@ -245,7 +270,8 @@ class SessionCoordinator @Inject constructor(
 
     /** Ends the mixed session and restores the music engine's normal queue looping. */
     fun endPlaylistSession() {
-        if (_playlistSession.value == null) return
+        val ending = _playlistSession.value ?: return
+        if (ending.current?.isArticle == true) viewModelScope.launch { tts.stop() }
         _playlistSession.value = null
         port.setMusicQueueLoop(true)
     }
@@ -254,7 +280,19 @@ class SessionCoordinator @Inject constructor(
     private fun startSessionItem() {
         val session = _playlistSession.value ?: return
         val item = session.current ?: return
-        if (item.video != null) {
+        // Leaving an article: stop reading so two voices never overlap.
+        if (!item.isArticle) viewModelScope.launch { tts.stop() }
+        if (item.article != null) {
+            // One primary voice: the article takes it from music and video.
+            port.pauseMusic()
+            if (port.video.value.videoId != null) port.pauseVideo()
+            val article = item.article
+            viewModelScope.launch {
+                val paragraphs = listOf(article.title) + article.body.split("\\n\\n", "\n\n", "\\n", "\n").map { it.trim() }.filter { it.isNotEmpty() }
+                tts.prepare(paragraphs.mapIndexed { i, text -> com.example.onespace.domain.news.model.TtsSegment(i, text) })
+                tts.play()
+            }
+        } else if (item.video != null) {
             // An ended run of music must not linger as the dock's mini player.
             if (port.music.value.status == PlaybackStatus.ENDED) port.stopMusic()
             viewModelScope.launch {
@@ -282,6 +320,7 @@ class SessionCoordinator @Inject constructor(
         val current = session.current ?: return
         // Stale ends: the engine that just ended is not the session's current item.
         if (endedId != current.id || isVideo != current.isVideo) return
+        if (current.isArticle) viewModelScope.launch { trackMissionAction(com.example.onespace.domain.session.model.MissionType.READ) }
         val settings = AppPlaylistStore.settingsOf(session.name)
         val nextIndex = when {
             settings.order == "shuffle" && session.items.size > 1 ->

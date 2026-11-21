@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Download
@@ -583,7 +584,7 @@ internal fun VideoDetailScreen(
                 Modifier
                     .fillMaxWidth()
                     .then(
-                        if (fullscreen) Modifier.fillParentMaxHeight().background(Color.Black)
+                        if (fullscreen) Modifier.fillParentMaxHeight().background(MaterialTheme.oneSpaceColors.mediaBackdrop)
                         else Modifier
                     )
             ) {
@@ -837,32 +838,32 @@ internal fun VideoDetailScreen(
                     ) {
                         Box(
                             Modifier.size(44.dp).background(
-                                androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f),
+                                MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.2f),
                                 MaterialTheme.shapes.medium
                             ),
                             contentAlignment = androidx.compose.ui.Alignment.Center
                         ) {
                             Icon(Icons.Filled.SportsEsports, contentDescription = null,
-                                tint = androidx.compose.ui.graphics.Color.White,
+                                tint = MaterialTheme.oneSpaceColors.onMedia,
                                 modifier = Modifier.size(24.dp))
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
                                 tr("Chơi nhanh: Câu hỏi về video", "Quick play: Quiz about this video"),
                                 style = MaterialTheme.typography.titleMedium,
-                                color = androidx.compose.ui.graphics.Color.White
+                                color = MaterialTheme.oneSpaceColors.onMedia
                             )
                             Text(
                                 tr("Trả lời đúng nhận điểm thưởng, combo càng cao càng nhiều", "Correct answers earn points, higher combos earn more"),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f)
+                                color = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.8f)
                             )
                         }
                         IconButton(onClick = { quizDismissed = true }) {
                             Icon(
                                 Icons.Filled.Close,
                                 contentDescription = tr("Đóng", "Close"),
-                                tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                                tint = MaterialTheme.oneSpaceColors.onMedia.copy(alpha = 0.7f),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -1332,6 +1333,7 @@ private sealed interface PlaylistRow {
     val id: String
     data class VideoRow(val video: Video) : PlaylistRow { override val id get() = video.id }
     data class TrackRow(val track: com.example.onespace.domain.music.model.Track) : PlaylistRow { override val id get() = track.id }
+    data class ArticleRow(val article: com.example.onespace.domain.news.model.Article) : PlaylistRow { override val id get() = article.id }
 }
 
 /**
@@ -1347,12 +1349,15 @@ internal fun VideoPlaylistScreen(
     onOpen: (String) -> Unit,
     onOpenTrack: (String) -> Unit = {},
     onPlay: () -> Unit = {},
-    watchProgress: Map<String, Long> = emptyMap()
+    watchProgress: Map<String, Long> = emptyMap(),
+    articles: List<com.example.onespace.domain.news.model.Article> = emptyList(),
+    onListenArticle: (String) -> Unit = {}
 ) {
     val playlist = AppPlaylistStore.playlists[name]
     val rows = (playlist?.orderedIds() ?: emptyList()).mapNotNull { id ->
         videos.find { it.id == id }?.let { PlaylistRow.VideoRow(it) }
             ?: tracks.find { it.id == id }?.let { PlaylistRow.TrackRow(it) }
+            ?: articles.find { it.id == id }?.let { PlaylistRow.ArticleRow(it) }
     }
     // Same onboarding hint as the Watch later sheet: teaches the left-swipe
     // delete; the X hides it once the gesture is understood.
@@ -1442,6 +1447,7 @@ internal fun VideoPlaylistScreen(
                                     when (row) {
                                         is PlaylistRow.VideoRow -> AppPlaylistStore.removeVideo(name, row.video.id)
                                         is PlaylistRow.TrackRow -> AppPlaylistStore.removeTrack(name, row.track.id)
+                                        is PlaylistRow.ArticleRow -> AppPlaylistStore.removeArticle(name, row.article.id)
                                     }
                                 }
                                 offsetX = 0f
@@ -1459,6 +1465,12 @@ internal fun VideoPlaylistScreen(
                         row.track.artist + " · " + row.track.duration,
                         Icons.Filled.MusicNote
                     ) { onOpenTrack(row.track.id) }
+                    // F-MUS-09: articles are listened to (TTS) in the same queue.
+                    is PlaylistRow.ArticleRow -> ContentCard(
+                        row.article.title,
+                        tr("Nghe bài báo", "Listen to article") + " · " + row.article.category,
+                        Icons.AutoMirrored.Filled.Article
+                    ) { onListenArticle(row.article.id) }
                 }
             }
         }

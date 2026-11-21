@@ -18,11 +18,13 @@ data class AppPlaylist(
     val name: String,
     val videoIds: List<String> = emptyList(),
     val trackIds: List<String> = emptyList(),
-    val order: List<String> = emptyList()
+    val order: List<String> = emptyList(),
+    /** F-MUS-09 "siêu playlist": news articles read aloud by TTS in the same queue. */
+    val articleIds: List<String> = emptyList()
 ) {
-    /** Every item id in mixed play order; falls back to videos then tracks when the order is missing or stale. */
+    /** Every item id in mixed play order; falls back to videos, tracks, then articles when the order is missing or stale. */
     fun orderedIds(): List<String> {
-        val union = (videoIds + trackIds).distinct()
+        val union = (videoIds + trackIds + articleIds).distinct()
         return if (order.toSet() == union.toSet()) order else union
     }
 }
@@ -32,6 +34,7 @@ data class AppPlaylist(
 fun playlistCountsLabel(playlist: AppPlaylist): String = buildList {
     if (playlist.videoIds.isNotEmpty()) add(playlist.videoIds.size.toString() + " video")
     if (playlist.trackIds.isNotEmpty()) add(playlist.trackIds.size.toString() + tr(" bài hát", " songs"))
+    if (playlist.articleIds.isNotEmpty()) add(playlist.articleIds.size.toString() + tr(" bài báo", " articles"))
 }.joinToString(" · ")
 
 object AppPlaylistStore {
@@ -49,6 +52,7 @@ object AppPlaylistStore {
                 arr.put(org.json.JSONObject().put("name", p.name)
                     .put("videoIds", org.json.JSONArray(p.videoIds))
                     .put("trackIds", org.json.JSONArray(p.trackIds))
+                    .put("articleIds", org.json.JSONArray(p.articleIds))
                     .put("order", org.json.JSONArray(p.orderedIds())))
             }
         })
@@ -67,7 +71,7 @@ object AppPlaylistStore {
             val list = root.optJSONArray("playlists") ?: org.json.JSONArray()
             fun ids(a: org.json.JSONArray?) = (0 until (a?.length() ?: 0)).map { a!!.getString(it) }
             playlists = (0 until list.length()).map { list.getJSONObject(it) }.associate { o ->
-                o.getString("name") to AppPlaylist(o.getString("name"), ids(o.optJSONArray("videoIds")), ids(o.optJSONArray("trackIds")), ids(o.optJSONArray("order")))
+                o.getString("name") to AppPlaylist(o.getString("name"), ids(o.optJSONArray("videoIds")), ids(o.optJSONArray("trackIds")), ids(o.optJSONArray("order")), ids(o.optJSONArray("articleIds")))
             }
             val st = root.optJSONObject("settings")
             playSettings = st?.keys()?.asSequence()?.associateWith { k ->
@@ -99,6 +103,26 @@ object AppPlaylistStore {
         playlists = playlists + (name to current.copy(
             trackIds = (current.trackIds + trackId).distinct(),
             order = if (trackId in current.order) current.order else current.order + trackId
+        ))
+        changed()
+    }
+
+    /** F-MUS-09: an article joins the mixed queue and is read aloud when its turn comes. */
+    fun addArticle(name: String, articleId: String) {
+        if (name.isBlank()) return
+        val current = playlists[name] ?: AppPlaylist(name)
+        playlists = playlists + (name to current.copy(
+            articleIds = (current.articleIds + articleId).distinct(),
+            order = if (articleId in current.order) current.order else current.order + articleId
+        ))
+        changed()
+    }
+
+    fun removeArticle(name: String, articleId: String) {
+        val current = playlists[name] ?: return
+        playlists = playlists + (name to current.copy(
+            articleIds = current.articleIds - articleId,
+            order = current.order - articleId
         ))
         changed()
     }

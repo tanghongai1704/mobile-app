@@ -24,6 +24,7 @@ internal const val QUIZ_COMBO_RECORD_ID = "video_quiz_combo"
 internal class VideoViewModel @Inject constructor(
     getVideo: GetVideo,
     getMusic: com.example.onespace.domain.music.usecase.GetMusic,
+    getNews: com.example.onespace.domain.news.usecase.GetNews,
     observeContinue: ObserveContinueWatching,
     private val engine: MediaPlaybackCoordinator,
     preferences: SessionPreferencesRepository,
@@ -43,6 +44,11 @@ internal class VideoViewModel @Inject constructor(
     val tracks = getMusic()
         .catch { emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<com.example.onespace.domain.music.model.Track>())
+
+    /** F-MUS-09: articles a mixed playlist reads aloud between videos and tracks. */
+    val articles = getNews()
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<com.example.onespace.domain.news.model.Article>())
 
     val continueWatching = observeContinue()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<ContinueEntry>())

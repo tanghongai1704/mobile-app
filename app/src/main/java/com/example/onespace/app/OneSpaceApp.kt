@@ -354,7 +354,7 @@ fun OneSpaceApp() {
                             ) { splitControls = !splitControls }
                         )
                         if (splitControls) {
-                            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.3f)))
+                            Box(Modifier.matchParentSize().background(MaterialTheme.oneSpaceColors.mediaScrim))
                             Row(
                                 Modifier.align(androidx.compose.ui.Alignment.Center),
                                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,

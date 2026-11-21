@@ -611,7 +611,7 @@ private fun VideoPostCard(
             if (isCurrent) {
                 // Scrim over the frame while the controls are up, like the video
                 // detail screen: darkens the picture so the ghost buttons read.
-                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.3f)))
+                Box(Modifier.matchParentSize().background(MaterialTheme.oneSpaceColors.mediaScrim))
                 // Transport row centered on the frame — same sizes as the video
                 // detail screen: 30dp icons, 56dp pause, 8dp spacing.
                 Row(
