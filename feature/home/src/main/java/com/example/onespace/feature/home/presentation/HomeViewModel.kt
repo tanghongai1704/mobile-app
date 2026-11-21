@@ -12,6 +12,7 @@ import com.example.onespace.domain.video.usecase.GetVideo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -49,7 +50,11 @@ internal class HomeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     val uiState: StateFlow<HomeUiState> = combine(
-        getVideo(), getMusic(), getNews(), topics
+        getVideo(), getMusic(),
+        // News is offline-first and may still be loading or failing (no cache, no network):
+        // the feed shows videos and music meanwhile instead of waiting or going blank.
+        getNews().onStart { emit(emptyList()) }.catch { emit(emptyList()) },
+        topics
     ) { videos, tracks, articles, topics ->
         HomeUiState(
             videos = if (topics.isEmpty()) videos

@@ -53,6 +53,18 @@ class ThemeScreenshotDarkTest : ScreenshotBase("dark") { @Test fun walk() = walk
 abstract class ScreenshotBase(private val mode: String) {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    /**
+     * Robolectric's default network has no INTERNET capability, which the app (correctly) reads as
+     * offline. Screenshots show the online app, so the test network is given that capability.
+     */
+    @org.junit.Before fun online() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java)
+        val caps = org.robolectric.shadows.ShadowNetworkCapabilities.newInstance()
+        org.robolectric.Shadows.shadowOf(caps).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        org.robolectric.Shadows.shadowOf(cm).setNetworkCapabilities(cm.activeNetwork, caps)
+    }
+
     protected fun shot(name: String) {
         val dir = File(System.getProperty("screenshot.dir") ?: "build/screenshots", mode).apply { mkdirs() }
         compose.waitForIdle()
