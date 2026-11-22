@@ -88,14 +88,17 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             }
         }
 
-        /** Requests a pass soon (after sign-in, or when the app returns to the foreground). */
+        /**
+         * Requests a pass soon (app start, sign-in, playlist edits). No network constraint here:
+         * WorkManager's CONNECTED needs a *validated* network, which a LAN with only the demo server
+         * never is; without a connection the pass fails fast and retries with backoff.
+         */
         fun syncNow(context: Context) {
             if (BackendConfig.useFakeBackend) return
             runCatching {
                 WorkManager.getInstance(context).enqueueUniqueWork(
                     NOW, ExistingWorkPolicy.REPLACE,
                     OneTimeWorkRequestBuilder<SyncWorker>()
-                        .setConstraints(online)
                         .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                         .build()
                 )
