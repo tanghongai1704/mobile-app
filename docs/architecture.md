@@ -11,7 +11,7 @@ Ba layer Presentation–Domain–Data dùng MVVM/UDF; có 23 Gradle module leaf 
 - **domain:** Kotlin/JVM thuần; package theo auth/video/music/news/games/session. Models, contracts, policies và use cases cần thiết.
 - **data:video/music/news/games/auth:** repository implementations, mapping và source orchestration. Chỉ app chọn factory trả domain interface.
 - **core:common/designsystem/session:** shared presentation types, design tokens/components và coordinator cho phiên nội dung.
-- **core:media/database/datastore/network/sync:** Android/media/storage adapters; network chứa Retrofit/OkHttp và backend giả (`FakeApiInterceptor`); sync chạy `ReminderWorker` (WorkManager) cho nhắc nhiệm vụ. VideoSurface là phần hiển thị platform trong media adapter.
+- **core:media/database/datastore/network/sync:** Android/media/storage adapters; network chứa Retrofit/OkHttp, refresh token và backend giả (`FakeApiInterceptor`, chỉ bật khi không có `onespace.apiBaseUrl`); sync chạy `ReminderWorker` cho nhắc nhiệm vụ và `SyncWorker`/`SyncEngine` đồng bộ outbox event, nhiệm vụ, tiến độ và playlist (409 → gộp) với server thật. VideoSurface là phần hiển thị platform trong media adapter.
 
 Core là nhóm module theo vai trò, không phải layer thứ tư. Feature không import feature khác hoặc data implementation; Domain không phụ thuộc Android/framework/implementation. Xem matrix dependency đầy đủ ở Section 4.3.2.
 
@@ -52,9 +52,9 @@ AuthRepository (`RemoteAuthRepository` ở data:auth) gọi `AuthApi`; request/v
 
 ## Runtime đã có và giới hạn
 
-- Danh mục video/nhạc là dữ liệu mẫu; tin tức đi qua `NewsApi` với backend giả. Video/MP3 sample streams phát thật bằng Media3.
+- Video, nhạc, tin tức đi qua `CatalogApi`/`NewsApi` theo kiểu offline-first (Room là nguồn đọc của UI). Server trong `backend/` (Ktor, Exposed, Flyway, PostgreSQL hoặc H2) hiện thực cùng hợp đồng; backend giả trong app trả dữ liệu mẫu tương đương. Video/MP3 phát thật bằng Media3.
 - Hai engine dùng chung: video và audio, không tạo lại theo screen.
-- Room schema v6 (8 bảng, migration 5→6 giữ dữ liệu) lưu video progress/watchlist, điểm, nhiệm vụ, thư viện, cache tin (`news_articles`) và ván game dở (`game_snapshots`); checkpoint video định kỳ là 3 giây.
+- Room schema v7 (11 bảng, migration 5→6→7 giữ dữ liệu) lưu video progress/watchlist, điểm, nhiệm vụ, thư viện, cache tin (`news_articles`), cache video/nhạc (`catalog_items`), outbox event (`pending_events`), trạng thái đồng bộ playlist (`playlist_sync`) và ván game dở (`game_snapshots`); checkpoint video định kỳ là 3 giây.
 - DataStore lưu settings, interests, last section/track ID và phiên demo.
 - C1 có ba lựa chọn, nhớ global trên thiết bị, reset ở Settings.
 - Native splash, themed shell, auth/onboarding và graph navigation có baseline.
