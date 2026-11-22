@@ -413,9 +413,10 @@ class MeService(
     companion object {
         const val MAX_EVENT_POINTS = 100
         val DEFAULT_MISSIONS = listOf(
-            Triple("LISTEN", "Nghe 3 bài nhạc", 3),
-            Triple("PLAY", "Chơi 1 mini game", 1),
-            Triple("READ", "Đọc 2 bài báo", 2)
+            // Same three missions as the app (RoomMissionRepository) so both sides agree on progress.
+            Triple("LISTEN", "Nghe 1 bài nhạc", 1),
+            Triple("PLAY", "Thắng 1 ván game", 1),
+            Triple("READ", "Đọc 1 bài tin", 1)
         )
     }
 }

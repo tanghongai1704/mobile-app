@@ -1,6 +1,7 @@
 package com.example.onespace.data.games.repository
 
 import com.example.onespace.core.database.ContentDatabase
+import com.example.onespace.core.database.PendingEventEntity
 import com.example.onespace.core.database.PointEntryEntity
 import com.example.onespace.domain.session.model.PointEntry
 import com.example.onespace.domain.session.repository.PointRepository
@@ -21,7 +22,10 @@ class RoomPointRepository(
     }
 
     override suspend fun add(source: String, amount: Int) {
-        dao.insert(PointEntryEntity(source = source, amount = amount, timestamp = System.currentTimeMillis()))
+        val now = System.currentTimeMillis()
+        dao.insert(PointEntryEntity(source = source, amount = amount, timestamp = now))
+        // Queued for POST /me/events; the sync worker sends it once the user is signed in.
+        database.pendingEventDao().insert(PendingEventEntity(newEventId(), source, amount, missionType = null, createdAt = now))
     }
 
     override suspend fun spend(amount: Int, description: String): Boolean {
@@ -31,5 +35,7 @@ class RoomPointRepository(
         return true
     }
 }
+
+internal fun newEventId(): String = "evt_" + java.util.UUID.randomUUID().toString()
 
 fun createPointRepository(database: ContentDatabase): PointRepository = RoomPointRepository(database)

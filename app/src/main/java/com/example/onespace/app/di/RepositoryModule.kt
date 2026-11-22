@@ -6,7 +6,7 @@ import com.example.onespace.data.auth.createSecureTokenStore
 import com.example.onespace.data.auth.SecureTokenStore
 import com.example.onespace.data.news.createNewsFakeRoute
 import com.example.onespace.core.database.NewsArticleDao
-import com.example.onespace.core.network.AccessTokenProvider
+import com.example.onespace.core.network.SessionTokens
 import com.example.onespace.core.network.api.AuthApi
 import com.example.onespace.core.network.api.NewsApi
 import com.example.onespace.core.network.di.OfflineSimulation
@@ -88,7 +88,7 @@ object NetworkBindings {
     @Provides @Singleton
     fun tokens(@ApplicationContext context: android.content.Context): SecureTokenStore = createSecureTokenStore(context)
 
-    @Provides fun accessTokens(tokens: SecureTokenStore): AccessTokenProvider = tokens
+    @Provides fun sessionTokens(tokens: SecureTokenStore): SessionTokens = tokens
 
     @Provides @Singleton
     fun offlineSimulation(preferences: SessionPreferencesRepository): OfflineSimulation {
@@ -101,6 +101,10 @@ object NetworkBindings {
 
     @Provides @IntoSet fun newsRoute(): FakeRoute = createNewsFakeRoute()
     @Provides @IntoSet fun authRoute(): FakeRoute = createAuthFakeRoute()
+    @Provides @IntoSet fun videoRoute(): FakeRoute = com.example.onespace.data.video.createVideoFakeRoute()
+    @Provides @IntoSet fun musicRoute(): FakeRoute = com.example.onespace.data.music.createMusicFakeRoute()
+
+    @Provides fun playlistPort(port: AppPlaylistPort): com.example.onespace.core.sync.PlaylistPort = port
 }
 
 /** Composition root: the only place that chooses mock versus production repositories. */
@@ -115,8 +119,12 @@ object RepositoryModule {
     @Provides fun passwordSignIn(repository: AuthRepository) = SignInWithPassword(repository)
     @Provides fun guest(repository: AuthRepository) = ContinueAsGuest(repository)
     @Provides fun signOut(repository: AuthRepository) = SignOut(repository)
-    @Provides @Singleton fun videos(): VideoRepository = createVideoRepository()
-    @Provides @Singleton fun music(): MusicRepository = createMusicRepository()
+    @Provides @Singleton
+    fun videos(database: ContentDatabase, api: com.example.onespace.core.network.api.CatalogApi): VideoRepository =
+        createVideoRepository(database, api)
+    @Provides @Singleton
+    fun music(database: ContentDatabase, api: com.example.onespace.core.network.api.CatalogApi): MusicRepository =
+        createMusicRepository(database, api)
     @Provides @Singleton
     fun news(@ApplicationContext context: android.content.Context, dao: NewsArticleDao, api: NewsApi): NewsRepository =
         createNewsRepository(context, dao, api)

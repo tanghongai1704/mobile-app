@@ -16,10 +16,13 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":core:network"))
+    implementation(project(":core:database"))
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

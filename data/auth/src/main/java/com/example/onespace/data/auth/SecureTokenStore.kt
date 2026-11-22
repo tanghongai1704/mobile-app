@@ -4,7 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import com.example.onespace.core.network.AccessTokenProvider
+import com.example.onespace.core.network.SessionTokens
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -75,12 +75,14 @@ internal class SharedPreferencesBlobStore(context: Context) : BlobStore {
 class SecureTokenStore internal constructor(
     private val blobs: BlobStore,
     private val cipher: TokenCipher
-) : AccessTokenProvider {
+) : SessionTokens {
     @Volatile private var access: String? = blobs.read(ACCESS)?.let(cipher::decrypt)
     @Volatile private var refresh: String? = blobs.read(REFRESH)?.let(cipher::decrypt)
 
     override fun accessToken(): String? = access
-    fun refreshToken(): String? = refresh
+    override fun refreshToken(): String? = refresh
+
+    override fun update(accessToken: String, refreshToken: String) = save(accessToken, refreshToken)
 
     internal fun save(accessToken: String, refreshToken: String) {
         access = accessToken
@@ -89,7 +91,7 @@ class SecureTokenStore internal constructor(
         blobs.write(REFRESH, cipher.encrypt(refreshToken))
     }
 
-    internal fun clear() {
+    override fun clear() {
         access = null
         refresh = null
         blobs.write(ACCESS, null)

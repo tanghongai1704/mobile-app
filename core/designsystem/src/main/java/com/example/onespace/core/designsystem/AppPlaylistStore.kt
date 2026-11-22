@@ -129,6 +129,13 @@ object AppPlaylistStore {
 
     fun remove(name: String) { playlists = playlists - name; changed() }
 
+    /** Sets a whole playlist at once, e.g. the copy downloaded from the server by the sync worker. */
+    fun replace(playlist: AppPlaylist) {
+        if (playlist.name.isBlank()) return
+        playlists = playlists + (playlist.name to playlist)
+        changed()
+    }
+
     /** Removing one item keeps the playlist and its play order intact. */
     fun removeVideo(name: String, videoId: String) {
         val current = playlists[name] ?: return

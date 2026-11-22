@@ -62,4 +62,13 @@ interface MeApi {
 
     @GET("me/points")
     suspend fun points(): PointsDto
+
+    @GET("me/progress")
+    suspend fun progress(@Query("since") since: Long = 0): List<ProgressDto>
+
+    @PUT("me/progress/{itemId}")
+    suspend fun saveProgress(@Path("itemId") itemId: String, @Body body: ProgressUpdate): ProgressDto
+
+    @GET("me/missions/today")
+    suspend fun missionsToday(): List<MissionDto>
 }

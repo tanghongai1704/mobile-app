@@ -27,7 +27,7 @@ internal class MockVideoRepository : VideoRepository {
     private val muxHi = "https://stream.mux.com/DS00Spx1CV902MCtPj5WknGlR102V5HFkDe/high.mp4"
     private val muxLo = "https://stream.mux.com/DS00Spx1CV902MCtPj5WknGlR102V5HFkDe/low.mp4"
 
-    private val catalog = listOf(
+    internal val catalog = listOf(
         // ---- Thiên nhiên ----
         Video("v1", "Gần với thiên nhiên thêm chút", "OneSpace Studio", "1:00", bunny, "Thiên nhiên"),
         Video("v7", "Nắng xuyên tán lá sớm", "Góc xanh", "0:10", je360, "Thiên nhiên"),

@@ -37,7 +37,10 @@ data class VideoDto(
     val creator: String,
     val duration: Int,
     val url: String,
-    val thumbnail: String? = null
+    val thumbnail: String? = null,
+    val topic: String = "",
+    /** "m:ss" as shown in the UI; [duration] is the same value in seconds. */
+    val durationLabel: String = ""
 )
 
 @Serializable
@@ -47,7 +50,10 @@ data class TrackDto(
     val artist: String,
     val album: String? = null,
     val duration: Int,
-    val url: String
+    val url: String,
+    val durationLabel: String = "",
+    val lyrics: List<String> = emptyList(),
+    val bpm: Int? = null
 )
 
 @Serializable
@@ -86,11 +92,35 @@ data class PlaylistDto(
 data class EventDto(
     val eventId: String,
     val source: String,
-    val amount: Int
+    val amount: Int,
+    /** LISTEN | READ | PLAY when the action also counts toward today's mission. */
+    val missionType: String? = null
 )
 
 @Serializable
-data class PointsDto(val balance: Int)
+data class PointEntryDto(val source: String, val amount: Int, val createdAt: Long)
+
+@Serializable
+data class PointsDto(val balance: Int, val entries: List<PointEntryDto> = emptyList())
+
+/** Playback position of one item; [version] guards against older writes from another device. */
+@Serializable
+data class ProgressDto(val itemId: String, val positionMs: Long, val version: Int = 0, val updatedAt: Long = 0L)
+
+@Serializable
+data class ProgressUpdate(val positionMs: Long, val version: Int? = null)
+
+@Serializable
+data class MissionDto(
+    val id: String,
+    val title: String,
+    val targetType: String,
+    val target: Int,
+    val progress: Int,
+    val completed: Boolean,
+    val date: String,
+    val version: Int = 0
+)
 
 /** Every error response shares this envelope: `{ "error": { code, message, details } }`. */
 @Serializable

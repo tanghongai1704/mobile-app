@@ -74,5 +74,5 @@ internal class MockMusicRepository : MusicRepository {
 
     /** Beat data for the first twenty songs: Beat Tiles is only offered for songs that have it. */
     private val tempos = listOf(92, 100, 108, 116, 124, 132)
-    private val catalog = rawCatalog.mapIndexed { i, t -> if (i < 20) t.copy(bpm = tempos[i % tempos.size]) else t }
+    internal val catalog = rawCatalog.mapIndexed { i, t -> if (i < 20) t.copy(bpm = tempos[i % tempos.size]) else t }
 }

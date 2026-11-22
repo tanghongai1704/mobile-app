@@ -3,8 +3,10 @@ package com.example.onespace.core.network.di
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import com.example.onespace.core.network.AccessTokenProvider
 import com.example.onespace.core.network.AuthHeaderInterceptor
+import com.example.onespace.core.network.BuildConfig
+import com.example.onespace.core.network.SessionTokens
+import com.example.onespace.core.network.TokenRefreshAuthenticator
 import com.example.onespace.core.network.api.AuthApi
 import com.example.onespace.core.network.api.CatalogApi
 import com.example.onespace.core.network.api.MeApi
@@ -22,6 +24,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -30,8 +33,17 @@ fun interface OfflineSimulation {
     fun isSimulatingOffline(): Boolean
 }
 
-/** Base URL of the designed backend; the fake interceptor answers it until the server exists. */
-const val API_BASE_URL = "https://api.onespace.app/v1/"
+/** Placeholder host answered in-process by the fake backend; no request leaves the device. */
+const val FAKE_API_BASE_URL = "https://api.onespace.app/v1/"
+
+/**
+ * Which backend the app talks to, fixed at build time (`-Ponespace.apiBaseUrl=...`, see README).
+ * The fake backend is the default so the app runs without a server.
+ */
+object BackendConfig {
+    val useFakeBackend: Boolean = BuildConfig.USE_FAKE_BACKEND
+    val baseUrl: String = if (useFakeBackend) FAKE_API_BASE_URL else BuildConfig.API_BASE_URL.let { if (it.endsWith("/")) it else "$it/" }
+}
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -51,19 +63,32 @@ object NetworkModule {
     fun okHttp(
         @ApplicationContext context: Context,
         routes: Set<@JvmSuppressWildcards FakeRoute>,
-        tokens: AccessTokenProvider,
+        tokens: SessionTokens,
         simulation: OfflineSimulation
-    ): OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .addInterceptor(AuthHeaderInterceptor(tokens))
-        // Must stay last: it terminates the chain instead of opening a socket.
-        .addInterceptor(FakeApiInterceptor(routes, isOnline = { !simulation.isSimulatingOffline() && context.isOnline() }))
-        .build()
+    ): OkHttpClient {
+        val builder = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .addInterceptor(AuthHeaderInterceptor(tokens))
+        if (BackendConfig.useFakeBackend) {
+            // Must stay last: it terminates the chain instead of opening a socket.
+            builder.addInterceptor(FakeApiInterceptor(routes, isOnline = { !simulation.isSimulatingOffline() && context.isOnline() }))
+            return builder.build()
+        }
+        // Real server: the demo "offline" switch still cuts every call.
+        builder.addInterceptor { chain ->
+            if (simulation.isSimulatingOffline()) throw IOException("Simulated offline")
+            chain.proceed(chain.request())
+        }
+        lateinit var client: OkHttpClient
+        builder.authenticator(TokenRefreshAuthenticator(BackendConfig.baseUrl, tokens, { client }))
+        client = builder.build()
+        return client
+    }
 
     @Provides @Singleton
     fun retrofit(client: OkHttpClient, json: Json): Retrofit = Retrofit.Builder()
-        .baseUrl(API_BASE_URL)
+        .baseUrl(BackendConfig.baseUrl)
         .client(client)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()

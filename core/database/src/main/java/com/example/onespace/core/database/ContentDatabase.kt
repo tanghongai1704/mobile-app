@@ -59,6 +59,10 @@ interface VideoProgressDao {
 
     @Query("DELETE FROM video_progress WHERE videoId = :videoId")
     suspend fun delete(videoId: String)
+
+    /** Rows written after [since] (epoch ms), oldest first: what the sync worker still has to upload. */
+    @Query("SELECT * FROM video_progress WHERE updatedAt > :since ORDER BY updatedAt ASC")
+    suspend fun changedSince(since: Long): List<VideoProgressEntity>
 }
 
 @Dao
@@ -208,6 +212,93 @@ interface GameSnapshotDao {
     suspend fun delete(gameId: String)
 }
 
+/** Offline-first cache of the video and music catalogue (`type` = video | music). */
+@Entity(tableName = "catalog_items")
+data class CatalogItemEntity(
+    @PrimaryKey val id: String,
+    val type: String,
+    val title: String,
+    val creator: String,
+    val duration: String,
+    val url: String,
+    val topic: String,
+    /** Lyric lines as a JSON array; "[]" when there are none. */
+    val lyricsJson: String,
+    val bpm: Int?,
+    val sortOrder: Int,
+    val cachedAt: Long
+)
+
+@Dao
+interface CatalogItemDao {
+    @Query("SELECT * FROM catalog_items WHERE type = :type ORDER BY sortOrder ASC")
+    fun observeByType(type: String): Flow<List<CatalogItemEntity>>
+
+    @Query("SELECT COUNT(*) FROM catalog_items WHERE type = :type")
+    suspend fun count(type: String): Int
+
+    @Query("SELECT * FROM catalog_items WHERE id = :id")
+    suspend fun find(id: String): CatalogItemEntity?
+
+    @Upsert
+    suspend fun upsertAll(items: List<CatalogItemEntity>)
+
+    @Query("DELETE FROM catalog_items WHERE type = :type AND id NOT IN (:keepIds)")
+    suspend fun deleteAllExcept(type: String, keepIds: List<String>)
+}
+
+/**
+ * Outbox of scored actions not yet sent to `POST /me/events`. [eventId] is created on the device,
+ * so the server counts a retried event once.
+ */
+@Entity(tableName = "pending_events")
+data class PendingEventEntity(
+    @PrimaryKey val eventId: String,
+    val source: String,
+    val amount: Int,
+    val missionType: String?,
+    val createdAt: Long
+)
+
+@Dao
+interface PendingEventDao {
+    @Query("SELECT * FROM pending_events ORDER BY createdAt ASC LIMIT :limit")
+    suspend fun oldest(limit: Int): List<PendingEventEntity>
+
+    @Query("SELECT COUNT(*) FROM pending_events")
+    fun observeCount(): Flow<Int>
+
+    @Upsert
+    suspend fun insert(event: PendingEventEntity)
+
+    @Query("DELETE FROM pending_events WHERE eventId = :eventId")
+    suspend fun delete(eventId: String)
+}
+
+/** Server id and version of each playlist the device has synced; [itemsHash] detects local edits. */
+@Entity(tableName = "playlist_sync")
+data class PlaylistSyncEntity(
+    @PrimaryKey val name: String,
+    val remoteId: String,
+    val version: Int,
+    val itemsHash: String
+)
+
+@Dao
+interface PlaylistSyncDao {
+    @Query("SELECT * FROM playlist_sync")
+    suspend fun all(): List<PlaylistSyncEntity>
+
+    @Upsert
+    suspend fun upsert(state: PlaylistSyncEntity)
+
+    @Query("DELETE FROM playlist_sync WHERE name = :name")
+    suspend fun delete(name: String)
+
+    @Query("DELETE FROM playlist_sync")
+    suspend fun clear()
+}
+
 @Database(
     entities = [
         VideoProgressEntity::class,
@@ -217,9 +308,12 @@ interface GameSnapshotDao {
         ExtractedAudioEntity::class,
         DownloadedContentEntity::class,
         NewsArticleEntity::class,
-        GameSnapshotEntity::class
+        GameSnapshotEntity::class,
+        CatalogItemEntity::class,
+        PendingEventEntity::class,
+        PlaylistSyncEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class ContentDatabase : RoomDatabase() {
@@ -231,4 +325,7 @@ abstract class ContentDatabase : RoomDatabase() {
     abstract fun dailyMissionDao(): DailyMissionDao
     abstract fun newsArticleDao(): NewsArticleDao
     abstract fun gameSnapshotDao(): GameSnapshotDao
+    abstract fun catalogItemDao(): CatalogItemDao
+    abstract fun pendingEventDao(): PendingEventDao
+    abstract fun playlistSyncDao(): PlaylistSyncDao
 }

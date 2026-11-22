@@ -2,6 +2,7 @@ package com.example.onespace.data.games.repository
 
 import com.example.onespace.core.database.ContentDatabase
 import com.example.onespace.core.database.DailyMissionEntity
+import com.example.onespace.core.database.PendingEventEntity
 import com.example.onespace.domain.session.model.DailyMission
 import com.example.onespace.domain.session.model.MissionType
 import com.example.onespace.domain.session.repository.MissionRepository
@@ -27,6 +28,10 @@ class RoomMissionRepository(
         val newProgress = target.progress + 1
         val completed = newProgress >= target.target
         dao.updateProgress(target.id, today, newProgress, completed)
+        // The server keeps its own copy of today's missions; this event (0 points) moves it too.
+        database.pendingEventDao().insert(
+            PendingEventEntity(newEventId(), "mission_${type.name.lowercase()}", 0, type.name, System.currentTimeMillis())
+        )
         return DailyMission(
             id = target.id, title = target.title,
             targetType = MissionType.valueOf(target.targetType),
