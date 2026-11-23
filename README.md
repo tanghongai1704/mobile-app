@@ -122,6 +122,8 @@ Mở root bằng Android Studio, Sync Gradle, chọn run configuration **OneSpac
 
 NavigationSmokeTest kiểm tra các tab, media, player overlay, settings/offline, bookmark, email/OTP và recreate trong luồng auth. Mạng cần cho sample streams; backend giả và fonts nằm trong app nên auth/tin tức không cần server.
 
+**Bản release để demo**: `./gradlew :app:assembleRelease` (thêm `-Ponespace.apiBaseUrl=...` cho bản nối server). APK khoảng 6 MB (R8), ký bằng khoá debug để cài thẳng. Kịch bản, chuẩn bị và phương án dự phòng: [docs/demo.md](docs/demo.md).
+
 ## Kiểm tra nhanh trên máy (trước khi demo)
 
 1. **Tin offline**: mở tab Tin → bật chế độ máy bay (hoặc "Mô phỏng mất mạng") → tắt hẳn app → mở lại: tin vẫn hiện.
