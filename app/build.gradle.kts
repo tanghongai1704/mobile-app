@@ -28,6 +28,9 @@ android {
 
     buildTypes {
         release {
+            // Demo builds only: signed with the local debug key so the APK installs directly.
+            // A store release would use its own upload key here.
+            signingConfig = signingConfigs.getByName("debug")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
